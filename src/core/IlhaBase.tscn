@@ -1,0 +1,3 @@
+-   **`IlhaBase.tscn`:**
+    -   **Estrutura:** Um nó `Node3D` com o script `Ilha.cs` anexado.
+    -   **Propósito:** Todas as ilhas do mapa herdarão desta cena.

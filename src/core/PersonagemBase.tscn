@@ -1,0 +1,3 @@
+-   **`PersonagemBase.tscn`:**
+    -   **Estrutura:** Um nó `CharacterBody3D` com o script `Personagem.cs` anexado.
+    -   **Propósito:** Todos os personagens do jogo (Guerreiro, Artesão) serão **cenas herdadas** desta.
