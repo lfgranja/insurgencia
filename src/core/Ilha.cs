@@ -1,0 +1,4 @@
+-   **`Ilha.cs`:**
+    -   **Propósito:** Define uma ilha no mapa.
+    -   **Propriedades:** `listaDeDesafios`, `estaConquistada`.
+    -   **Métodos Abstratos:** `IniciarIlha()`, `VerificarCondicaoDeVitoria()`.
