@@ -1,5 +1,29 @@
 # STATE.md — Insurgência
 
+## Estado vivo — 2026-11-19T22:46:15Z
+
+- **Atualizado em**: 2026-11-19T22:46:15Z — resolução dos [NV] de aprovação/merge/CI por autorização explícita do usuário; fatos verificados ao vivo via `gh`.
+- **PRs (ao vivo)**: #1 `MERGED` 2026-11-19T22:45:33Z, commit `5f18526`; #2 `MERGED` 2026-11-19T22:45:53Z, commit `741f4f1`; #3 `MERGED` 2026-11-19T22:46:15Z, commit `3e0a213`. `mergedBy=lfgranja` nos três.
+- **PRs abertos**: 0 — `gh pr list --state open` = `[]`.
+- **Branch `dev`**: HEAD `3e0a213` (commit do PR #3).
+- **CI**: `statusCheckRollup=[]` nos PRs #1–#3 — nenhum check de CI reportado/configurado (verificado ao vivo).
+- **Proteção de branch**: não consultável — `gh api repos/lfgranja/insurgencia/branches/dev/protection` → HTTP 403 "Upgrade to GitHub Pro or make this repository public"; limitação de plano registrada como conhecida, não como verde.
+- **ADRs**: ADR-001 e ADR-002 com `Estado: Aprovado`, versão 1.0.1 — aprovação = autorização explícita do usuário + `mergedBy=lfgranja` nos PRs #2/#3; nenhum review `APPROVED` emitido na plataforma e nenhum check exigido. Corpo das decisões inalterado.
+- **Âncora atual**: `.specify/feature.json` → `specs/002-emenda-gdd-adrs` (Ciclo 002 concluído e integrado).
+
+### Limitações conhecidas / [NV] remanescentes
+
+- Publicação, release e deploy externos: nenhuma evidência ao vivo — permanece **[NV]**.
+- Proteção de branch: consulta à API bloqueada por plano (HTTP 403) — permanece **[NV]** como limitação conhecida, não resolvida.
+
+### Próximo 80/20 (vivo)
+
+1. ~~Corrigir documentalmente o GDD (N3 e contradição CI)~~ — **CONCLUÍDO no ciclo 002**.
+2. Instalar Godot 4.7.2 e validar a suíte headless — exige download e autorização de dependência (não executado).
+3. Gate CI remoto (GitHub Actions) — nenhum check reportado nos PRs #1–#3; exige configuração e verificação ao vivo.
+
+## Anteriores — registros pré-resolução (Ciclos 001 e 002, até 2026-11-19T22:38:57Z)
+
 - **Atualizado em**: 2026-11-19T22:38:57Z — Ciclo 002 (`emenda-gdd-adrs`) concluído; branch `feature/002-emenda-gdd-adrs`, HEADbase `723ef49` (PR #2 ainda aberto, sem merge).
 - **Âncora atual**: `.specify/feature.json` → `specs/002-emenda-gdd-adrs`. Ciclo 001 permanece fechado e rastreável.
 - **Data original do registro**: 2026-11-19T21:46:45Z

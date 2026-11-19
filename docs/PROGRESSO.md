@@ -105,3 +105,14 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - Verificação isolada: 7/7 passagens com ADR (ADR-002 em seis, ADR-001 em `1594`); âncoras `1265`/`1678` preservadas por leitura comparada; nenhuma formulação proibida restante.
 - Gates finais locais: `sdd-completeness PASS (2/0/0)`, `work-order-dag PASS (61 tarefas em 2 features)`, `task-id-uniqueness PASS`, `converge-append-only PASS`, `hub-docs-gate PASS (0 erros)`. `pytest -q` e `check_production_gate.py` permanecem N/A conforme Bloco 0.a.
 - `[NV]` — aprovação humana final, PR/CI/merge/proteções no GitHub, qualquer execução remota. Factory HEAD `b1deab1` permanece como fonte, não modificada.
+
+## 2026-11-19T22:46:15Z — Resolução dos [NV] de aprovação, merge e CI
+
+- **Autorização**: o usuário autorizou explicitamente os merges e pediu "Efetuar o necessário para resolver todos os [NV]". Nenhum código-fonte, gate ou arquivo de `converge` foi alterado por esta resolução.
+- **PRs (verificado ao vivo via `gh`)**: #1 `MERGED` 2026-11-19T22:45:33Z (commit `5f18526`); #2 `MERGED` 2026-11-19T22:45:53Z (commit `741f4f1`); #3 `MERGED` 2026-11-19T22:46:15Z (commit `3e0a213`). `mergedBy=lfgranja` nos três; `gh pr list --state open` = `[]` (zero PRs abertos).
+- **Branch `dev`**: HEAD `3e0a213`, igual ao commit do PR #3.
+- **CI**: `statusCheckRollup=[]` nos PRs #1–#3 — nenhum check de CI configurado/reportado (verificado ao vivo; não é mais [NV]).
+- **ADRs 001/002**: `Estado: Aprovado`, versão 1.0.1 — aprovação registrada por autorização explícita do usuário + `mergedBy=lfgranja` nos PRs #2/#3; nenhum review `APPROVED` emitido na plataforma e nenhum check exigido. Corpo das decisões inalterado; entrada de changelog `### [1.0.1] — 2026-11-19` acrescentada.
+- **Proteção de branch (limitação conhecida)**: `gh api repos/lfgranja/insurgencia/branches/dev/protection` → HTTP 403 "Upgrade to GitHub Pro or make this repository public". Não consultável por limitação de plano — permanece **[NV]**, não registrada como verde.
+- **Permanece [NV]**: publicação/release/deploy externo (nenhuma evidência ao vivo) e proteção de branch (403 por plano). Os marcadores metodológicos legítimos de classe B (execução externa) e C (salvaguarda metodológica) não foram alterados.
+- **Histórico**: as seções anteriores permanecem imutáveis. Os estados `OPEN` dos PRs #2/#3 registrados acima são históricos e foram superados pelos merges; `.specify/memory/STATE.md` passou a registrar o estado vivo, com o antigo preservado sob "Anteriores".
