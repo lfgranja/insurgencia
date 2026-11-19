@@ -1,0 +1,12 @@
+{
+  "_provenance": {
+    "origem": "alvo-local",
+    "repo": "lfgranja/insurgencia",
+    "head": "a5e4131",
+    "data": "2026-11-19",
+    "metodo": "derived-from: python3 scripts/ci/check_sdd_completeness.py --json",
+    "factory_utilizada": false,
+    "nota": "Mapa vazio: nenhuma lacuna historica legitima identificada no estado verificado. Feature 003 (release/validate) sao artefatos de portaria R4/R7, nao lacuna baselinavel."
+  },
+  "allow_missing": {}
+}
