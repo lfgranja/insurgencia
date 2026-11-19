@@ -2,8 +2,8 @@
 
 - **ID**: ADR-002
 - **Data**: 2026-11-19
-- **Versão**: 1.0.0
-- **Estado**: Pendente de aprovação
+- **Versão**: 1.0.1
+- **Estado**: Aprovado
 
 ## Contexto
 
@@ -42,7 +42,7 @@ A decisão Godot-first, registrada em `docs/GDD - Insurgência.md:1265,1678` (su
 
 ## Autoridade de aprovação
 
-O maintainer do projeto é a autoridade de aprovação destes registros; a aprovação humana é necessária para que a decisão deixe a condição de pendente. A ausência de registro humano de aprovação mantém este ADR no estado `Pendente de aprovação`, não como aprovação obtida. Todo status remoto permanece `[NV]` até confirmação ao vivo: aprovação registrada em plataforma remota `[NV]`, execução de integração contínua `[NV]`, merge `[NV]` e proteção de branch `[NV]`. Nenhum critério de sucesso deste ciclo depende de status remoto.
+O maintainer do projeto é a autoridade de aprovação destes registros; a aprovação humana é necessária para que a decisão deixe a condição de pendente. Registro de aprovação: aprovada pelo maintainer lfgranja (autorização explícita + merges dos PRs #2/#3 em 2026-11-19); nenhum review APPROVED emitido na plataforma, e nenhum check exigido. Integração contínua: nenhum check de CI reportado (statusCheckRollup=[] nos PRs #1–#3, verificado ao vivo). A proteção de branch permanece `[NV]` por limitação de plano (HTTP 403 na API do GitHub), registrada como limitação conhecida. Nenhum critério de sucesso deste ciclo depende de status remoto.
 
 ## Rastreabilidade
 
@@ -54,6 +54,10 @@ O maintainer do projeto é a autoridade de aprovação destes registros; a aprov
 As referências acima são as únicas aplicáveis a este registro, conforme a matriz do contrato (§2.3). Os demais desvios da avaliação de stack não se aplicam a este ADR e não são incluídos.
 
 ## Histórico de versões
+
+### [1.0.1] — 2026-11-19
+
+- Aprovado pelo maintainer lfgranja: autorização explícita do usuário em 2026-11-19 + `mergedBy=lfgranja` nos PRs #2/#3 (merges em 2026-11-19). Estado alterado de `Pendente de aprovação` para `Aprovado`; nenhum review `APPROVED` emitido na plataforma e nenhum check de CI exigido (`statusCheckRollup=[]` nos PRs #1–#3). Corpo da decisão inalterado.
 
 ### [1.0.0] — 2026-11-19
 
