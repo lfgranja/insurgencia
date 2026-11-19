@@ -1,0 +1,14 @@
+{
+  "schema_version": "087.1.0",
+  "enforce_unbaselined": true,
+  "files": {},
+  "_provenance": {
+    "origem": "alvo-local",
+    "repo": "lfgranja/insurgencia",
+    "head": "a5e4131",
+    "data": "2026-11-19",
+    "metodo": "python3 scripts/ci/check_converge_append_only.py --bootstrap",
+    "factory_utilizada": false,
+    "nota": "Nenhum converge.md existe no alvo; mapa vazio e honesto. Ratchet permanece ativo: qualquer converge.md futuro sem entrada no baseline falha."
+  }
+}

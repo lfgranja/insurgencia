@@ -116,3 +116,13 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - **Proteção de branch (limitação conhecida)**: `gh api repos/lfgranja/insurgencia/branches/dev/protection` → HTTP 403 "Upgrade to GitHub Pro or make this repository public". Não consultável por limitação de plano — permanece **[NV]**, não registrada como verde.
 - **Permanece [NV]**: publicação/release/deploy externo (nenhuma evidência ao vivo) e proteção de branch (403 por plano). Os marcadores metodológicos legítimos de classe B (execução externa) e C (salvaguarda metodológica) não foram alterados.
 - **Histórico**: as seções anteriores permanecem imutáveis. Os estados `OPEN` dos PRs #2/#3 registrados acima são históricos e foram superados pelos merges; `.specify/memory/STATE.md` passou a registrar o estado vivo, com o antigo preservado sob "Anteriores".
+
+## 2026-11-19T23:37:11Z — Ciclo 003 (baseline-governanca) implementado
+
+- Branch `feature/003-baseline-governanca` a partir de `dev`=`a5e4131`; NNN=003 resolvido por `create-new-feature.sh`, não pelo nome do branch.
+- Três baselines LOCAIS materializados em `docs/governance/`: `sdd-completeness-baseline.json`, `converge-append-only-baseline.json` e `task-id-uniqueness-baseline.json`, com `_provenance` origem `alvo-local`, head `a5e4131`, `factory_utilizada=false`. Nenhum baseline da factory foi copiado.
+- Mapas vazios registrados honestamente: nenhuma lacuna histórica legítima, nenhum `converge.md` e nenhuma duplicata de `T###`; ratchet permanece ativo para o futuro.
+- 12 FRs, 8 SCs, 36 tarefas `[X]`; RG-1/RG-5 condicionais não executados (estado atual com mapas vazios); RG-2/RG-3/RG-4 executados como prova de ratchet.
+- Analyze READ-ONLY: 6 achados corrigidos em 3 rodadas; 0 achados pendentes na revalidação final.
+- Gates locais: `sdd-completeness PASS (3/0/0)`, `work_order_dag PASS (97 tarefas/3 features)`, `task-id-uniqueness PASS`, `converge-append-only PASS`, `hub_docs_gate PASS (0 erros)`. `pytest -q` (exit 5) e `check_production_gate.py` (exit 2) permanecem N/A por decisão do Bloco 0.a.
+- Ressalva: `baselined=0` permanece nos gates cujos mapas estão vazios; a prova é arquivo presente + saída colada em R4 + cenários de ratchet recusados, não contagem de entradas.

@@ -1,0 +1,13 @@
+{
+  "schema": "087.1.0",
+  "allow_duplicates": {},
+  "_provenance": {
+    "origem": "alvo-local",
+    "repo": "lfgranja/insurgencia",
+    "head": "a5e4131",
+    "data": "2026-11-19",
+    "metodo": "derived-from: python3 scripts/ci/check_task_id_uniqueness.py --json (specs_with_duplicates=0)",
+    "factory_utilizada": false,
+    "nota": "Nenhuma duplicata de T### encontrada; mapa vazio e honesto. Tolerancia zero registrada como politica."
+  }
+}
