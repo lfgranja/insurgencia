@@ -1,10 +1,12 @@
 # STATE.md — Insurgência
 
-- **Data**: 2026-11-19T21:46:45Z
-- **Âncora**: `specs/001-excecao-linguagem-licenca-nucleo` (`.specify/feature.json`)
-- **Ciclo**: 001 — exceção de linguagem e licença MIT-only do Núcleo (R1 `go`, R4 aprovado, R7 1.0.0)
-- **Branch**: `feature/001-excecao-linguagem-licenca-nucleo` (sem merge)
-- **HEAD base**: `6e25758` (`main`); factory HEAD como fonte: `b1deab15f482dd85871cd6c6a857ad710b89e2a6`
+- **Atualizado em**: 2026-11-19T22:38:57Z — Ciclo 002 (`emenda-gdd-adrs`) concluído; branch `feature/002-emenda-gdd-adrs`, HEADbase `723ef49` (PR #2 ainda aberto, sem merge).
+- **Âncora atual**: `.specify/feature.json` → `specs/002-emenda-gdd-adrs`. Ciclo 001 permanece fechado e rastreável.
+- **Data original do registro**: 2026-11-19T21:46:45Z
+- **Âncora anterior**: `specs/001-excecao-linguagem-licenca-nucleo`
+- **Ciclo anterior**: 001 — exceção de linguagem e licença MIT-only do Núcleo (R1 `go`, R4 aprovado, R7 1.0.0)
+- **Branch anterior**: `feature/001-excecao-linguagem-licenca-nucleo` (sem merge)
+- **HEAD base original**: `6e25758` (`main`); factory HEAD como fonte: `b1deab15f482dd85871cd6c6a857ad710b89e2a6`
 - **Gate autoritativo do alvo**: `scripts/ci/` local; `check_production_gate.py --check` é N/A por decisão de governança do Bloco 0.a (factory é fonte, não autoridade)
 
 ## Gates locais (execução final)
@@ -36,6 +38,6 @@
 
 ## Próximo 80/20 (fora deste ciclo)
 
-1. Corrigir documentalmente o GDD (N3 e contradição CI) com base nos ADRs aprovados.
+1. ~~Corrigir documentalmente o GDD (N3 e contradição CI) com base nos ADRs~~ — **CONCLUÍDO no ciclo 002** (7 passagens emendadas); mantido como histórico.
 2. Instalar Godot 4.7.2 e validar a suíte headless — exige download e autorização de dependência.
 3. Gate CI remoto (GitHub Actions) — exige autorização e verificação ao vivo.

@@ -87,3 +87,21 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - Gates finais locais: `check_sdd_completeness PASS (1/0/0)`, `check_work_order_dag PASS (35 tarefas)`, `check_task_id_uniqueness PASS`, `check_converge_append_only PASS`, `hub_docs_gate PASS (0 erros)`. `pytest -q` = `no tests ran` (exit 5, N/A — sem suíte no alvo). `check_production_gate.py --check` = N/A por decisão do Bloco 0.a.
 - Entregáveis: `docs/adr/001-excecao-linguagem-gdscript.md`, `docs/adr/002-licenca-mit-nucleo.md`, R4 em `.specify/validations/`, R7 (1.0.0) em `.specify/releases/`.
 - `[NV]` — aprovação humana dos ADRs, PR/CI/merge/proteções no GitHub, qualquer execução remota.
+
+## 2026-11-19T22:11:07Z — Reavaliação pós-ciclo-001 (Blocos 2–4)
+
+- Recontagem por `find`: specs=1; assessments=176; validations=1; releases=1; bugs=0; docs/*.md=35. Comparação: `OBJETIVO.md`, `ROADMAP.md`, este `PROGRESSO.md` e `docs/research/index.md` descrevem o estado anterior (28 docs, 175 assessments); as diferenças são exatamente os artefatos criados no ciclo 001 e nesta reavaliação. Nenhuma contagem foi inventada; números anteriores permanecem como histórico.
+- Âncora real: `.specify/feature.json` → `specs/001-excecao-linguagem-licenca-nucleo`; branch `feature/001-...`, HEAD `723ef49`. Nenhum ciclo em voo: R4 e R7 materializados, PR #2 `OPEN` **[NV]** para checks/merge.
+- 4 checkers SDD PASS (`spec_dirs=1 gaps=0`; `tasks=35 cycles=0`; `duplicates=0`; `files=0`). Nenhum gate RED; autorizo abrir o próximo ciclo.
+- Auditória (Bloco 2): funciona — gates locais, ADRs, R4/R7, 35 tarefas `[X]`; não funciona — aprovação humana dos ADRs pendente, baseline de governança ausente, verdes com `baselined=0/edges=0/files=0`; não implementado — código, Godot instalado, CI, telemetria, banco, deploy; não faz — importar gate da factory, merge cego, afirmar remoto sem `[NV]`.
+- Divergências do GDD mapeadas para emenda pontual: N3 (1659, 1668, 1673), licenciamento (1451, 1459), CI (1594) e ressalva AGPL de terceiro (1389). Âncoras Godot-first (1265, 1678) NÃO serão tocadas.
+- `[NV]` — checks de CI, merge, proteções, aprovações remotas; nada foi reconsultado além do estado do PR registrado no ciclo 001.
+
+## 2026-11-19T22:38:57Z — Ciclo 002 concluído (Blocos 5–8)
+
+- 80/20 escolheu a emenda do GDD a partir dos ADRs (score 125,0); Godot install e CI remoto ficaram DEFER por exigirem autorização de dependência/acesso remoto.
+- Branch `feature/002-emenda-gdd-adrs` (NNN=002 por `create-new-feature.sh`, nunca pelo nome do branch), derivada de `feature/001-...` — PR dependente do PR #2, sem merge.
+- Ciclo completo: intake→research→define→shape→decide(go)→specify→clarify(3 Q/A)→plan→checklist(50)→tasks(26)→analyze(4 achados + 6º residual)→implement(7 emendas no GDD, 26/26 `[X]`)→converge(sem gaps)→R4→R7(1.0.0).
+- Verificação isolada: 7/7 passagens com ADR (ADR-002 em seis, ADR-001 em `1594`); âncoras `1265`/`1678` preservadas por leitura comparada; nenhuma formulação proibida restante.
+- Gates finais locais: `sdd-completeness PASS (2/0/0)`, `work-order-dag PASS (61 tarefas em 2 features)`, `task-id-uniqueness PASS`, `converge-append-only PASS`, `hub-docs-gate PASS (0 erros)`. `pytest -q` e `check_production_gate.py` permanecem N/A conforme Bloco 0.a.
+- `[NV]` — aprovação humana final, PR/CI/merge/proteções no GitHub, qualquer execução remota. Factory HEAD `b1deab1` permanece como fonte, não modificada.
