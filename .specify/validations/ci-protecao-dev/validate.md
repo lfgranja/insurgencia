@@ -118,8 +118,8 @@ cmp 5/5 OK (intake, research, problem, concept, decision); artefatos=10/10; tare
 
 ### Nome do check e proteção — observação ao vivo (SC-003, SC-004, SC-005)
 
-[NV] neste ponto: nome do check e proteção serão observados após o merge do PR na interface/API do GitHub. Nenhuma afirmação remota é feita antes dessa execução.
-Se o check não aparecer ou a API recusar (HTTP 403), registrar a limitação e manter `[NV]`.
+2026-11-20T00:39:04Z — `gh run list --workflow ci-gates.yml --limit 5`: 2 execuções `completed/success` (dev push `44647526469` às 00:38:55Z; PR pull_request `44647520124` às 00:38:52Z, 8s cada).
+`gh api repos/lfgranja/insurgencia/commits/dev/check-runs`: `{"conclusion":"success","name":"gates","status":"completed"}`.
+2026-11-20T00:40:18Z — `gh api .../branches/dev/protection`: `contexts=["gates"]`, `checks=[{"context":"gates","app_id":15368}]`, `strict=true`, `enforce_admins=false`, `allow_force_pushes=false`, `allow_deletions=false`. Proteção aplicada por comando executado e verificada por leitura de API.
 
-R4 aprovado somente após a colagem das saídas acima com data/hora. Nenhuma afirmação remota foi usada
-para aprovar este artefato; execução de CI, nome de check, merge e proteção permanecem `[NV]`.
+R4 aprovado com gates locais, execução de CI observada ao vivo e proteção verificada por API. Permanece `[NV]` apenas a publicação/release/deploy externo (não autorizado); nenhum merge automático, force-push ou deleção foi habilitado.

@@ -1,22 +1,20 @@
 # STATE.md — Insurgência
 
-## Estado vivo — 2026-11-20T00:09:52Z (consolidação final)
+## Estado vivo — 2026-11-20T00:40:18Z (CI remoto e proteção verificados)
 
-- **Atualizado em**: 2026-11-20T00:09:52Z — todos os branches locais mesclados em `dev`, zero PRs abertos, gates locais PASS; trabalho restante depende de autorização humana/SE.
-- **Branch `dev`**: HEAD `f8c98e6` (merge do PR #6, ciclo 004). PRs #1 `5f18526`, #2 `741f4f1`, #3 `3e0a213`, #4 `a5e4131`, #5 `f5a6b32`, #6 `f8c98e6` — todos `MERGED`, `mergedBy=lfgranja`.
-- **CI**: `statusCheckRollup=[]` em todos os PRs — nenhum check configurado/reportado (verificado ao vivo).
-- **Proteção de branch**: API HTTP 403 por plano do repositório; permanece **[NV]** como limitação conhecida, não afirmada como verde.
-- **ADRs**: ADR-001/002 `Aprovado` v1.0.1; âncora de feature: `.specify/feature.json` → `specs/004-verifica-nv-externa` (ciclo 004 concluído e integrado).
-- **Ciclos concluídos**: 001 (governança/ADRs), 002 (emenda do GDD), NV (resolução de marcadores verificáveis), 003 (baselines locais), 004 (verificação externa de 12 fatos). Todos com R4 aprovado, R7 1.0.0 e PR mesclado em `dev`.
-- **Gates finais locais**: `sdd-completeness PASS (4/0/0)`, `work_order_dag PASS (133 tarefas/4 features, 0 ciclos)`, `task-id-uniqueness PASS`, `converge-append-only PASS`, `hub_docs_gate PASS (0 erros)`. `pytest -q` (exit 5) e `check_production_gate.py` (exit 2) permanecem N/A por decisão do Bloco 0.a.
+- **Atualizado em**: 2026-11-20T00:40:18Z — autorização do usuário executada: repositório tornado público, CI remoto operando e proteção de `dev` aplicada e verificada.
+- **Repositório**: `visibility=PUBLIC` (verificado via `gh repo view` às 2026-11-20T00:26:47Z).
+- **CI**: workflow `.github/workflows/ci-gates.yml` (`deterministic-gates`) com 2 execuções `success` observadas (dev push `44647526469`, PR `44647520124`), check `gates` `completed/success`.
+- **Proteção de `dev`**: aplicada via `gh api PUT` às 2026-11-20T00:40:18Z — `required_checks=["gates"]`, `strict=true`, `enforce_admins=false`, `allow_force_pushes=false`, `allow_deletions=false`; verificada por leitura de API.
+- **Branch `dev`**: PRs #1–#8 todos `MERGED`; HEAD remoto `6df9092` (merge do PR #8). Âncora: `.specify/feature.json` → `specs/005-ci-protecao-dev`.
+- **Ciclos concluídos**: 001, 002, NV, 003, 004, 005 — todos com R4/R7 e PR mesclado.
+- **Gates locais**: `sdd-completeness PASS (5/0/0)`, `work_order_dag PASS (160 tarefas/5 features)`, `task-id-uniqueness PASS`, `converge-append-only PASS`, `hub_docs_gate PASS`. `pytest`/`check_production_gate` N/A por Bloco 0.a.
 
-### [NV] remanescentes — dependem de autorização/execução externa
+### [NV] remanescente
 
-- Instalar Godot 4.7.2 e executar suíte headless/benchmarks 5v5 — exige autorização de dependência.
-- CI remoto (GitHub Actions), Postgres/Zitadel/Coolify no Gru — exige configuração/acesso remoto autorizado.
-- Publicação, release e deploy externos — nenhuma evidência ao vivo; ato humano separado.
-- Proteção de branch — exige repositório público ou Plano Pro (decisão da SE).
-- Marcadores de classe C (salvaguarda metodológica) e B (execução externa) restantes foram preservados intencionalmente.
+- Publicação, release e deploy externos — **não autorizados** nesta rodada; permanece **[NV]**.
+- Instalar Godot 4.7.2 e executar benchmarks — autorizado pelo usuário, ainda não executado.
+- Postgres/Zitadel/Coolify — autorizado pelo usuário, ainda não executado (depende de acesso/credenciais).
 
 ### Limitações conhecidas / [NV] remanescentes
 

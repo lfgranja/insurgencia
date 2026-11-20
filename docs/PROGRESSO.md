@@ -134,3 +134,12 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - Gates finais em `dev`: `sdd-completeness PASS (4/0/0)`, `work_order_dag PASS (133 tarefas/4 features, 0 ciclos)`, `task-id-uniqueness PASS`, `converge-append-only PASS`, `hub_docs_gate PASS (0 erros)`. `pytest -q`/`check_production_gate.py` permanecem N/A por Bloco 0.a.
 - `[NV]` remanescentes dependem de autorização/execução externa: instalar Godot 4.7.2 e benchmarks, CI remoto/Postgres/Zitadel/Coolify, publicação/deploy, proteção de branch (API 403 por plano). Marcadores metodológicos legítimos permanecem por política.
 - Fonte do aparato: factory HEAD `b1deab15f482dd85871cd6c6a857ad710b89e2a6`, lida como fonte, nunca modificada. Nenhum merge automático, force-push ou deleção de branch de terceiros.
+
+## 2026-11-20T00:40:18Z — Ciclo 005: CI remoto, repo público e proteção de dev
+
+- Autorização do usuário executada: `gh repo edit --visibility public` (confirmado `visibility=PUBLIC` às 00:26:47Z).
+- Ciclo SDD 005 concluído (R1 go, 14 FRs, 27 tarefas, analyze sem CRITICAL, R4 aprovado, R7 1.0.0); PR #8 mesclado em `dev` (`6df9092`).
+- Workflow `.github/workflows/ci-gates.yml` executa exatamente os 5 gates do alvo em PR/push para `dev`/`main`, `permissions: contents: read`, sem deploy/segredos/Forgejo/gates da factory.
+- CI ao vivo: 2 execuções `completed/success` (`44647526469` push dev; `44647520124` PR) e check `gates` `completed/success` em `dev`.
+- Proteção de `dev` aplicada por API (`PUT .../branches/dev/protection`) e verificada: `required_checks=["gates"]`, `strict=true`, `enforce_admins=false`, `allow_force_pushes=false`, `allow_deletions=false`. Nenhum auto-merge habilitado.
+- Ressalva: publicação/release/deploy externo segue **não autorizado** e `[NV]`; install do Godot e Postgres/Zitadel/Coolify foram autorizados pelo usuário mas ainda não executados.
