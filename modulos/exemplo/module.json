@@ -1,0 +1,13 @@
+{
+	"contract_version": "1.0.0",
+	"module_id": "insurgencia.exemplo",
+	"display_name": "Insurgencia modulo de exemplo",
+	"protocol_version": 1,
+	"content_hash": "b2c11e6d84ac9db0ff4698343a3d47132e34f5e54d2f5b7f54c0d6374d4cd746",
+	"content_bytes": 218,
+	"content_files": ["module.json", "mapa.json", "personagens.json", "regras.cfg"],
+	"map": "mapa.json",
+	"characters": "personagens.json",
+	"rules": "regras.cfg",
+	"assets": []
+}
