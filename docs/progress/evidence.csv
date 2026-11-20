@@ -1,0 +1,9 @@
+id,criterio,verdict,source,command,result,confidence,unverified,recorded_at
+EV-20261119-001,CE-1,PASS,tests/test_contrato.gd,make test-contrato,16,high,,2026-11-20T03:19Z
+EV-20261119-002,CE-2.1,PASS,tests/test_loopback.gd,godot --headless --path . --script res://tests/test_loopback.gd,8,high,,2026-11-20T03:19Z
+EV-20261119-003,CE-2.2,PASS,tests/test_validacao.gd,make test-validacao,9,high,,2026-11-20T03:19Z
+EV-20261119-004,CE-3.4,PASS,tests/test_ilha_sincronia.gd,make test-ilha,14,high,,2026-11-20T03:19Z
+EV-20261119-005,CE-3.6,PASS,tests/test_loopback_ilha.gd,godot --headless --path . --script res://tests/test_loopback_ilha.gd,3,high,,2026-11-20T03:19Z
+EV-20261119-006,CE-4.4,PASS,tests/test_manifesto.gd,make test-manifesto,7,high,,2026-11-20T03:19Z
+EV-20261119-007,CE-5.1,PASS,docs/progress/evidence.csv,make check,5,high,,2026-11-20T03:19Z
+EV-20261120-008,CE-2.1-REDE,NAO_VERIFICADO,docs/GDD - Insurgência.md:1582,sem comando local; requer 2 clientes UDP reais,,,"conexao UDP real entre 2 clientes nao executada; somente loopback local verificado (EV-20261119-002)",

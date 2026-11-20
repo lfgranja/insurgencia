@@ -1582,7 +1582,7 @@ O MVP está fechado quando todos os critérios de aceitação acima passarem em 
 - [~] CE-2 — servidor headless e validação (6 + 8 + 9 `PASS`; `SERVIDOR_PRONTO porta=7777`); conexão UDP real entre clientes **[NV]**
 - [x] CE-3 — Ilha Meio (14 `PASS` + `OK test_ilha_sincronia`; `DELTA_EVENTO_MS 0` + 3 `PASS`)
 - [x] CE-4 — manifesto e gate local (7 `PASS`; `COMPAT_OK module_id=insurgencia.exemplo`; 3 execuções idênticas; divergência de hash recusada)
-- [ ] CE-5 — `evidence.csv` (9 colunas) e `make check`
+- [x] CE-5 — evidência auditável (`make check` exit 0; CSV de 9 colunas; 1 `NAO_VERIFICADO` explícito)
 
 **Critérios de aceitação do MVP (§16.4 — 18 itens)**
 - [~] 1514 — 2 clientes em IP:porta na mesma partida: handshake em teste unitário; conexão real **[NV]**

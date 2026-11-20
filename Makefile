@@ -1,9 +1,24 @@
-.PHONY: check-compat
+.PHONY: check check-compat test-contrato test-servidor test-validacao test-ilha test-manifesto
 
 GODOT ?= godot
 GODOT_FLAGS := --headless --path . --script
 
-# Gate local de compatibilidade (ast-36): manifesto.json + versao + SHA-256 de 32 bytes.
-# Fora do escopo (doc-26 DEFER): sondagem de lobby/worker e publicacao de release.
+check: test-contrato test-servidor test-validacao test-ilha test-manifesto check-compat
+
+test-contrato:
+	$(GODOT) $(GODOT_FLAGS) res://tests/test_contrato.gd
+
+test-servidor:
+	$(GODOT) $(GODOT_FLAGS) res://tests/test_servidor.gd
+
+test-validacao:
+	$(GODOT) $(GODOT_FLAGS) res://tests/test_validacao.gd
+
+test-ilha:
+	$(GODOT) $(GODOT_FLAGS) res://tests/test_ilha_sincronia.gd
+
+test-manifesto:
+	$(GODOT) $(GODOT_FLAGS) res://tests/test_manifesto.gd
+
 check-compat:
 	$(GODOT) $(GODOT_FLAGS) res://ferramentas/verificar_compatibilidade.gd
