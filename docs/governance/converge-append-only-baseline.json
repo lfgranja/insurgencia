@@ -1,14 +1,19 @@
 {
   "schema_version": "087.1.0",
   "enforce_unbaselined": true,
-  "files": {},
+  "files": {
+    "specs/018-iam-adapter-local/converge.md": {
+      "bytes": 1056,
+      "sha256": "22286499c0d9209d0c9cca93ab545e8485b59a8140ee3bbcabe1824f9e7ee6af"
+    }
+  },
   "_provenance": {
     "origem": "alvo-local",
     "repo": "lfgranja/insurgencia",
-    "head": "a5e4131",
-    "data": "2026-11-19",
+    "head": "51945f5",
+    "data": "2026-11-20",
     "metodo": "python3 scripts/ci/check_converge_append_only.py --bootstrap",
     "factory_utilizada": false,
-    "nota": "Nenhum converge.md existe no alvo; mapa vazio e honesto. Ratchet permanece ativo: qualquer converge.md futuro sem entrada no baseline falha."
+    "nota": "Entrada 018 adicionada por bootstrap deterministico apos materializacao legitima de specs/018-iam-adapter-local/converge.md. Nenhum arquivo preexistente foi reescrito; ratchet permanece ativo."
   }
 }
