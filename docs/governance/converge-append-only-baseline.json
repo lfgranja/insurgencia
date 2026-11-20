@@ -9,15 +9,19 @@
     "specs/019-tela-resultado/converge.md": {
       "bytes": 1034,
       "sha256": "7e7b993f96b96a9e626c2dd97acb3dbb104fa6b7275a6c878ffdbccc4a799c25"
+    },
+    "specs/020-engines-rust/converge.md": {
+      "bytes": 1252,
+      "sha256": "dc34a9dcbfc8654a552ee5c281ae28528897f1379905d9f17d03132231164282"
     }
   },
   "_provenance": {
     "origem": "alvo-local",
     "repo": "lfgranja/insurgencia",
-    "head": "c7d5882",
+    "head": "9dadc68",
     "data": "2026-11-20",
     "metodo": "python3 scripts/ci/check_converge_append_only.py --bootstrap",
     "factory_utilizada": false,
-    "nota": "Entradas 018 e 019 adicionadas por bootstrap deterministico apos materializacao legitima de converge.md. Nenhum arquivo preexistente foi reescrito; ratchet permanece ativo."
+    "nota": "Entradas 018, 019 e 020 adicionadas por bootstrap deterministico apos materializacao legitima de converge.md. Nenhum arquivo preexistente reescrito; ratchet ativo."
   }
 }
