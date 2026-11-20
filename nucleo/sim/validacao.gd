@@ -1,9 +1,10 @@
 extends RefCounted
 class_name ValidacaoComandos
 
-const ACOES_PERMITIDAS: Array = ["mover", "sinalizar_sincronia", "sinalizar_alavanca", "coletar_materiais"]
+const ACOES_PERMITIDAS: Array = ["mover", "sinalizar_sincronia", "sinalizar_alavanca", "coletar_materiais", "construir_barreira", "atacar_forte"]
 const LIMITE_MOVIMENTO_M: float = 1.0
 const ALAVANCAS_TOPO: int = 3
+const CAMPOS_RECURSO: Array = ["materiais", "credito", "saldo", "quantidade", "valor", "materiais_creditados", "custo", "dano", "pv", "recarga", "barreiras", "ataques"]
 
 static func validar(mundo, peer_id: int, cmd: Dictionary) -> Dictionary:
 	if not mundo.jogadores.has(peer_id):
@@ -36,4 +37,8 @@ static func validar(mundo, peer_id: int, cmd: Dictionary) -> Dictionary:
 		for campo in ["materiais", "credito", "saldo", "quantidade", "valor", "materiais_creditados"]:
 			if cmd.has(campo):
 				return {"valido": false, "codigo": "MATERIAIS_FORJADOS"}
+	if acao == "construir_barreira" or acao == "atacar_forte":
+		for campo in CAMPOS_RECURSO:
+			if cmd.has(campo):
+				return {"valido": false, "codigo": "RECURSO_FORJADO"}
 	return {"valido": true, "codigo": "OK"}
