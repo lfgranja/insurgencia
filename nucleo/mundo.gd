@@ -5,6 +5,7 @@ const PASSO_SEGUNDOS: float = 1.0 / 30.0
 const IlhaSincronia = preload("res://nucleo/desafios/ilha_sincronia.gd")
 const IlhaTopo = preload("res://nucleo/desafios/ilha_topo.gd")
 const PontoColeta = preload("res://nucleo/desafios/ponto_coleta.gd")
+const Funcoes = preload("res://nucleo/sim/funcoes.gd")
 
 var tick: int = 0
 var epoch: int = 1
@@ -16,6 +17,7 @@ var comandos_do_tick: Array = []
 var ilha_sincronia = IlhaSincronia.new()
 var ilha_topo = IlhaTopo.new()
 var ponto_coleta = PontoColeta.new()
+var funcoes = Funcoes.new()
 var estado_persistido: String = ""
 
 func adicionar_jogador(peer_id: int) -> void:
@@ -56,18 +58,37 @@ func _fase_skills() -> void:
 				var jogador: Dictionary = jogadores.get(int(cmd["peer_id"]), {})
 				if not jogador.is_empty():
 					jogador["materiais"] = int(jogador.get("materiais", 0)) + int(resultado["materiais"])
+		elif cmd["acao"] == "construir_barreira":
+			var jogador_barreira: Dictionary = jogadores.get(int(cmd["peer_id"]), {})
+			if jogador_barreira.is_empty():
+				continue
+			var materiais: int = int(jogador_barreira.get("materiais", 0))
+			var resultado_barreira: Dictionary = funcoes.construir_barreira(
+				int(cmd["peer_id"]), float(tick) * PASSO_SEGUNDOS, materiais
+			)
+			if bool(resultado_barreira["aceito"]):
+				jogador_barreira["materiais"] = materiais - int(resultado_barreira["custo"])
+		elif cmd["acao"] == "atacar_forte":
+			funcoes.atacar(int(cmd["peer_id"]), float(tick) * PASSO_SEGUNDOS)
 
 func _fase_finish() -> void:
 	var gas: Dictionary = ilha_sincronia.aplicar_gas(PASSO_SEGUNDOS)
 	for peer_id in gas["dano"].keys():
 		if jogadores.has(int(peer_id)):
-			jogadores[int(peer_id)]["vida"] -= int(gas["dano"][peer_id])
+			var dano: Dictionary = funcoes.receber_dano(
+				int(peer_id), int(gas["dano"][peer_id]), float(tick) * PASSO_SEGUNDOS
+			)
+			jogadores[int(peer_id)]["vida"] -= int(dano["dano_restante"])
+			if int(dano["reembolso"]) > 0:
+				var atingido: Dictionary = jogadores[int(peer_id)]
+				atingido["materiais"] = int(atingido.get("materiais", 0)) + int(dano["reembolso"])
 	for peer_id in gas["expulsos"]:
 		remover_jogador(int(peer_id))
 	if ilha_sincronia.capturada:
 		estado_persistido = ilha_sincronia.estado_persistido
 	if ilha_topo.capturada:
 		estado_persistido = ilha_topo.estado_persistido
+	funcoes.avancar(float(tick) * PASSO_SEGUNDOS)
 	ponto_coleta.avancar(float(tick) * PASSO_SEGUNDOS)
 	comandos_do_tick.clear()
 
@@ -75,4 +96,5 @@ func hash_estado() -> String:
 	var ctx := HashingContext.new()
 	ctx.start(HashingContext.HASH_SHA256)
 	ctx.update(str(jogadores, tick).to_utf8_buffer())
+	ctx.update(str(funcoes.canalizacao, funcoes.barreiras, funcoes.recarga_ate).to_utf8_buffer())
 	return ctx.finish().hex_encode()
