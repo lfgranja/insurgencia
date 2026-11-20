@@ -6,4 +6,5 @@ EV-20261119-004,CE-3.4,PASS,tests/test_ilha_sincronia.gd,make test-ilha,14,high,
 EV-20261119-005,CE-3.6,PASS,tests/test_loopback_ilha.gd,godot --headless --path . --script res://tests/test_loopback_ilha.gd,3,high,,2026-11-20T03:19Z
 EV-20261119-006,CE-4.4,PASS,tests/test_manifesto.gd,make test-manifesto,7,high,,2026-11-20T03:19Z
 EV-20261119-007,CE-5.1,PASS,docs/progress/evidence.csv,make check,5,high,,2026-11-20T03:19Z
-EV-20261120-008,CE-2.1-REDE,NAO_VERIFICADO,docs/GDD - Insurgência.md:1582,sem comando local; requer 2 clientes UDP reais,,,"conexao UDP real entre 2 clientes nao executada; somente loopback local verificado (EV-20261119-002)",
+EV-20261120-008,CE-2.1-REDE,PASS,tests/run_e2e_rede.sh,make test-rede-e2e,2 clientes UDP reais 127.0.0.1:7780 join_accept COMANDO_ACEITO exit0,high,,2026-11-20T10:04Z
+EV-20261120-009,CE-2.1-NAT,NAO_VERIFICADO,docs/GDD - Insurgência.md:1514,sem acesso a rede publica,,,"NAT traversal e clientes externos nao testados; apenas loopback local 127.0.0.1",

@@ -1,4 +1,4 @@
-.PHONY: check check-compat test-contrato test-servidor test-validacao test-ilha test-manifesto
+.PHONY: check check-compat test-contrato test-servidor test-validacao test-ilha test-manifesto test-rede-e2e
 
 GODOT ?= godot
 GODOT_FLAGS := --headless --path . --script
@@ -22,3 +22,6 @@ test-manifesto:
 
 check-compat:
 	$(GODOT) $(GODOT_FLAGS) res://ferramentas/verificar_compatibilidade.gd
+
+test-rede-e2e:
+	GODOT=$(GODOT) bash tests/run_e2e_rede.sh

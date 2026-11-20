@@ -14,6 +14,7 @@ const HASH_MODULO: String = "b2c11e6d84ac9db0ff4698343a3d47132e34f5e54d2f5b7f54c
 var mundo = Mundo.new()
 var peers_aceitos: Dictionary = {}
 var _peer_de_rede: ENetMultiplayerPeer
+var _api: SceneMultiplayer
 var snapshots: Array = []
 var _snapshot_acumulador: float = 0.0
 
@@ -30,7 +31,45 @@ func abrir(porta: int = PORTA_PADRAO) -> void:
 			api.multiplayer_peer = _peer_de_rede
 			api.peer_connected.connect(_on_peer_connected)
 			api.peer_disconnected.connect(_on_peer_disconnected)
+			_api = api as SceneMultiplayer
+			_api.peer_packet.connect(_on_peer_packet)
 	print("SERVIDOR_PRONTO porta=%d" % porta)
+
+func _on_peer_packet(id: int, packet: PackedByteArray) -> void:
+	var remetente: int = id
+	if remetente <= 0 and _api != null and _api.get_remote_sender_id() > 0:
+		remetente = _api.get_remote_sender_id()
+	var json := JSON.new()
+	var erro: int = json.parse(packet.get_string_from_utf8())
+	if erro != OK or not (json.data is Dictionary):
+		printerr("FAIL envelope_invalido peer=%d erro=%d" % [remetente, erro])
+		return
+	var envelope: Dictionary = json.data
+	match str(envelope.get("tipo", "")):
+		"join_request":
+			_responder_join(remetente, envelope)
+		"comando":
+			var resultado: Dictionary = handle_command(remetente, envelope)
+			if bool(resultado["aceito"]):
+				print("COMANDO_ACEITO peer=%d acao=%s" % [remetente, str(envelope.get("acao", ""))])
+			else:
+				printerr("FAIL comando_recusado peer=%d codigo=%s" % [remetente, str(resultado["codigo"])])
+		_:
+			printerr("FAIL tipo_desconhecido peer=%d" % remetente)
+
+func _responder_join(peer_id: int, envelope: Dictionary) -> void:
+	var resultado: Dictionary = handle_join(peer_id, envelope)
+	var resposta: Dictionary
+	if bool(resultado["aceito"]):
+		var modulo: String = Protocolo.MODULO_ID
+		if peers_aceitos.has(peer_id):
+			modulo = str(peers_aceitos[peer_id].get("module_id", Protocolo.MODULO_ID))
+		resposta = {"tipo": "join_accept", "module_id": modulo}
+	else:
+		resposta = {"tipo": "join_reject", "reason": str(resultado["codigo"])}
+	var erro: int = _api.send_bytes(JSON.stringify(resposta).to_utf8_buffer(), peer_id)
+	if erro != OK:
+		printerr("FAIL send_bytes peer=%d erro=%d" % [peer_id, erro])
 
 func _on_peer_connected(peer_id: int) -> void:
 	print("PEER_CONECTADO id=%d aguardando_JOIN" % peer_id)
