@@ -126,3 +126,11 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - Analyze READ-ONLY: 6 achados corrigidos em 3 rodadas; 0 achados pendentes na revalidação final.
 - Gates locais: `sdd-completeness PASS (3/0/0)`, `work_order_dag PASS (97 tarefas/3 features)`, `task-id-uniqueness PASS`, `converge-append-only PASS`, `hub_docs_gate PASS (0 erros)`. `pytest -q` (exit 5) e `check_production_gate.py` (exit 2) permanecem N/A por decisão do Bloco 0.a.
 - Ressalva: `baselined=0` permanece nos gates cujos mapas estão vazios; a prova é arquivo presente + saída colada em R4 + cenários de ratchet recusados, não contagem de entradas.
+
+## 2026-11-20T00:09:52Z — Consolidação final (todos os branches mesclados)
+
+- PRs #5 (ciclo 003, `f5a6b32`) e #6 (ciclo 004, `f8c98e6`) mesclados em `dev`; PR #4 (resolução [NV], `a5e4131`) mesclado às 22:57:32Z. Todos os branches locais têm 0 commits não mesclados; `gh pr list --state open` = `[]`.
+- Ciclo 004: 12 fatos NV-A01–A12 verificados com 2 fontes primárias e ressalvas; classes B/C preservadas; notas de superação append-only; nenhum benchmark reclassificado. R4 aprovado, R7 1.0.0.
+- Gates finais em `dev`: `sdd-completeness PASS (4/0/0)`, `work_order_dag PASS (133 tarefas/4 features, 0 ciclos)`, `task-id-uniqueness PASS`, `converge-append-only PASS`, `hub_docs_gate PASS (0 erros)`. `pytest -q`/`check_production_gate.py` permanecem N/A por Bloco 0.a.
+- `[NV]` remanescentes dependem de autorização/execução externa: instalar Godot 4.7.2 e benchmarks, CI remoto/Postgres/Zitadel/Coolify, publicação/deploy, proteção de branch (API 403 por plano). Marcadores metodológicos legítimos permanecem por política.
+- Fonte do aparato: factory HEAD `b1deab15f482dd85871cd6c6a857ad710b89e2a6`, lida como fonte, nunca modificada. Nenhum merge automático, force-push ou deleção de branch de terceiros.
