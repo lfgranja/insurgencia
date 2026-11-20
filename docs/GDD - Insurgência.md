@@ -1581,7 +1581,7 @@ O MVP está fechado quando todos os critérios de aceitação acima passarem em 
 - [x] CE-1 — estrutura e contrato versionado (16 `PASS`; hash `b2c11e6d…`; 14/39 caminhos)
 - [~] CE-2 — servidor headless e validação (6 + 8 + 9 `PASS`; `SERVIDOR_PRONTO porta=7777`); conexão UDP real entre clientes **[NV]**
 - [x] CE-3 — Ilha Meio (14 `PASS` + `OK test_ilha_sincronia`; `DELTA_EVENTO_MS 0` + 3 `PASS`)
-- [ ] CE-4 — `manifesto.json` e gate local de compatibilidade
+- [x] CE-4 — manifesto e gate local (7 `PASS`; `COMPAT_OK module_id=insurgencia.exemplo`; 3 execuções idênticas; divergência de hash recusada)
 - [ ] CE-5 — `evidence.csv` (9 colunas) e `make check`
 
 **Critérios de aceitação do MVP (§16.4 — 18 itens)**
