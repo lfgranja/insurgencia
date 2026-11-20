@@ -1,25 +1,19 @@
 # STATE.md — Insurgência
 
-## Estado vivo — 2026-11-20T00:40:18Z (CI remoto e proteção verificados)
+## Estado vivo — 2026-11-20T01:14:03Z (autorizações executadas até o limite seguro)
 
-- **Atualizado em**: 2026-11-20T00:40:18Z — autorização do usuário executada: repositório tornado público, CI remoto operando e proteção de `dev` aplicada e verificada.
-- **Repositório**: `visibility=PUBLIC` (verificado via `gh repo view` às 2026-11-20T00:26:47Z).
-- **CI**: workflow `.github/workflows/ci-gates.yml` (`deterministic-gates`) com 2 execuções `success` observadas (dev push `44647526469`, PR `44647520124`), check `gates` `completed/success`.
-- **Proteção de `dev`**: aplicada via `gh api PUT` às 2026-11-20T00:40:18Z — `required_checks=["gates"]`, `strict=true`, `enforce_admins=false`, `allow_force_pushes=false`, `allow_deletions=false`; verificada por leitura de API.
-- **Branch `dev`**: PRs #1–#8 todos `MERGED`; HEAD remoto `6df9092` (merge do PR #8). Âncora: `.specify/feature.json` → `specs/005-ci-protecao-dev`.
-- **Ciclos concluídos**: 001, 002, NV, 003, 004, 005 — todos com R4/R7 e PR mesclado.
-- **Gates locais**: `sdd-completeness PASS (5/0/0)`, `work_order_dag PASS (160 tarefas/5 features)`, `task-id-uniqueness PASS`, `converge-append-only PASS`, `hub_docs_gate PASS`. `pytest`/`check_production_gate` N/A por Bloco 0.a.
+- **Atualizado em**: 2026-11-20T01:14:03Z — PRs #1–#11 mesclados em `dev`; HEAD remoto `05d38b8`. Âncora: `.specify/feature.json` → `specs/007-postgres-local-validacao`.
+- **Repositório**: `visibility=PUBLIC` (00:26:47Z); CI `.github/workflows/ci-gates.yml` com execuções `success` e check `gates`; proteção de `dev` aplicada (`required_checks=["gates"]`, `strict=true`, sem force-push/deleção).
+- **Godot 4.7.2**: instalada da release oficial com SHA512 de 128 hex idêntico ao `SHA512-SUMS.txt` (`CHECKSUM_OK`, 00:43:52Z); binário `4.7.2.stable.official.ed1daf0bf`. Benchmark headless sintético 600 ticks × 64 entidades: mediana 37,48 µs/tick em 7 amostras (mín 22,71; máx 42,95) — carga sintética, **não** 5v5 real.
+- **Postgres**: validado localmente em container descartável `postgres:16-alpine` → 16.15; JSONB/GIN e privilégio mínimo provados; UPDATE negado ao papel da aplicação; container removido (0 remanescentes). Remote/Coolify/Zitadel/`pgmq` permanecem `[NV]`.
+- **Ciclos concluídos**: 001, 002, NV, 003, 004, 005 (CI/proteção), 006 (Godot/benchmark), 007 (Postgres local) — todos com R1 go, R4 aprovado, R7 1.0.0 e PR mesclado.
+- **Gates locais**: `sdd-completeness PASS (7/0/0)`, `work_order_dag PASS (222 tarefas/7 features)`, `task-id-uniqueness PASS`, `converge-append-only PASS`, `hub_docs_gate PASS`. `pytest`/`check_production_gate` N/A por Bloco 0.a.
 
-### [NV] remanescente
+### [NV] remanescentes — bloqueio real
 
-- Publicação, release e deploy externos — **não autorizados** nesta rodada; permanece **[NV]**.
-- Instalar Godot 4.7.2 e executar benchmarks — autorizado pelo usuário, ainda não executado.
-- Postgres/Zitadel/Coolify — autorizado pelo usuário, ainda não executado (depende de acesso/credenciais).
-
-### Limitações conhecidas / [NV] remanescentes
-
-- Publicação, release e deploy externos: nenhuma evidência ao vivo — permanece **[NV]**.
-- Proteção de branch: consulta à API bloqueada por plano (HTTP 403) — permanece **[NV]** como limitação conhecida, não resolvida.
+- **Publicação/deploy externo**: não autorizado nesta rodada — permanece **[NV]**.
+- **Postgres/Coolify remotos e Zitadel**: autorizados, mas credenciais e instância ficam fora do alvo (`MDMV/.tokens/` e topologia do Gru). Nenhuma credencial foi lida/copiada nesta sessão; sem acesso remoto verificável no alvo. **[NV]** — exige intervenção/fornecimento de credencial no escopo do projeto.
+- **`pgmq`**: extensão não verificada no ambiente local; permanece **[NV]**.
 
 ### Próximo 80/20 (vivo)
 

@@ -143,3 +143,11 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - CI ao vivo: 2 execuções `completed/success` (`44647526469` push dev; `44647520124` PR) e check `gates` `completed/success` em `dev`.
 - Proteção de `dev` aplicada por API (`PUT .../branches/dev/protection`) e verificada: `required_checks=["gates"]`, `strict=true`, `enforce_admins=false`, `allow_force_pushes=false`, `allow_deletions=false`. Nenhum auto-merge habilitado.
 - Ressalva: publicação/release/deploy externo segue **não autorizado** e `[NV]`; install do Godot e Postgres/Zitadel/Coolify foram autorizados pelo usuário mas ainda não executados.
+
+## 2026-11-20T01:14:03Z — Ciclos 006 e 007 + limite seguro das autorizações
+
+- Ciclo 006: Godot 4.7.2 instalada da release oficial (`SHA512-SUMS.txt` 128-hex idêntico ao cálculo local, `CHECKSUM_OK`), binário `4.7.2.stable.official.ed1daf0bf`; benchmark headless sintético 600×64 com mediana 37,48 µs/tick (7 amostras, 22,71–42,95) — explicitamente não é 5v5 real. PR #10 mesclado (`e9b1f34`).
+- Ciclo 007: Postgres local descartável `postgres:16-alpine` (16.15) com migrações, JSONB/GIN, GRANTs mínimos e teste negativo de UPDATE (`permission denied`); container removido com 0 remanescentes. PR #11 mesclado (`05d38b8`).
+- PRs #1–#11 todos `MERGED`; zero PRs abertos; proteção de `dev` exigindo check `gates` operando em todos os merges recentes.
+- Bloqueio real: publicação/deploy não autorizado; Postgres/Coolify remotos e Zitadel dependem de credenciais/instância fora do alvo (`MDMV/.tokens/`, Gru) — nenhuma credencial foi lida ou copiada nesta sessão. `pgmq` segue `[NV]`.
+- Factory HEAD `b1deab15f482dd85871cd6c6a857ad710b89e2a6`, lida como fonte, nunca modificada.
