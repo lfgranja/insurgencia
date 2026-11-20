@@ -15,6 +15,16 @@
 			"janela_segundos": 45.0,
 			"tempo_alavanca_segundos": 8.0,
 			"reinicio_segundos": 2.0
+		},
+		{
+			"id": "ilha_inferior",
+			"tipo": "coleta",
+			"ponto_coleta": {
+				"ciclo_segundos": 3.0,
+				"materiais_por_ciclo": 5,
+				"ciclos_estoque": 3,
+				"recarga_segundos": 20.0
+			}
 		}
 	]
 }
