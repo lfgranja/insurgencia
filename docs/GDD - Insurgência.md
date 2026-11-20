@@ -1574,13 +1574,13 @@ O MVP está fechado quando todos os critérios de aceitação acima passarem em 
 - [x] Constituição local, factory como fonte (HEAD `b1deab1`) e gate autoritativo do alvo
 - [x] 9 ciclos SDD com R1/R4/R7; 5 gates determinísticos PASS
 - [x] ADR-001 (GDScript) e ADR-002 (MIT) aprovadas
-- [x] CI remoto, proteção de `dev` e PRs #1–#13 mesclados (verificados ao vivo via `gh`)
+- [x] CI remoto, proteção de `dev` e PRs #1–#14 mesclados (verificados ao vivo via `gh`)
 - [x] Godot 4.7.2 executável localmente; benchmark headless executado
 
 **Fatia 80/20 (spec CE-1..CE-5)**
 - [x] CE-1 — estrutura e contrato versionado (16 `PASS`; hash `b2c11e6d…`; 14/39 caminhos)
 - [~] CE-2 — servidor headless e validação (6 + 8 + 9 `PASS`; `SERVIDOR_PRONTO porta=7777`); conexão UDP real entre clientes **[NV]**
-- [ ] CE-3 — Desafio da Ilha Meio
+- [x] CE-3 — Ilha Meio (14 `PASS` + `OK test_ilha_sincronia`; `DELTA_EVENTO_MS 0` + 3 `PASS`)
 - [ ] CE-4 — `manifesto.json` e gate local de compatibilidade
 - [ ] CE-5 — `evidence.csv` (9 colunas) e `make check`
 
@@ -1588,7 +1588,7 @@ O MVP está fechado quando todos os critérios de aceitação acima passarem em 
 - [~] 1514 — 2 clientes em IP:porta na mesma partida: handshake em teste unitário; conexão real **[NV]**
 - [~] 1515 — servidor aceita só intenções: `normalizar_pacote` e `handle_command` testados; integração de rede pendente
 - [ ] 1516, 1519–1521 — Ilha Topo (alavancas, ordem, janela)
-- [ ] 1524–1527 — Ilha Meio (2 placas/5 s, gás, regra de produção)
+- [x] 1524–1527 — Ilha Meio (2 placas/5 s, gás 8/amostra, 24 em 3 s, regra de produção 3 no Módulo base)
 - [ ] 1530–1531 — Ilha Inferior (Materiais, recarga, material forjado)
 - [ ] 1534–1535 — Artesão (Barricada) e Guerreiro (Ataque Forte)
 - [ ] 1538–1541 — Ilha Central e condição de vitória

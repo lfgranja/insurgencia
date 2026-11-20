@@ -1,0 +1,12 @@
+{
+	"mapa_id": "arquipelago.exemplo",
+	"ilhas": [
+		{
+			"id": "ilha_meio",
+			"tipo": "sincronia",
+			"placas": [1, 2],
+			"janela_segundos": 5.0,
+			"jogadores_necessarios": 2
+		}
+	]
+}
