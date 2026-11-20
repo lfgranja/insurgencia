@@ -1,0 +1,5 @@
+[application]
+
+config/name="Insurgencia Headless Benchmark"
+config/features=PackedStringArray("4.7")
+run/main_scene=""
