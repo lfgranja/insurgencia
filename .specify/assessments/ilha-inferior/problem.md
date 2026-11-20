@@ -1,0 +1,16 @@
+# Problem — Ilha Inferior: ponto de coleta com estoque e recarga
+
+**Data:** 2026-11-20T09:38Z
+
+## Problema
+A fatia CE-1..CE-5 está concluída (contrato, servidor, Ilha Meio, compatibilidade e `make check`) e a Ilha Topo acaba de receber sua frente de trabalho documental (ciclo 013), mas a **Ilha Inferior segue sem implementação**: o GDD §16.7 registra a pendência explícita em `docs/GDD - Insurgência.md:1592` (`[ ] 1530–1531 — Ilha Inferior (Materiais, recarga, material forjado)`). A regra canônica do GDD §16.3 (linha 1504) fixa um ponto de coleta com ciclo de 3 s, 5 unidades de "Materiais" por ciclo, estoque de 3 ciclos e recarga em 20 s; o §16.4 (linhas 1529–1531) exige que o servidor credite 5 Materiais a cada 3 s ao coletor, que o ponto esgote após 3 ciclos e recarregue em 20 s, e que um cliente que inventa Materiais sem passar pelo ponto tenha o crédito recusado. A hipótese H3 (linha 1677) repete os mesmos quatro números.
+
+Não existem, hoje, `nucleo/desafios/ilha_inferior.gd`, a integração do ponto ao tick de `nucleo/mundo.gd`, a validação de crédito forjado em `nucleo/sim/validacao.gd`, a declaração de `ilha_inferior` em `modulos/exemplo/mapa.json` nem `tests/test_ilha_inferior.gd`. Consequentemente, não há prova determinística de que o servidor — e somente ele — concede Materiais, nem de que o estoque esgota e recarrega nos prazos literais. Toda execução de Godot, gate ou suíte desta etapa é **[NV]**; este artefato é apenas documental e não escreve código.
+
+## Por que é válido
+- **Impacto 5** — a Ilha Inferior é a única fonte de Materiais do protótipo e, por isso, a pré-condição econômica de qualquer habilidade futura (a Barricada do Artesão custa 20 Materiais conforme GDD 1505); sem o ponto validado no servidor, a tese de "intenção do cliente, decisão do servidor" não pode ser demonstrada na Rota Inferior, e um cliente modificado poderia alegar recursos que nunca coletou.
+- **Evidência 5** — GDD §16.3 linha 1504 e §16.4 linhas 1529–1531 dão ciclo, quantidade, estoque e recarga literais; a hipótese H3 em `:1677` e a pendência em `:1592` registram o estado; o padrão já mesclado de `nucleo/desafios/ilha_topo.gd`, `nucleo/mundo.gd`, `nucleo/sim/validacao.gd`, `modulos/exemplo/mapa.json` e `tests/test_ilha_topo.gd` fornece o desenho a replicar; `.specify/memory/STATE.md:5` registra 5 gates PASS em 2026-11-20T03:21:31Z.
+- **Custo de não agir** — nenhum crédito periódico pode ser verificado, nenhum esgotamento ou recarga pode ser medido com tempo determinístico e nenhuma recusa de material forjado pode ser provada no ponto único de validação; a condição de vitória da Ilha Central continua dependentes de ilhas de rota não entregues, sem que este ciclo a implemente.
+
+## Limites
+Fora de escopo: partidas 5v5, funções Artesão/Guerreiro (inclusive o custo de 20 Materiais da Barricada), condição completa de vitória da Ilha Central, conexão UDP real entre clientes, `manifesto.json`, `Makefile`, `evidence.csv`, deploy, remote, CI remoto, factory, alteração de baselines e portarias R4/R7. Nenhuma alegação de funções implementadas, de vitória efetiva, de UDP real, de cobertura integral da árvore canônica (39/39 caminhos) ou de execução observada é feita aqui; o que depende de comando permanece **[NV]**.

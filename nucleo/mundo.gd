@@ -4,6 +4,7 @@ class_name Mundo
 const PASSO_SEGUNDOS: float = 1.0 / 30.0
 const IlhaSincronia = preload("res://nucleo/desafios/ilha_sincronia.gd")
 const IlhaTopo = preload("res://nucleo/desafios/ilha_topo.gd")
+const PontoColeta = preload("res://nucleo/desafios/ponto_coleta.gd")
 
 var tick: int = 0
 var epoch: int = 1
@@ -14,6 +15,7 @@ var comandos_do_tick: Array = []
 
 var ilha_sincronia = IlhaSincronia.new()
 var ilha_topo = IlhaTopo.new()
+var ponto_coleta = PontoColeta.new()
 var estado_persistido: String = ""
 
 func adicionar_jogador(peer_id: int) -> void:
@@ -48,6 +50,12 @@ func _fase_skills() -> void:
 			ilha_sincronia.sinalizar(int(cmd["peer_id"]), int(cmd["alvo"]), float(tick) * PASSO_SEGUNDOS)
 		elif cmd["acao"] == "sinalizar_alavanca":
 			ilha_topo.sinalizar_alavanca(int(cmd["peer_id"]), int(cmd["alvo"]), float(tick) * PASSO_SEGUNDOS)
+		elif cmd["acao"] == "coletar_materiais":
+			var resultado: Dictionary = ponto_coleta.coletar(int(cmd["peer_id"]), float(tick) * PASSO_SEGUNDOS)
+			if bool(resultado["aceito"]):
+				var jogador: Dictionary = jogadores.get(int(cmd["peer_id"]), {})
+				if not jogador.is_empty():
+					jogador["materiais"] = int(jogador.get("materiais", 0)) + int(resultado["materiais"])
 
 func _fase_finish() -> void:
 	var gas: Dictionary = ilha_sincronia.aplicar_gas(PASSO_SEGUNDOS)
@@ -60,6 +68,7 @@ func _fase_finish() -> void:
 		estado_persistido = ilha_sincronia.estado_persistido
 	if ilha_topo.capturada:
 		estado_persistido = ilha_topo.estado_persistido
+	ponto_coleta.avancar(float(tick) * PASSO_SEGUNDOS)
 	comandos_do_tick.clear()
 
 func hash_estado() -> String:

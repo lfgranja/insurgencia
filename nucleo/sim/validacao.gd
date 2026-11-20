@@ -1,7 +1,7 @@
 extends RefCounted
 class_name ValidacaoComandos
 
-const ACOES_PERMITIDAS: Array = ["mover", "sinalizar_sincronia", "sinalizar_alavanca"]
+const ACOES_PERMITIDAS: Array = ["mover", "sinalizar_sincronia", "sinalizar_alavanca", "coletar_materiais"]
 const LIMITE_MOVIMENTO_M: float = 1.0
 const ALAVANCAS_TOPO: int = 3
 
@@ -14,6 +14,8 @@ static func validar(mundo, peer_id: int, cmd: Dictionary) -> Dictionary:
 	if seq <= int(jogador["seq"]) or request_id <= int(jogador["request_id"]):
 		return {"valido": false, "codigo": "SEQ_OU_REQUEST_REPLAY"}
 	var acao: String = str(cmd.get("acao", ""))
+	if acao == "creditar_materiais":
+		return {"valido": false, "codigo": "MATERIAIS_FORJADOS"}
 	if not ACOES_PERMITIDAS.has(acao):
 		return {"valido": false, "codigo": "ACAO_DESCONHECIDA"}
 	if acao == "mover":
@@ -30,4 +32,8 @@ static func validar(mundo, peer_id: int, cmd: Dictionary) -> Dictionary:
 		var alavanca: int = int(cmd.get("alvo", 0))
 		if alavanca < 1 or alavanca > ALAVANCAS_TOPO:
 			return {"valido": false, "codigo": "ALAVANCA_INVALIDA"}
+	if acao == "coletar_materiais":
+		for campo in ["materiais", "credito", "saldo", "quantidade", "valor", "materiais_creditados"]:
+			if cmd.has(campo):
+				return {"valido": false, "codigo": "MATERIAIS_FORJADOS"}
 	return {"valido": true, "codigo": "OK"}
