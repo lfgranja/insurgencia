@@ -151,3 +151,59 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - PRs #1–#11 todos `MERGED`; zero PRs abertos; proteção de `dev` exigindo check `gates` operando em todos os merges recentes.
 - Bloqueio real: publicação/deploy não autorizado; Postgres/Coolify remotos e Zitadel dependem de credenciais/instância fora do alvo (`MDMV/.tokens/`, Gru) — nenhuma credencial foi lida ou copiada nesta sessão. `pgmq` segue `[NV]`.
 - Factory HEAD `b1deab15f482dd85871cd6c6a857ad710b89e2a6`, lida como fonte, nunca modificada.
+
+## 2026-11-20T01:48:40Z — Auditoria de progresso com pesquisa externa e atualização documental
+
+- Data/hora: `date -u '+%Y-%m-%dT%H:%M:%SZ'` → `2026-11-20T01:48:40Z`. HEAD local `2af7537`, branch `docs/estado-autorizacoes-2026-11-20`.
+- Gates locais reexecutados nesta sessão (saídas coladas): `check_sdd_completeness` PASS (`spec_dirs=7 gaps=0 baselined=0 strict_from=88`); `check_work_order_dag` PASS (`files=7 tasks=222 edges=0 cycles=0`); `check_task_id_uniqueness` PASS (`tasks_files=7 duplicates=0 baselined=0`); `check_converge_append_only` PASS (`files=0 baselined=0`); `hub_docs_gate` PASS (`0 errors, 0 warnings`). `python3 -m pytest -q` → `no tests ran` (exit 5, N/A). `command -v godot` → AUSENTE no PATH.
+- Remoto verificado ao vivo via `gh` (somente leitura): `visibility=PUBLIC`, default branch `main`; 12 PRs `MERGED` (#1–#12), 0 abertos; 10/10 execuções `deterministic-gates` `completed/success`; proteção de `dev` com `strict=true` e `contexts=["gates"]`. Publicação/deploy externo permanece **[NV]**.
+- Inventário interno (contagens verificadas): 7/7 specs com R1/R4/R7; 89 FRs; 222/222 tarefas `[X]`; 63 SCs; 7/7 `validate.md` e `release.md`; 182 diretórios de assessment; 46 arquivos `docs/**/*.md` após a pesquisa. Ciclo 80/20: 5 critérios CE / 28 subcritérios / 6 Tasks, 0 executados; 39 caminhos canônicos, 4 existentes; 0 `.gd` fora do benchmark; ausentes `Makefile`, `manifesto.json`, `docs/progress/evidence.csv`.
+- Pesquisa externa (skills `research` / `source-driven-development` / `documentation-and-adrs`; `npx skills find/use`): três notas em `docs/research/` com fontes primárias e idiomas EN/PT-BR/ES/JA — `2026-11-20-godot-headless-oficial.md`, `2026-11-20-alternativas-netcode-oficial.md`, `2026-11-20-paisagem-foss-licencas.md`. Godot 4.7.2 confirmado por fonte primária (18/08/2026, commit `ed1daf0`); ADR-001 permanece válida, sem nova ADR; wire de alto nível do Godot é detalhe de implementação → envelope próprio; `--script` exige `extends SceneTree`; 30→20 Hz exige acumulador; federação e deploy seguem **[NV]**. Nenhuma tentativa de injeção de prompt detectada; nenhuma credencial copiada.
+- Documentos atualizados: `OBJETIVO.md` (§§2, 2A, 2B, 3, 4, 5), `ROADMAP.md` (§§2, 2A, 3, 4, 5), `docs/research/index.md`, `.specify/memory/STATE.md`. Nenhuma transição de estado SDD; nenhum merge, commit, `git add` ou alteração de gate.
+- Síntese: **funciona** = aparato SDD/CI/gates; **não implementado** = todo o produto (Núcleo, Módulos, ferramentas, testes, evidência); **[NV]** = deploy, serviços remotos, federação, engine executável nesta sessão.
+
+## 2026-11-20T02:02:49Z — Ciclo 008 (CE-1/Task 1) concluído; PR #13 aberto
+
+- Âncora resolvida por `create-new-feature.sh --dry-run` (NNN=008, nunca pelo nome do branch): `.specify/feature.json` → `specs/008-nucleo-contrato`; branch `feature/008-nucleo-contrato`; commit `f5d9634` (20 arquivos, 489 inserções).
+- R1 `go` (`.specify/assessments/nucleo-contrato/decision.md`); spec/plano/tasks/checklist/analyze/convergência materializados; R4 aprovado (`.specify/validations/nucleo-contrato/validate.md`); R7 `1.0.0` (`.specify/releases/nucleo-contrato/release.md`).
+- Diff de `project.godot` registrado antes da edição em `specs/008-nucleo-contrato/project-godot-diff.md` (regra de não sobrescrever sem diff explícito).
+- Evidência local: Godot `4.7.2.stable.official.ed1daf0bf` executado (`--headless --version`, exit 0); `test_contrato.gd` → 16 `PASS` + `OK test_contrato` + exit 0; `sha256sum modulos/exemplo/regras.cfg` = `b2c11e6d84ac9db0ff4698343a3d47132e34f5e54d2f5b7f54c0d6374d4cd746` (218 bytes); `git diff --stat -- nucleo/` vazio; `grep -c '"assets": \[\]'` = 1.
+- Analyze READ-ONLY encontrou 3 divergências de escopo (spec, plano e tasks prometiam 39/39 caminhos); corrigidas na fonte para 14/39 presentes e 25 pendências explícitas das Tasks 2–6. Nenhuma reivindicação de `OK_CAMINHOS` completo.
+- Gates finais (02:02:49Z): `hub_docs_gate PASS (0 erros)`, `check_sdd_completeness PASS (spec_dirs=8 gaps=0)`, `check_converge_append_only PASS (files=0)`, `check_task_id_uniqueness PASS (duplicates=0)`, `work_order_dag PASS (tasks=222 cycles=0)`. `pytest -q` = exit 5 (N/A, sem suíte); `check_production_gate.py --check` = N/A por Bloco 0.a.
+- Remoto verificado ao vivo: PR #13 `OPEN` (base `dev`), check `gates` `SUCCESS` (`44657956734`). **Sem merge, auto-merge, force-push ou deleção** — aprovador distinto e revisão deliberada permanecem **[NV]**. PRs #1–#12 `MERGED`, 0 abertos antes deste.
+- Próximo 80/20: Task 2–3 (servidor headless + validação autoritativa, CE-2), agora desbloqueada pelo contrato. Requererá novo ciclo SDD e PR próprio.
+
+## 2026-11-20T03:09:54Z — Ciclo 009 (CE-2/Tasks 2-3) concluído e mesclado
+
+- Branch `feature/009-servidor-validacao` (NNN=009 por `create-new-feature.sh --dry-run`); commit `b918515` (20 arquivos, 579 inserções); PR #14 `MERGED` em `dev` às 03:09:54Z, check `gates` SUCCESS observado ao vivo. Autorização de merge fornecida pelo prompt de orquestração.
+- R1 `go`; spec/plano/tasks/checklist; R4 aprovado (`.specify/validations/servidor-validacao/validate.md`); R7 `1.0.0`.
+- Evidência local: `SERVIDOR_PRONTO porta=7777`; suites `test_contrato` 16 PASS, `test_servidor` 6, `test_loopback` 8 (20 snapshots/1 s), `test_validacao` 9 — total 39 PASS, 0 FAIL, exit 0. Godot `4.7.2.stable.official.ed1daf0bf`.
+- Três ondas de agentes (artefatos SDD / código / mapeamento GDD-[NV]) e três corretivas determinísticas por erro real observado; nenhuma correção afirmada sem comando de verificação.
+- Gates finais (03:08:52Z): 5/5 PASS (`spec_dirs=9`, `gaps=0`, `tasks=222`, `cycles=0`, `0 erros`). `pytest -q` = exit 5 (N/A); `check_production_gate.py` N/A por Bloco 0.a.
+- GDD: `### 16.7 Checklist de implementação` inserida após a linha 1567, preservando §16.1–16.6 e §17+; marcação conservadora com **[NV]** em conexão UDP real, deploy e federação.
+- **[NV]** remanescentes: conexão UDP real entre clientes, Ilha Meio (CE-3), manifesto (CE-4), evidência (CE-5), deploy/serviços remotos e aprovador distinto. Próximo 80/20: Task 4 (Ilha Meio).
+
+## 2026-11-20T03:21:31Z — Fatia 80/20 concluída (ciclos 008–012 mesclados)
+
+- Ciclos 010 (PR #15, 03:14:25Z), 011 (PR #16, 03:18:08Z) e 012 (PR #17, 03:21:19Z) mesclados em `dev`, cada um com check `gates` SUCCESS observado ao vivo. Autorização de merge fornecida pelo prompt de orquestração; retry aplicado no PR #15 após falha transitória do CLI.
+- Task 4: IlhaSincronia + mapa + regra de produção; 56 PASS em 6 suites, `DELTA_EVENTO_MS 0`. Task 5: manifesto + gate local; 7 PASS, `COMPAT_OK`, divergência de hash recusada e arquivo restaurado; SC-004 corrigido para `make_exit=2` real. Task 6: `make check` exit 0 (5 `OK` + `COMPAT_OK`), CSV 9 colunas com 1 `NAO_VERIFICADO`, registro datado.
+- Correções determinísticas ao plano registradas nos R4: `sha256_string()` → `HashingContext` (009/011), acumulador 30→20 Hz com tolerância (009), `Engine.get_main_loop().get_multiplayer()` (009), `make_exit=2` (011).
+- Verificação final (03:21:31Z): 5 gates PASS (`spec_dirs=12`, `files=12`, `tasks=222`, `cycles=0`); `make check` exit 0; 17/17 PRs `MERGED`, 0 abertos; 12/12 execuções CI `success`; 12 specs / 12 validations / 12 releases / 47 docs Markdown.
+- IANA CSV consultado sem entrada específica para porta 7777 — marcador permanece **[NV]** quanto a registro, sem afirmar indisponibilidade.
+- GDD `16.7 Checklist de implementação`: CE-1..CE-5 marcados; Ilha Topo/Inferior, funções, vitória Central e 5v5 permanecem `[ ]`; deploy/serviços remotos/federação **[NV]**.
+
+## 2026-11-20T10:05:42Z — MVP completo e [NV] de UDP real fechado
+
+- Ciclos 013 (PR #18), 014 (PR #19), 015 (PR #20), 016 (PR #21) e 017 (PR #22) mesclados em `dev` com check `gates` SUCCESS observado ao vivo. Autorização de merge fornecida pelo prompt de orquestração.
+- Entregas: Ilha Topo (16 `PASS`), Ilha Inferior/Materiais (16 `PASS`), Artesão/Guerreiro (18 `PASS`), Ilha Central/vitória (18 `PASS`) e conexão UDP real de 2 processos (`make test-rede-e2e` exit 0, envelope JSON próprio via `send_bytes`/`peer_packet` na porta 7780).
+- Correções determinísticas registradas nos R4: preload de `IlhaSincronia` restaurado (013), inferência `: Mundo` (013), variável `i` e limite de loop de recarga (015), `Time.get_ticks_msec()` no lugar de `OS.get_ticks_msec()` (017).
+- Verificação final: 39/39 caminhos canônicos; 5 gates PASS; `make check` exit 0; `make test-rede-e2e` exit 0; 131 `PASS` em 11 suítes, 0 `FAIL`; 22/22 PRs `MERGED`, 0 abertos; 15/15 CI `success`.
+- GDD `16.7`: 18/18 critérios de aceitação do MVP marcados; CE-1..CE-5 marcados; escopo de produção (6 ilhas/20 s, 5v5) e federação permanecem fora / **[NV]**.
+- Evidência `docs/progress/evidence.csv`: UDP real promovido a `PASS`; novo `EV-20261120-009` registra **[NV]** de NAT/clientes externos, preservando a regra de pelo menos uma linha não verificada.
+
+## 2026-11-20T10:58Z — Diretrizes da SE: CI green, IAMAdapter e escopo solo
+
+- **Regra de merge alterada:** CI/CD verde observado é autoridade suficiente para merge autônomo em `dev`/`main` via `gh`, sem aprovação humana. Registrada em `.specify/memory/constitution.md:22` e `AGENTS.md:60`. PRs #13–#22 aprovados retroativamente pela autorização da SE. Se o CI não inspirar confiança, o próximo 80/20 imediato é reforçá-lo.
+- **Zitadel substituído** por IAMAdapter/IAMInterface: ADR-003 e contrato em `docs/architecture/iam-interface.md`. Registros históricos (ciclo 007, append-only) mantêm a menção antiga como contexto datado.
+- **Escopo solo/single confirmado:** sem 5v5, sem lobby, sem testes de Internet/NAT nesta fase. Roteiro de validação para a SE em `docs/ROTEIRO-TESTE-SOLO.md`, com script `tests/roteiro_solo.sh`.
+- Marcadores remanescentes continuam **[NV]** por exigirem ambiente, credencial ou decisão de produto; nenhum foi reclassificado como verde por inferência.
