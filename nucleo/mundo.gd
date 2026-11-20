@@ -3,6 +3,7 @@ class_name Mundo
 
 const PASSO_SEGUNDOS: float = 1.0 / 30.0
 const IlhaSincronia = preload("res://nucleo/desafios/ilha_sincronia.gd")
+const IlhaTopo = preload("res://nucleo/desafios/ilha_topo.gd")
 
 var tick: int = 0
 var epoch: int = 1
@@ -12,6 +13,7 @@ var comandos_pendentes: Array = []
 var comandos_do_tick: Array = []
 
 var ilha_sincronia = IlhaSincronia.new()
+var ilha_topo = IlhaTopo.new()
 var estado_persistido: String = ""
 
 func adicionar_jogador(peer_id: int) -> void:
@@ -44,6 +46,8 @@ func _fase_skills() -> void:
 			jogador["posicao"] = (cmd["destino"] as Array).duplicate(true)
 		elif cmd["acao"] == "sinalizar_sincronia":
 			ilha_sincronia.sinalizar(int(cmd["peer_id"]), int(cmd["alvo"]), float(tick) * PASSO_SEGUNDOS)
+		elif cmd["acao"] == "sinalizar_alavanca":
+			ilha_topo.sinalizar_alavanca(int(cmd["peer_id"]), int(cmd["alvo"]), float(tick) * PASSO_SEGUNDOS)
 
 func _fase_finish() -> void:
 	var gas: Dictionary = ilha_sincronia.aplicar_gas(PASSO_SEGUNDOS)
@@ -54,6 +58,8 @@ func _fase_finish() -> void:
 		remover_jogador(int(peer_id))
 	if ilha_sincronia.capturada:
 		estado_persistido = ilha_sincronia.estado_persistido
+	if ilha_topo.capturada:
+		estado_persistido = ilha_topo.estado_persistido
 	comandos_do_tick.clear()
 
 func hash_estado() -> String:

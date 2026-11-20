@@ -7,6 +7,14 @@
 			"placas": [1, 2],
 			"janela_segundos": 5.0,
 			"jogadores_necessarios": 2
+		},
+		{
+			"id": "ilha_topo",
+			"tipo": "topo",
+			"alavancas": [1, 2, 3],
+			"janela_segundos": 45.0,
+			"tempo_alavanca_segundos": 8.0,
+			"reinicio_segundos": 2.0
 		}
 	]
 }
