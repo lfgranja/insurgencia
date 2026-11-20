@@ -1,15 +1,22 @@
 # STATE.md — Insurgência
 
-## Estado vivo — 2026-11-19T22:46:15Z
+## Estado vivo — 2026-11-20T00:09:52Z (consolidação final)
 
-- **Atualizado em**: 2026-11-19T22:46:15Z — resolução dos [NV] de aprovação/merge/CI por autorização explícita do usuário; fatos verificados ao vivo via `gh`.
-- **PRs (ao vivo)**: #1 `MERGED` 2026-11-19T22:45:33Z, commit `5f18526`; #2 `MERGED` 2026-11-19T22:45:53Z, commit `741f4f1`; #3 `MERGED` 2026-11-19T22:46:15Z, commit `3e0a213`. `mergedBy=lfgranja` nos três.
-- **PRs abertos**: 0 — `gh pr list --state open` = `[]`.
-- **Branch `dev`**: HEAD `3e0a213` (commit do PR #3).
-- **CI**: `statusCheckRollup=[]` nos PRs #1–#3 — nenhum check de CI reportado/configurado (verificado ao vivo).
-- **Proteção de branch**: não consultável — `gh api repos/lfgranja/insurgencia/branches/dev/protection` → HTTP 403 "Upgrade to GitHub Pro or make this repository public"; limitação de plano registrada como conhecida, não como verde.
-- **ADRs**: ADR-001 e ADR-002 com `Estado: Aprovado`, versão 1.0.1 — aprovação = autorização explícita do usuário + `mergedBy=lfgranja` nos PRs #2/#3; nenhum review `APPROVED` emitido na plataforma e nenhum check exigido. Corpo das decisões inalterado.
-- **Âncora atual**: `.specify/feature.json` → `specs/002-emenda-gdd-adrs` (Ciclo 002 concluído e integrado).
+- **Atualizado em**: 2026-11-20T00:09:52Z — todos os branches locais mesclados em `dev`, zero PRs abertos, gates locais PASS; trabalho restante depende de autorização humana/SE.
+- **Branch `dev`**: HEAD `f8c98e6` (merge do PR #6, ciclo 004). PRs #1 `5f18526`, #2 `741f4f1`, #3 `3e0a213`, #4 `a5e4131`, #5 `f5a6b32`, #6 `f8c98e6` — todos `MERGED`, `mergedBy=lfgranja`.
+- **CI**: `statusCheckRollup=[]` em todos os PRs — nenhum check configurado/reportado (verificado ao vivo).
+- **Proteção de branch**: API HTTP 403 por plano do repositório; permanece **[NV]** como limitação conhecida, não afirmada como verde.
+- **ADRs**: ADR-001/002 `Aprovado` v1.0.1; âncora de feature: `.specify/feature.json` → `specs/004-verifica-nv-externa` (ciclo 004 concluído e integrado).
+- **Ciclos concluídos**: 001 (governança/ADRs), 002 (emenda do GDD), NV (resolução de marcadores verificáveis), 003 (baselines locais), 004 (verificação externa de 12 fatos). Todos com R4 aprovado, R7 1.0.0 e PR mesclado em `dev`.
+- **Gates finais locais**: `sdd-completeness PASS (4/0/0)`, `work_order_dag PASS (133 tarefas/4 features, 0 ciclos)`, `task-id-uniqueness PASS`, `converge-append-only PASS`, `hub_docs_gate PASS (0 erros)`. `pytest -q` (exit 5) e `check_production_gate.py` (exit 2) permanecem N/A por decisão do Bloco 0.a.
+
+### [NV] remanescentes — dependem de autorização/execução externa
+
+- Instalar Godot 4.7.2 e executar suíte headless/benchmarks 5v5 — exige autorização de dependência.
+- CI remoto (GitHub Actions), Postgres/Zitadel/Coolify no Gru — exige configuração/acesso remoto autorizado.
+- Publicação, release e deploy externos — nenhuma evidência ao vivo; ato humano separado.
+- Proteção de branch — exige repositório público ou Plano Pro (decisão da SE).
+- Marcadores de classe C (salvaguarda metodológica) e B (execução externa) restantes foram preservados intencionalmente.
 
 ### Limitações conhecidas / [NV] remanescentes
 
