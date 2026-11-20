@@ -5,15 +5,19 @@
     "specs/018-iam-adapter-local/converge.md": {
       "bytes": 1056,
       "sha256": "22286499c0d9209d0c9cca93ab545e8485b59a8140ee3bbcabe1824f9e7ee6af"
+    },
+    "specs/019-tela-resultado/converge.md": {
+      "bytes": 1034,
+      "sha256": "7e7b993f96b96a9e626c2dd97acb3dbb104fa6b7275a6c878ffdbccc4a799c25"
     }
   },
   "_provenance": {
     "origem": "alvo-local",
     "repo": "lfgranja/insurgencia",
-    "head": "51945f5",
+    "head": "c7d5882",
     "data": "2026-11-20",
     "metodo": "python3 scripts/ci/check_converge_append_only.py --bootstrap",
     "factory_utilizada": false,
-    "nota": "Entrada 018 adicionada por bootstrap deterministico apos materializacao legitima de specs/018-iam-adapter-local/converge.md. Nenhum arquivo preexistente foi reescrito; ratchet permanece ativo."
+    "nota": "Entradas 018 e 019 adicionadas por bootstrap deterministico apos materializacao legitima de converge.md. Nenhum arquivo preexistente foi reescrito; ratchet permanece ativo."
   }
 }
