@@ -1566,6 +1566,39 @@ Durações são [HIPÓTESE — ritmo de um desenvolvedor com base em engenharia 
 
 O MVP está fechado quando todos os critérios de aceitação acima passarem em duas partidas consecutivas, uma delas com cliente modificado.
 
+### 16.7 Checklist de implementação
+
+> Estado verificado em 2026-11-20T03:08Z. **[x]** = concluído com comando executado e saída colada; **[~]** = parcial (lógica validada, integração pendente); **[ ]** = não implementado. Nenhum marcador afirma execução remota sem confirmação ao vivo.
+
+**Governança e aparato**
+- [x] Constituição local, factory como fonte (HEAD `b1deab1`) e gate autoritativo do alvo
+- [x] 9 ciclos SDD com R1/R4/R7; 5 gates determinísticos PASS
+- [x] ADR-001 (GDScript) e ADR-002 (MIT) aprovadas
+- [x] CI remoto, proteção de `dev` e PRs #1–#13 mesclados (verificados ao vivo via `gh`)
+- [x] Godot 4.7.2 executável localmente; benchmark headless executado
+
+**Fatia 80/20 (spec CE-1..CE-5)**
+- [x] CE-1 — estrutura e contrato versionado (16 `PASS`; hash `b2c11e6d…`; 14/39 caminhos)
+- [~] CE-2 — servidor headless e validação (6 + 8 + 9 `PASS`; `SERVIDOR_PRONTO porta=7777`); conexão UDP real entre clientes **[NV]**
+- [ ] CE-3 — Desafio da Ilha Meio
+- [ ] CE-4 — `manifesto.json` e gate local de compatibilidade
+- [ ] CE-5 — `evidence.csv` (9 colunas) e `make check`
+
+**Critérios de aceitação do MVP (§16.4 — 18 itens)**
+- [~] 1514 — 2 clientes em IP:porta na mesma partida: handshake em teste unitário; conexão real **[NV]**
+- [~] 1515 — servidor aceita só intenções: `normalizar_pacote` e `handle_command` testados; integração de rede pendente
+- [ ] 1516, 1519–1521 — Ilha Topo (alavancas, ordem, janela)
+- [ ] 1524–1527 — Ilha Meio (2 placas/5 s, gás, regra de produção)
+- [ ] 1530–1531 — Ilha Inferior (Materiais, recarga, material forjado)
+- [ ] 1534–1535 — Artesão (Barricada) e Guerreiro (Ataque Forte)
+- [ ] 1538–1541 — Ilha Central e condição de vitória
+
+**Fora do MVP / pendente de autorização**
+- [ ] Fase 5 — governança de comunidade, editor e funções restantes
+- [ ] Deploy/publicação, Postgres/Coolify remotos, Zitadel, `pgmq` e federação forte — **[NV]**
+
+Este checklist registra estado; não substitui os critérios normativos de §16.4 nem o fechamento em duas partidas consecutivas (§16.6). Histórico datado em `docs/PROGRESSO.md`.
+
 ## 17. Métricas de Sucesso
 
 A instrumentação registra eventos no Núcleo, nunca apenas no cliente. Toda meta abaixo é [HIPÓTESE] e deve ser recalibrada após 20 partidas instrumentadas. [HIPÓTESE — amostra mínima para separar sorte de padrão.]
