@@ -19,7 +19,7 @@ VI. **Verificação honesta.** Nada é afirmado como verde sem comando executado
 ## Normas de trabalho
 
 - Commits convencionais em português brasileiro; staging explícito; nunca `git add -A` ou `git add .`.
-- Branch `feature/<NNN>-<slug>`, PR para `dev`/`main` via `gh`; sem merge, auto-merge ou force-push automáticos.
+- **CI/CD e merge:** check obrigatório verde observado no CI/CD é autoridade suficiente para mesclar em `dev`/`main` de forma autônoma via `gh`, **sem aprovação humana**. Se o CI/CD não inspirar confiança, o próximo 80/20 **imediato** é reforçá-lo até inspirar confiança para merge autônomo. Auto-merge habilitado no provedor, force-push, reescrita e deleção de branch alheia continuam proibidos. PRs #13–#22 aprovados retroativamente pela autorização da SE (2026-11-20T10:58Z).
 - Identidade da feature vem de `.specify/feature.json` / `check-prerequisites.sh --json`, nunca do nome do branch.
 - Nenhum segredo, token ou credencial em arquivos, logs ou mensagens.
 - Em caso de divergência entre constituição, AGENTS.md e documento normativo externo, prevalece o registro de governança do alvo (Bloco 0.a).

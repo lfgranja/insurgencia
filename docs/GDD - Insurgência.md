@@ -1572,30 +1572,30 @@ O MVP está fechado quando todos os critérios de aceitação acima passarem em 
 
 **Governança e aparato**
 - [x] Constituição local, factory como fonte (HEAD `b1deab1`) e gate autoritativo do alvo
-- [x] 9 ciclos SDD com R1/R4/R7; 5 gates determinísticos PASS
+- [x] 17 ciclos SDD com R1/R4/R7; 5 gates determinísticos PASS; `make check` e `make test-rede-e2e` exit 0
 - [x] ADR-001 (GDScript) e ADR-002 (MIT) aprovadas
-- [x] CI remoto, proteção de `dev` e PRs #1–#14 mesclados (verificados ao vivo via `gh`)
+- [x] CI remoto, proteção de `dev` e PRs #1–#22 mesclados (verificados ao vivo via `gh`)
 - [x] Godot 4.7.2 executável localmente; benchmark headless executado
 
 **Fatia 80/20 (spec CE-1..CE-5)**
-- [x] CE-1 — estrutura e contrato versionado (16 `PASS`; hash `b2c11e6d…`; 14/39 caminhos)
-- [~] CE-2 — servidor headless e validação (6 + 8 + 9 `PASS`; `SERVIDOR_PRONTO porta=7777`); conexão UDP real entre clientes **[NV]**
+- [x] CE-1 — estrutura e contrato versionado (16 `PASS`; hash `b2c11e6d…`; 39/39 caminhos canônicos presentes)
+- [x] CE-2 — servidor headless e validação (6 + 8 + 9 `PASS`; `SERVIDOR_PRONTO 7777`; UDP real com 2 clientes no E2E)
 - [x] CE-3 — Ilha Meio (14 `PASS` + `OK test_ilha_sincronia`; `DELTA_EVENTO_MS 0` + 3 `PASS`)
 - [x] CE-4 — manifesto e gate local (7 `PASS`; `COMPAT_OK module_id=insurgencia.exemplo`; 3 execuções idênticas; divergência de hash recusada)
 - [x] CE-5 — evidência auditável (`make check` exit 0; CSV de 9 colunas; 1 `NAO_VERIFICADO` explícito)
 
 **Critérios de aceitação do MVP (§16.4 — 18 itens)**
-- [~] 1514 — 2 clientes em IP:porta na mesma partida: handshake em teste unitário; conexão real **[NV]**
-- [~] 1515 — servidor aceita só intenções: `normalizar_pacote` e `handle_command` testados; integração de rede pendente
-- [ ] 1516, 1519–1521 — Ilha Topo (alavancas, ordem, janela)
+- [x] 1514 — 2 clientes em IP:porta na mesma partida: 2 processos UDP reais em 127.0.0.1:7780 com `join_accept` (ciclo 017)
+- [x] 1515 — servidor aceita só intenções: `normalizar_pacote`/`handle_command` testados e comandos pela rede aceitos no E2E
+- [x] 1516, 1519–1521 — Ilha Topo (ordem 1→2→3 em 45 s, erro reinicia em 2 s, validação no servidor; 16 `PASS`)
 - [x] 1524–1527 — Ilha Meio (2 placas/5 s, gás 8/amostra, 24 em 3 s, regra de produção 3 no Módulo base)
-- [ ] 1530–1531 — Ilha Inferior (Materiais, recarga, material forjado)
-- [ ] 1534–1535 — Artesão (Barricada) e Guerreiro (Ataque Forte)
-- [ ] 1538–1541 — Ilha Central e condição de vitória
+- [x] 1530–1531 — Ilha Inferior (5 Materiais/3 s, 3 ciclos, recarga 20 s, crédito forjado recusado; 16 `PASS`)
+- [x] 1534–1535 — Artesão (20 Materiais/1,5 s/200 PV/12 s) e Guerreiro (2×/1,2 s/6 s); 18 `PASS`
+- [x] 1538–1541 — Ilha Central e condição de vitória (3 ilhas, 4 s, Artesão+Guerreiro vivos, servidor declara; 18 `PASS`)
 
 **Fora do MVP / pendente de autorização**
 - [ ] Fase 5 — governança de comunidade, editor e funções restantes
-- [ ] Deploy/publicação, Postgres/Coolify remotos, Zitadel, `pgmq` e federação forte — **[NV]**
+- [ ] Deploy/publicação, Postgres/Coolify remotos, IAMAdapter/IAMInterface, `pgmq` e federação forte — **[NV]**
 
 Este checklist registra estado; não substitui os critérios normativos de §16.4 nem o fechamento em duas partidas consecutivas (§16.6). Histórico datado em `docs/PROGRESSO.md`.
 
