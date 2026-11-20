@@ -6,6 +6,7 @@ const IlhaSincronia = preload("res://nucleo/desafios/ilha_sincronia.gd")
 const IlhaTopo = preload("res://nucleo/desafios/ilha_topo.gd")
 const PontoColeta = preload("res://nucleo/desafios/ponto_coleta.gd")
 const Funcoes = preload("res://nucleo/sim/funcoes.gd")
+const IlhaCentral = preload("res://nucleo/desafios/ilha_central.gd")
 
 var tick: int = 0
 var epoch: int = 1
@@ -18,6 +19,7 @@ var ilha_sincronia = IlhaSincronia.new()
 var ilha_topo = IlhaTopo.new()
 var ponto_coleta = PontoColeta.new()
 var funcoes = Funcoes.new()
+var ilha_central = IlhaCentral.new()
 var estado_persistido: String = ""
 
 func adicionar_jogador(peer_id: int) -> void:
@@ -25,6 +27,53 @@ func adicionar_jogador(peer_id: int) -> void:
 
 func remover_jogador(peer_id: int) -> void:
 	jogadores.erase(peer_id)
+
+func definir_funcao(peer_id: int, nome_funcao: String) -> void:
+	if jogadores.has(peer_id):
+		jogadores[peer_id]["funcao"] = nome_funcao
+
+func definir_presenca_central(peer_id: int, presente: bool) -> void:
+	if jogadores.has(peer_id):
+		jogadores[peer_id]["presente_central"] = presente
+
+func vitoria_declarada_persistida() -> bool:
+	return ilha_central.vitoria_declarada or estado_persistido == IlhaCentral.EVENTO_VITORIA
+
+func _contar_ilhas_concluidas() -> int:
+	var concluidas: int = 0
+	if ilha_sincronia.capturada:
+		concluidas += 1
+	if ilha_topo.capturada:
+		concluidas += 1
+	if int(ponto_coleta.total_creditado) > 0:
+		concluidas += 1
+	return concluidas
+
+func _funcoes_no_centro() -> Array:
+	var presentes: Array = []
+	for peer_id in jogadores.keys():
+		var jogador: Dictionary = jogadores[peer_id]
+		if int(jogador.get("vida", 0)) <= 0 or not bool(jogador.get("presente_central", false)):
+			continue
+		presentes.append({
+			"peer_id": int(peer_id), "funcao": str(jogador.get("funcao", "")),
+			"viva": true, "presente": true,
+		})
+	return presentes
+
+func _atualizar_ilha_central(agora: float) -> void:
+	if ilha_central.vitoria_declarada:
+		estado_persistido = ilha_central.estado_persistido
+		return
+	var funcoes_presentes: Array = _funcoes_no_centro()
+	var ilhas_concluidas: int = _contar_ilhas_concluidas()
+	if ilha_central.canalizando and not ilha_central.verificar_funcoes(funcoes_presentes):
+		ilha_central.interromper()
+	if not ilha_central.canalizando:
+		ilha_central.iniciar_canalizacao(ilhas_concluidas, funcoes_presentes, agora)
+	var resultado: Dictionary = ilha_central.avancar(agora)
+	if bool(resultado.get("vitoria", false)):
+		estado_persistido = ilha_central.estado_persistido
 
 func agendar_comando(peer_id: int, cmd: Dictionary) -> void:
 	var copia: Dictionary = cmd.duplicate(true)
@@ -91,10 +140,12 @@ func _fase_finish() -> void:
 	funcoes.avancar(float(tick) * PASSO_SEGUNDOS)
 	ponto_coleta.avancar(float(tick) * PASSO_SEGUNDOS)
 	comandos_do_tick.clear()
+	_atualizar_ilha_central(float(tick) * PASSO_SEGUNDOS)
 
 func hash_estado() -> String:
 	var ctx := HashingContext.new()
 	ctx.start(HashingContext.HASH_SHA256)
 	ctx.update(str(jogadores, tick).to_utf8_buffer())
 	ctx.update(str(funcoes.canalizacao, funcoes.barreiras, funcoes.recarga_ate).to_utf8_buffer())
+	ctx.update(str(vitoria_declarada_persistida(), ilha_central.progresso).to_utf8_buffer())
 	return ctx.finish().hex_encode()
