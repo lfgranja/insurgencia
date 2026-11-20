@@ -21,4 +21,8 @@ static func validar(mundo, peer_id: int, cmd: Dictionary) -> Dictionary:
 		var deslocamento: Vector2 = Vector2(destino[0] - origem[0], destino[1] - origem[1])
 		if deslocamento.length() > LIMITE_MOVIMENTO_M:
 			return {"valido": false, "codigo": "MOVIMENTO_FORA_DO_LIMITE"}
+	if acao == "sinalizar_sincronia":
+		var alvo: int = int(cmd.get("alvo", 0))
+		if alvo < 1 or alvo > 2:
+			return {"valido": false, "codigo": "PLACA_INVALIDA"}
 	return {"valido": true, "codigo": "OK"}
