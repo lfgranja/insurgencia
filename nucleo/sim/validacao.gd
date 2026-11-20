@@ -1,8 +1,9 @@
 extends RefCounted
 class_name ValidacaoComandos
 
-const ACOES_PERMITIDAS: Array = ["mover", "sinalizar_sincronia"]
+const ACOES_PERMITIDAS: Array = ["mover", "sinalizar_sincronia", "sinalizar_alavanca"]
 const LIMITE_MOVIMENTO_M: float = 1.0
+const ALAVANCAS_TOPO: int = 3
 
 static func validar(mundo, peer_id: int, cmd: Dictionary) -> Dictionary:
 	if not mundo.jogadores.has(peer_id):
@@ -25,4 +26,8 @@ static func validar(mundo, peer_id: int, cmd: Dictionary) -> Dictionary:
 		var alvo: int = int(cmd.get("alvo", 0))
 		if alvo < 1 or alvo > 2:
 			return {"valido": false, "codigo": "PLACA_INVALIDA"}
+	if acao == "sinalizar_alavanca":
+		var alavanca: int = int(cmd.get("alvo", 0))
+		if alavanca < 1 or alavanca > ALAVANCAS_TOPO:
+			return {"valido": false, "codigo": "ALAVANCA_INVALIDA"}
 	return {"valido": true, "codigo": "OK"}
