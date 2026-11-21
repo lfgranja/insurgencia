@@ -10,6 +10,7 @@
 | C3 | `verify.sh:2` | diz "casv-rust" | T007: corrigir |
 | C4 | `docs/GDD - Insurgência.md:1627` | CI remoto DEFER `[NV]` | T008: nota datada |
 | C6 | job `rust` (CI) | `dtolnay/rust-toolchain@master` exige input `toolchain`; CI RED 04:29Z | T005b: `toolchain: '1.99.1'` explícito |
+| C8 | job `rust` (CI) | `alsa-sys` exige `alsa.pc`; runner Ubuntu sem lib → CI RED 04:45Z | T005d: ampliar step para libasound2-dev + libs X11/GL |
 | C7 | job `rust` (CI) | `wayland-sys` exige `libwayland.pc`; runner Ubuntu sem lib → CI RED 04:37Z | T005c: step `Install system libraries` (pkg-config, libwayland-dev, libxkbcommon-dev, libx11-dev, libudev-dev) |
 
 ## Conflitos entre artefatos SDD

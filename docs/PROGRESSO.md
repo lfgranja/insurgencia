@@ -289,3 +289,8 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - **Regra da janela reforçada pela SE às 04:33Z**: agente SEMPRE roda o cliente com `--minimizado` em desenvolvimento, depuração, inspeção, teste, validação e segundo plano. **NUNCA** abrir janela normal enquanto a SE trabalha no notebook. Janela normal apenas sob pedido explícito e momentâneo. Registrada em `AGENTS.md` §Development Commands e §Testing & QA; janela aberta pelo agente foi encerrada imediatamente.
 - **CI do PR #34 (ciclo 028)**: job `gates` SUCCESS; job `rust` FAILURE em `Setup Rust` — `dtolnay/rust-toolchain@master` exige input `toolchain` e não lê `rust-toolchain.toml`. Corrigido com `toolchain: '1.99.1'` explícito, espelhando a fonte local. Artefatos SDD revisados (spec/plan/analyze C6/validate/release/converge append-only). Status remoto após correção: **[NV]** até check verde observado.
 
+## 2026-11-21T04:43Z — Ciclo 028: segunda falha do CI corrigida
+
+- CI run `44866958727` (após `toolchain: '1.99.1'`): job `gates` SUCCESS; job `rust` FAILURE em `verify.sh` stage 1 — `wayland-sys` panicked: `Package 'wayland-client' not found` no runner Ubuntu (Fedora local tem a lib). Corrigido com step `Install system libraries`: `pkg-config libwayland-dev libxkbcommon-dev libx11-dev libudev-dev`.
+- Verificação local após correção: YAML parse (4 steps no job rust), `pkg-config --exists wayland-client` OK, `./verify.sh` ALL STAGES OK, 5/5 gates SDD PASS. Status remoto do novo check: **[NV]** até observação ao vivo.
+
