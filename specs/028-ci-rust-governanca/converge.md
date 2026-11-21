@@ -16,3 +16,12 @@
 
 ## Atendimento
 FR-001..FR-008 atendidos. SC-001..SC-004 atendidos; SC-005 **[NV]** (CI remoto com o novo job ainda não observado ao vivo). Nenhum arquivo alheio tocado (ast-* assessments preservados). Baseline de converge inalterado (converge.md é novo, 028 não é baselined).
+
+## 2026-11-21T04:35Z — Revisão pós-CI (append-only)
+
+- CI do PR #34 (run `44866375752`): job `gates` SUCCESS; job `rust` FAILURE em `Setup Rust` — `'toolchain' is a required input` (dtolnay/rust-toolchain@master não lê `rust-toolchain.toml`). Corrigido com `toolchain: '1.99.1'` explícito.
+- Revisão de artefatos: spec FR-002/FR-003, plan, analyze (C6), validate (evidência remota) e release (Fixed) atualizados. Nenhuma baseline reescrita; nenhum converge anterior editado.
+- Regra da janela reforçada pela SE às 04:33Z: agente sempre `--minimizado`; janela normal encerrada imediatamente. Registrada em AGENTS.md e STATE.md.
+- Inspeção visual da SE confirmada por imagem anexada às 04:33Z: low-poly visível (terreno irregular, 4 ilhas, árvores/rochas, avatar, HUD) — resolve `[NV]` SC-005 do ciclo 027.
+- Reexecução local de `./verify.sh` e 5 gates pendente após esta revisão; CI remoto com job `rust` verde ainda **[NV]** até observação ao vivo.
+

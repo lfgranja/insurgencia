@@ -1,25 +1,26 @@
 # Release (R7) — 028-ci-rust-governanca
 
-**Data:** 2026-11-21T04:29Z · **Versão:** `1.0.0` · **R4:** aprovado
+**Data:** 2026-11-21T04:29Z (revisão 04:35Z) · **Versão:** `1.0.0` · **R4:** aprovado
 
 ## Changelog
 
 ### [1.0.0] — 2026-11-21
 ### Added
-- Job `rust` em `.github/workflows/ci-gates.yml` executando `./verify.sh` (check → clippy → nextest/test → fmt); toolchain lida de `rust-toolchain.toml`; job `gates` (docs) preservado.
+- Job `rust` em `.github/workflows/ci-gates.yml` executando `./verify.sh` (check → clippy → nextest/test → fmt); job `gates` (docs) preservado.
 
 ### Changed
-- `AGENTS.md` reescrito para refletir a realidade Rust/Bevy (5 crates, 34 testes, `verify.sh`, ADR-004, regra da janela) mantendo governança local (Bloco 0.a, SDD, append-only, 80/20, untrusted content).
-- `docs/GDD - Insurgência.md:1627` — CI remoto materializado; check `gates SUCCESS` observado em 2026-11-21T02:57Z; job `rust` **[NV]**.
+- `AGENTS.md` reescrito com stack Rust/Bevy, 34 testes, `verify.sh`, ADR-004 e regra da janela reforçada pela SE (agente sempre `--minimizado`; nunca janela normal durante trabalho de agente).
+- `docs/GDD - Insurgência.md:1627` — CI remoto materializado; check `gates SUCCESS` observado 2026-11-21T02:57Z.
 
 ### Fixed
-- `verify.sh:2` — cabeçalho corrigido de "casv-rust" para "Insurgência".
+- `verify.sh:2` — cabeçalho de "casv-rust" para "Insurgência".
+- `toolchain: '1.99.1'` explícito no job `rust` — a action `dtolnay/rust-toolchain@master` exige o input; CI RED detectado em 2026-11-21T04:29Z e corrigido em 04:35Z.
 
 ## Rastreabilidade
-FR-001..FR-008 · T001..T011 · SC-001..SC-005 · C1..C5 (analyze) · constituição art. CI/CD · ADR-004.
+FR-001..FR-008 · T001..T011 · SC-001..SC-005 · C1..C6 (analyze) · constituição art. CI/CD · ADR-004.
 
 ## Rollback
-`git revert <merge commit do PR>`; restaura `ci-gates.yml`, `AGENTS.md`, `verify.sh:2` e GDD:1627 ao estado anterior. Nenhuma baseline, gate ou trabalho alheio afetado.
+`git revert <merge commit do PR>`; restaura `ci-gates.yml`, `AGENTS.md`, `verify.sh:2` e GDD:1627. Nenhuma baseline ou trabalho alheio afetado.
 
 ## Não incluído
-Provider, CLI de PR, deploy, credenciais, assinatura GPG, itens 5-6, rede/5v5, trabalho da factory.
+Provider, CLI, deploy, credenciais, GPG, itens 5-6, rede/5v5, trabalho da factory, janela normal por iniciativa de agente.

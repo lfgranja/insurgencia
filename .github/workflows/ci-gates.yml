@@ -46,10 +46,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Toolchain fixada em rust-toolchain.toml (1.99.1 + rustfmt/clippy).
+      # Versão explícita: dtolnay/rust-toolchain@master exige o input `toolchain`.
+      # Espelha rust-toolchain.toml (1.99.1 + rustfmt/clippy) — fonte local.
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: '1.99.1'
           components: clippy, rustfmt
 
       # verify.sh usa cargo nextest quando disponível e faz fallback para

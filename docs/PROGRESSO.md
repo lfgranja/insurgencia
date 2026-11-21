@@ -283,3 +283,9 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - Dívidas documentais detectadas: `AGENTS.md` desatualizado (afirma "sem código/verify.sh" quando existem 5 crates Rust e gate verde); cabeçalho de `verify.sh` copiado do `casv-rust`. Não corrigidas nesta nota — candidatas ao 80/20.
 - Status remoto/CI/merge/proteções: **[NV]** nesta auditoria (sem confirmação ao vivo via UI/API além do gate local e do `gh pr view` do ciclo anterior).
 
+## 2026-11-21T04:35Z — Orquestração: confirmação visual, regra da janela e CI 028
+
+- **Inspeção visual da SE confirmada por imagem anexada às 04:33Z**: cena low-poly visível — terreno irregular triangulado, 4 ilhas com taludos/cores (azul, verde, violeta, laranja), árvores e rochas em cada ilha, avatar com corpo/cabeça e HUD. Resolve o `[NV]` de inspeção visual do ciclo 027 (SC-005). Captura de agente via `spectacle -b -n -f` funciona em Wayland (`/tmp/test-spectacle.png`, PNG 1366×768) — o limite técnico anterior de "imagem preta via Xwayland" não se aplica.
+- **Regra da janela reforçada pela SE às 04:33Z**: agente SEMPRE roda o cliente com `--minimizado` em desenvolvimento, depuração, inspeção, teste, validação e segundo plano. **NUNCA** abrir janela normal enquanto a SE trabalha no notebook. Janela normal apenas sob pedido explícito e momentâneo. Registrada em `AGENTS.md` §Development Commands e §Testing & QA; janela aberta pelo agente foi encerrada imediatamente.
+- **CI do PR #34 (ciclo 028)**: job `gates` SUCCESS; job `rust` FAILURE em `Setup Rust` — `dtolnay/rust-toolchain@master` exige input `toolchain` e não lê `rust-toolchain.toml`. Corrigido com `toolchain: '1.99.1'` explícito, espelhando a fonte local. Artefatos SDD revisados (spec/plan/analyze C6/validate/release/converge append-only). Status remoto após correção: **[NV]** até check verde observado.
+

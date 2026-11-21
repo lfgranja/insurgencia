@@ -40,15 +40,15 @@ python3 scripts/ci/check_converge_append_only.py
 python3 scripts/ci/hub_docs_gate.py
 
 # Cliente low-poly
-cargo run -p insurgencia-cliente                  # janela NORMAL — somente quando a SE pedir
-cargo run -p insurgencia-cliente -- --minimizado  # validação/inspeção por agente
+cargo run -p insurgencia-cliente -- --minimizado  # PADRÃO em TODO trabalho de agente (dev/debug/teste/validação)
+# NUNCA abrir janela normal durante trabalho de agente — a SE está no notebook.
 
 # Benchmark/Postgres (documentados; execução [NV])
 $G --headless --path tests/benchmark --script headless_tick.gd
 docker run ... postgres:16-alpine && psql -U insurgencia_app -f tests/postgres/003_smoke.sql
 ```
 
-`pytest -q` → "no tests ran" (exit 5) = N/A, not RED. `check_production_gate.py --check`, `.forgejo/**`, `fj`, `make check` are **not materialized** here (exit 2 = N/A, Bloco 0.a). Regra da janela (SE, 2026-11-21): **normal sem flag** só quando a SE solicitar; **`--minimizado`** em debug/teste/validação de agente.
+`pytest -q` → "no tests ran" (exit 5) = N/A, not RED. `check_production_gate.py --check`, `.forgejo/**`, `fj`, `make check` are **not materialized** here (exit 2 = N/A, Bloco 0.a). **Regra da janela (SE, 2026-11-21, reforçada):** agente SEMPRE roda o cliente com `--minimizado` — desenvolvimento, depuração, inspeção, teste, validação, segundo plano. **NUNCA** abrir janela normal enquanto a SE trabalha no notebook. Janela normal só sob pedido explícito e momentâneo da SE para inspeção visual direta; nunca por iniciativa do agente.
 
 ## Code Conventions & Common Patterns
 
