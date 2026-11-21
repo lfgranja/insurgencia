@@ -132,3 +132,9 @@ Nenhuma percentagem é declarada — a governança proíbe. Contagens verificada
 - **Gates SDD (13:18:27Z)**: 5/5 PASS — SDD `spec_dirs=30 gaps=0`, DAG `262 tarefas/0 ciclos`, task-id `0 duplicatas`, converge `13/13`, hub-docs `0 erros/0 avisos`. `check_production_gate.py` ausente no alvo → exit 2 = N/A, não RED.
 - **Remoto ao vivo (13:19:29Z, `gh`)**: `lfgranja/insurgencia` público, default `main`; **0 PRs abertos**; 5 runs recentes de `deterministic-gates` com `conclusion=success`; proteção de `dev` exige check `gates`, `enforce_admins=false`, sem reviews obrigatórios; `main` desprotegido (HTTP 404). `ls-remote` confirma `dev=3709c56` igual ao HEAD local.
 - **[NV]**: `./verify.sh` completo em execução; confirmação visual final da SE (PR #35); deploy/publicação; assinatura GPG; detalhes de required checks do job `rust` na proteção remota (só `gates` é exigido).
+
+### Atualização verificada — 2026-11-21T20:25Z
+
+- PR #36 mesclado em `dev` (`ce2d1f0`, 20:25:35Z) sob autorização expressa do SE, com `gates` e `rust` verdes e `./verify.sh` 34/34. 0 PRs abertos.
+- Proteção de `dev` endurecida com autorização expressa: required checks agora `["gates","rust"]` (antes só `gates`), `strict=true`, `enforce_admins=false`, sem reviews/restrições. Verificado por PUT e GET via `gh api`; evidência em `docs/PROGRESSO.md`.
+- `[NV]/DEFER`: confirmação visual da SE, deploy/publicação e assinatura GPG.
