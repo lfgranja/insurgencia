@@ -45,6 +45,10 @@
     "specs/028-ci-rust-governanca/converge.md": {
       "bytes": 1478,
       "sha256": "f0b63f2b133fe35577959816f80e59014d6129343db98d934a74245c36cd4f68"
+    },
+    "specs/029-hud-glyphs/converge.md": {
+      "bytes": 622,
+      "sha256": "57ca664061b9f5b87fc9b5f8d32660386f044f1d2ac9d5d38395645067571bc5"
     }
   },
   "_provenance": {
