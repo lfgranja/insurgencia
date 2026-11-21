@@ -247,3 +247,30 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - Branch `feature/023-cliente-greybox`, NNN=023 por `create-new-feature.sh --dry-run`; `feature.json` → `specs/023-cliente-greybox`.
 - Artefatos SDD e código Bevy do cliente entregues por agentes: `App` com `DefaultPlugins`, `Camera2d`, avatar com input WASD/setas, quatro ilhas geométricas (Topo/Meio/Inferior/Central) e painel de texto.
 - Resolução de dependência: `thiserror` unificado em `=2.0.21` nos crates `contratos` e `sim` (pin exato) para atender à cadeia Bevy 0.20.1 → `bevy_shader` → `wesl` → `wgsl-parse` (`^2.0.12`); nenhum pacote foi substituído por nome similar.
+
+## 2026-11-21T01:26Z — Entregável da SE concluído (itens 1–4)
+
+- PR #29 (ciclo 023): cliente greybox Bevy jogável, janela minizada; 20 testes Rust. GPU Vulkan detectada e janela criada sem erro. Inspeção visual **[NV]**.
+- PR #30 (ciclo 024): instrumentação no Núcleo, 20 partidas com métricas §17 e corredor de duas partidas com cliente modificado (GDD:1567); 28 testes. Relatório datado em `docs/evidencias/metricas-20-partidas-2026-11-21.md`.
+- PR #31 (ciclo 025): exportação versionada, `COPYRIGHT.txt` e DCO; 34 testes. Assinatura GPG **[NV]** (sem chave no ambiente).
+- GDD `16.7` atualizado com migração ADR-004 e os 4 itens; itens 5 e 6 permanecem DEFER por decisão da SE.
+- Verificação final: 5/5 gates do alvo PASS, `verify.sh` ALL STAGES OK, 31/31 PRs mesclados, 0 abertos.
+
+## 2026-11-21T01:57Z — Confirmação visual da SE sobre o cliente greybox
+
+- Observação direta da SE: o jogo abre, o avatar se movimenta com WASD/setas e, ao passar sobre as ilhas, o painel identifica a região. Registrado como verdade observada, sem reexecução por agente.
+- Resolve o marcador `[NV]` de inspeção visual do greybox constante do R4 do ciclo 023 e do GDD `16.7`. O limite remanescente e tecnico de captura (ponte Xwayland gera imagem preta), nao do jogo.
+
+## 2026-11-21T02:28:07Z — Ciclo 026 (cliente low-poly 3D) mesclado
+
+- PR #32 `MERGED` em `dev`, check `gates` SUCCESS; total 32 PRs mesclados, 0 abertos. NNN=026 por `create-new-feature.sh --dry-run`.
+- Item 1 redefinido pela SE de "greybox" para "low-poly": `main.rs` migrado de `Camera2d`/`Sprite` para `Camera3d`, iluminação e malhas procedurais (cubos/prismas/avatar cone), sem textura; `lib.rs` puro e seus 5 testes preservados.
+- GDD §13.2 e limite ≤10k triângulos (`:1127`) atendidos por construção; Kenney CC0 registrado como fonte futura, não baixado (host fora da allowlist).
+- Gate Rust: `verify.sh` ALL STAGES OK, 34 testes; 5 gates do alvo PASS. Binário rodou minizado por 18s com Vulkan e janela criada sem erro. Inspeção visual da SE **[NV]**.
+## 2026-11-21T02:55Z — Ciclo 027 (low-poly visual real) em PR
+
+- Correção do report da SE: o ciclo 026 entregou primitivas 3D (greybox), não low-poly visual. `main.rs` reescrito com malhas irregulares: terreno 16×10 (320 triângulos), ilhas com contorno de 8 vértices e taludo (32 triângulos), 3 árvores + 2 rochas por ilha e avatar com base/corpo/cabeça icosaédrica; 4 cores preservadas, sem textura.
+- Bug encontrado e corrigido: B0004 do Bevy — pai do avatar sem `Visibility` tornava os 3 filhos invisíveis (conforme doc oficial). Corrigido com `Visibility::default()`; `Transform::IDENTITY` adicionado aos spawns de terreno/topo/taludo. Também corrigidos E0308 (`cor: [f32; 3]`) e lints de precisão do hash.
+- `lib.rs` intacto (5 testes); `verify.sh` ALL STAGES OK, 34 testes nextest; 5/5 gates do alvo PASS; runtime minizado com 0 avisos/0 erros, Vulkan RADV RAVEN.
+- Janela normal aberta para inspeção da SE (PID 696504); inspeção visual **[NV]** até confirmação. Regra da janela inalterada.
+

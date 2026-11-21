@@ -1,6 +1,27 @@
 # STATE.md — Insurgência
 
-## Estado vivo — 2026-11-21T00:22Z (prioridade da SE redefinida)
+## Estado vivo — 2026-11-21T02:55Z (low-poly visual real, PR pendente)
+
+- **Ciclo 027 em `feature/027-lowpoly-real`**: correção do report da SE ("continua greybox"). `main.rs` reescrito com terreno irregular (320 triângulos), ilhas com 32 triângulos cada, 3 árvores + 2 rochas por ilha e avatar com corpo/cabeça icosaédrica. `lib.rs` intacto (5 testes preservados).
+- **Correção B0004**: `Visibility::default()` no pai do avatar — sem isso os filhos ficavam invisíveis conforme doc oficial Bevy. `Transform::IDENTITY` nos spawns sem transform.
+- **Verificação:** `verify.sh` ALL STAGES OK, 34 testes; 5/5 gates do alvo PASS; runtime sem avisos/erros. Janela normal aberta para a SE (PID 696504); inspeção visual **[NV]** até confirmação.
+- Janela: padrão normal quando a SE pede; `--minimizado` em validação de agente (regra inalterada).
+
+## Anteriores — 2026-11-21T01:26Z (4 itens da SE entregues)
+
+- **Ciclos 023–025 mesclados** (PRs #29, #30, #31). Stack Bevy 0.20.1 + Lightyear 0.31 (ADR-004), Rust 1.99.1, 5 crates. Total 31 PRs mesclados, 0 abertos.
+- **Item 1** — cliente greybox jogável: `Camera2d`, avatar WASD, 4 ilhas geométricas, painel de texto; janela inicia **minizada** por pedido da SE. Binário executado 8s com GPU Vulkan e sem erro; inspeção visual do conteúdo **[NV]** (Wayland/KDE, captura da ponte Xwayland preta).
+- **Item 2** — duas partidas consecutivas com cliente modificado (GDD:1567) no corredor determinístico, com 3 divergências registradas no Núcleo.
+- **Item 3** — instrumentação no Núcleo + 20 partidas com métricas da §17; relatório em `docs/evidencias/metricas-20-partidas-2026-11-21.md`. Números de simulação determinística, não de partidas humanas.
+- **Item 4** — exportação versionada, `COPYRIGHT.txt` MIT e DCO (`Signed-off-by`) no commit. **Assinatura GPG [NV]**: não há chave no ambiente; gerar exige autorização da SE.
+- **DEFER (itens 5/6)** — dois servidores com Módulos diferentes/queda do servidor de referência e servidores comunitários/forks publicados.
+
+
+**Validação visual confirmada pela SE (2026-11-21T01:57Z):** o cliente greybox abre, movimenta e, ao passar sobre as ilhas, identifica a região no painel. Observação direta da SE — não reexecutada nem inferida por agente. Resolve o `[NV]` anterior sobre inspeção visual do greybox (capturas de agente via ponte Xwayland continuam limitations técnicas, não do jogo).
+**Regra operacional da janela (SE, 2026-11-21):** rodar o cliente **normal** (sem flag) somente quando a SE solicitar; durante inspecao, debug, testes e validacao de agente, iniciar com `--minimizado`. Registrada em `AGENTS.md` §Development Commands e §Testing & QA.
+- **Verificação:** 5/5 gates do alvo PASS, `verify.sh` ALL STAGES OK, 34 testes nextest, 31 CI `success` (verificado em 01:26Z).
+
+## Anteriores — 2026-11-21T00:22Z (prioridade da SE redefinida)
 
 - **Alvo agora:** MVP jogável **single-player** que prove a tese: (1) cliente greybox jogável (main scene, câmera, ilhas geométricas); (2) duas partidas consecutivas, uma com cliente modificado (GDD:1567); (3) instrumentação no Núcleo + 20 partidas com as métricas da §17; (4) exportação de conta/personagem, `COPYRIGHT.txt` e commits assinados (GDD §15.9).
 - **DEFER explícito:** (5) dois servidores com Módulos diferentes e teste de queda do servidor de referência (GDD:50–53); (6) servidores comunitários e forks publicados — dependem de outras pessoas, não de código.
