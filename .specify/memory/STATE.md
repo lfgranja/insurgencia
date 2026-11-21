@@ -1,5 +1,13 @@
 # STATE.md — Insurgência
 
+## Estado vivo — 2026-11-21T21:31Z (ciclo 033: manifesto de compatibilidade em Rust)
+
+- **80/20 escolhido**: portar para Rust o contrato de manifesto **já existente** (`manifesto.json` 6 campos, `specs/011` FR-001..FR-006, ordem formato→versão→módulo→64 hex→regras→hash), não criar segundo esquema. GDD §1/§14.2 fundamenta a camada de framework; `contratos` só tinha constantes e `REJEICAO_MANIFESTO`, sem validador.
+- **Entrega**: `crates/contratos/src/manifesto.rs` (`ManifestoCompatibilidade`, `ErroCompatibilidade` com `codigo()`, `validar_formato`, `conferir` sem I/O), `pub mod manifesto;` em `lib.rs`, `crates/contratos/tests/manifesto.rs` com 7 testes espelhando `tests/test_manifesto.gd`. Sem dependências novas, sem `unsafe`/`unwrap`/`expect`.
+- **Correções reais registradas no converge (append-only)**: `clippy::double_must_use` (atributos redundantes removidos) e rustfmt aplicado (`cargo fmt --all`). Nenhum `allow` adicionado.
+- **Verificação (21:31:15Z)**: `./verify.sh` → `ALL STAGES OK`, `41 tests run: 41 passed` (antes 34), `VERIFY_EXIT=0`; 5 gates PASS — SDD `33/0`, DAG `296/0`, task-id `0 duplicatas`, converge `16/16`, hub-docs `0 erros`. Baseline de converge reatualizado por bootstrap.
+- Factory fonte `b1deab1`, nada transplantado; 194 paths untracked alheios preservados. **[NV]**: CI/merge do ciclo 033, confirmação visual da SE, deploy/GPG (DEFER).
+
 ## Estado vivo — 2026-11-21T20:25Z (PR #36 mesclado, proteção de `dev` endurecida)
 
 - **Merge autorizado**: `gh pr merge 36 --merge` às 20:25:32Z → `MERGED` em `2026-11-21T20:25:35Z`, merge commit `ce2d1f0`; `git ls-remote origin refs/heads/dev` = `ce2d1f0`; 0 PRs abertos. Precedido de `gh pr checks 36`: `gates pass 9s`, `rust pass 3m48s` e `./verify.sh ALL STAGES OK (34/34)` às 20:25:17Z, mais 5/5 gates Python PASS.

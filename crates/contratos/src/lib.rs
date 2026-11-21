@@ -6,6 +6,10 @@
 //! Espelham `nucleo/contratos/protocolo.gd`: versão do protocolo, identificador
 //! do módulo, tipos de pacote, códigos de recusa, metadados de snapshot e a
 //! normalização que descarta chaves fora do contrato.
+//!
+//! O módulo `manifesto` porta o contrato de compatibilidade de `specs/011`.
+
+pub mod manifesto;
 
 use std::collections::BTreeMap;
 
