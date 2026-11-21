@@ -39,6 +39,11 @@
       "bytes": 805,
       "sha256": "d511694621129cd80513021df576e2f2389365d06f39b99a2e27429ac12efb01"
     }
+    ,
+    "specs/026-cliente-lowpoly/converge.md": {
+      "bytes": 858,
+      "sha256": "cf8b64529202e3a5e21cd8f0251e5812f77fa84d7b8f6143e959747ea8a31b0a"
+    }
   },
   "_provenance": {
     "origem": "alvo-local",
