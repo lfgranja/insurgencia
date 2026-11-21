@@ -1,0 +1,16 @@
+Insurgência — Núcleo, servidor headless e ferramentas do repositório
+Copyright (c) 2025-2026 Luís Felipe Mesquita Granja
+
+Licença: MIT, conforme ADR-002 (docs/adr/002-licenca-mit-nucleo.md).
+O texto integral da licença está em LICENSE, na raiz do repositório.
+
+Fonte: todo o código e toda a documentação versionados aqui são de autoria do
+próprio projeto, produzidos neste repositório. Nenhum código de terceiros foi
+copiado ou incorporado; contribuições externas, se houver, devem ser
+identificadas, atribuídas e registradas neste arquivo.
+
+Data: 2026-11-21.
+
+Assets de terceiros: não há assets de terceiros versionados neste repositório.
+Se qualquer material de terceiros vier a ser versionado, ele deve ser
+identificado, atribuído e listado aqui antes da inclusão.

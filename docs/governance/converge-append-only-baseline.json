@@ -34,6 +34,11 @@
       "bytes": 806,
       "sha256": "df250135420007bc80cf17ed37a39cbd6b5caa5a9645aeb2a49444a6c91cfd90"
     }
+    ,
+    "specs/025-soberania-exportacao/converge.md": {
+      "bytes": 805,
+      "sha256": "d511694621129cd80513021df576e2f2389365d06f39b99a2e27429ac12efb01"
+    }
   },
   "_provenance": {
     "origem": "alvo-local",
