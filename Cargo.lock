@@ -3312,6 +3312,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "insurgencia-exportacao"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "insurgencia-metricas"
 version = "0.1.0"
 dependencies = [
