@@ -29,6 +29,11 @@
       "bytes": 1088,
       "sha256": "ae40c7aea58a5e792ee76a6d0acab02528318e8dbf744ae9e6e26de383d3fc48"
     }
+    ,
+    "specs/024-instrumentacao-metricas/converge.md": {
+      "bytes": 806,
+      "sha256": "df250135420007bc80cf17ed37a39cbd6b5caa5a9645aeb2a49444a6c91cfd90"
+    }
   },
   "_provenance": {
     "origem": "alvo-local",

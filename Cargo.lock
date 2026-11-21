@@ -3312,6 +3312,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "insurgencia-metricas"
+version = "0.1.0"
+dependencies = [
+ "insurgencia-contratos",
+ "insurgencia-sim",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "insurgencia-sim"
 version = "0.1.0"
 dependencies = [
