@@ -267,7 +267,7 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - Item 1 redefinido pela SE de "greybox" para "low-poly": `main.rs` migrado de `Camera2d`/`Sprite` para `Camera3d`, iluminação e malhas procedurais (cubos/prismas/avatar cone), sem textura; `lib.rs` puro e seus 5 testes preservados.
 - GDD §13.2 e limite ≤10k triângulos (`:1127`) atendidos por construção; Kenney CC0 registrado como fonte futura, não baixado (host fora da allowlist).
 - Gate Rust: `verify.sh` ALL STAGES OK, 34 testes; 5 gates do alvo PASS. Binário rodou minizado por 18s com Vulkan e janela criada sem erro. Inspeção visual da SE **[NV]**.
-## 2026-11-21T02:55Z — Ciclo 027 (low-poly visual real) em PR
+## 2026-11-21T02:55Z — Ciclo 027 (low-poly visual real) — PR #33 mesclado
 
 - Correção do report da SE: o ciclo 026 entregou primitivas 3D (greybox), não low-poly visual. `main.rs` reescrito com malhas irregulares: terreno 16×10 (320 triângulos), ilhas com contorno de 8 vértices e taludo (32 triângulos), 3 árvores + 2 rochas por ilha e avatar com base/corpo/cabeça icosaédrica; 4 cores preservadas, sem textura.
 - Bug encontrado e corrigido: B0004 do Bevy — pai do avatar sem `Visibility` tornava os 3 filhos invisíveis (conforme doc oficial). Corrigido com `Visibility::default()`; `Transform::IDENTITY` adicionado aos spawns de terreno/topo/taludo. Também corrigidos E0308 (`cor: [f32; 3]`) e lints de precisão do hash.
