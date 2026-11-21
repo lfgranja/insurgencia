@@ -25,3 +25,10 @@ FR-001..FR-008 atendidos. SC-001..SC-004 atendidos; SC-005 **[NV]** (CI remoto c
 - Inspeção visual da SE confirmada por imagem anexada às 04:33Z: low-poly visível (terreno irregular, 4 ilhas, árvores/rochas, avatar, HUD) — resolve `[NV]` SC-005 do ciclo 027.
 - Reexecução local de `./verify.sh` e 5 gates pendente após esta revisão; CI remoto com job `rust` verde ainda **[NV]** até observação ao vivo.
 
+## 2026-11-21T04:42Z — Revisão pós-CI #2 (append-only)
+
+- CI run `44866958727` (após correção do toolchain): job `gates` SUCCESS; job `rust` FAILURE em `wayland-sys` — `Package 'wayland-client' not found` no runner Ubuntu. Corrigido com step `Install system libraries` (pkg-config, libwayland-dev, libxkbcommon-dev, libx11-dev, libudev-dev).
+- Verificação local: `pkg-config --exists wayland-client` OK (Fedora), YAML parse com 4 steps no job rust, `./verify.sh` ALL STAGES OK, 5/5 gates PASS.
+- Artefatos revisados: analyze (C7), release, validate, spec/plan. Nenhum converge anterior editado; nenhuma baseline reescrita.
+- CI remoto com job `rust` verde ainda **[NV]** até observação ao vivo.
+

@@ -1,6 +1,6 @@
 # Analyze — 028-ci-rust-governanca (READ-ONLY)
 
-**Data**: 2026-11-21T04:28Z (revisão 04:35Z) · **Escopo**: somente leitura; nenhuma edição nesta etapa.
+**Data**: 2026-11-21T04:28Z (revisões 04:35Z e 04:42Z) · **Escopo**: somente leitura; nenhuma edição nesta etapa.
 
 ## Conflitos artefato ↔ realidade (confirmados por comando)
 | ID | Artefato | Conflito | Ação na fonte |
@@ -10,6 +10,7 @@
 | C3 | `verify.sh:2` | diz "casv-rust" | T007: corrigir |
 | C4 | `docs/GDD - Insurgência.md:1627` | CI remoto DEFER `[NV]` | T008: nota datada |
 | C6 | job `rust` (CI) | `dtolnay/rust-toolchain@master` exige input `toolchain`; CI RED 04:29Z | T005b: `toolchain: '1.99.1'` explícito |
+| C7 | job `rust` (CI) | `wayland-sys` exige `libwayland.pc`; runner Ubuntu sem lib → CI RED 04:37Z | T005c: step `Install system libraries` (pkg-config, libwayland-dev, libxkbcommon-dev, libx11-dev, libudev-dev) |
 
 ## Conflitos entre artefatos SDD
 Nenhum após revisão: spec/plan/checklist/tasks/decision coerentes (FR-001..FR-008 ↔ T001..T011).
@@ -17,6 +18,7 @@ Nenhum após revisão: spec/plan/checklist/tasks/decision coerentes (FR-001..FR-
 ## Riscos mitigados
 - `verify.sh:79-88` — fallback para `cargo test --locked --workspace` quando nextest ausente; nenhuma action de terceiros exigida.
 - Toolchain: valor explícito `1.99.1` no YAML espelha `rust-toolchain.toml` — fonte local, sem duplicação de política (apenas de valor, por exigência da action).
+- Bibliotecas de sistema instaladas no runner Ubuntu; `pkg-config --exists wayland-client` confirmado localmente (Fedora).
 
 ## Resultado
-Analyze PASS — sem conflitos não resolvíveis. Correções C1–C6 aplicadas na implementação; reexecução de gates ao final. CI remoto ainda precisa ser observado verde **[NV]** após a correção.
+Analyze PASS — sem conflitos não resolvíveis. Correções C1–C7 aplicadas. CI remoto com job `rust` verde ainda **[NV]** até observação ao vivo.
