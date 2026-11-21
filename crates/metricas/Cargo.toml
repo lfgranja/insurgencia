@@ -1,0 +1,12 @@
+[package]
+name = "insurgencia-metricas"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Contratos de rede compartilhados com o núcleo (ADR-004).
+insurgencia-contratos = { path = "../contratos" }
+# Simulação autoritativa e determinística do núcleo (ADR-004).
+insurgencia-sim = { path = "../sim" }
+# Erros tipados: Result<Relatorio, ErroMetricas> em vez de abortos por pânico.
+thiserror = "=2.0.21"
