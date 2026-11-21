@@ -37,3 +37,8 @@ FR-001..FR-008 atendidos. SC-001..SC-004 atendidos; SC-005 **[NV]** (CI remoto c
 - CI run `44867517637` (após C7): job `gates` SUCCESS; job `rust` FAILURE em `alsa-sys` — `Package 'alsa' not found`. Corrigido ampliando `Install system libraries` com `libasound2-dev`, `libxrandr-dev`, `libxinerama-dev`, `libxcursor-dev`, `libxi-dev`, `libgl1-mesa-dev` (conjunto completo Bevy no Ubuntu, evita falha sucessiva por lib faltante).
 - `./verify.sh` e 5 gates revalidados localmente após a edição; CI remoto ainda **[NV]** até check verde observado.
 
+## 2026-11-21T04:57Z — CI verde observado (append-only)
+
+- Run `44868073016`: job `gates` SUCCESS, job `rust` SUCCESS (04:56:22Z) via `gh pr view 34 --json statusCheckRollup`. Ambos os checks obrigatórios verdes ao vivo; autoridade para merge autônomo conforme constituição art. CI/CD.
+- SC-005 atendido. Nenhum `[NV]` remanescente neste ciclo.
+
