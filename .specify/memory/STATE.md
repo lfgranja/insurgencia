@@ -7,7 +7,7 @@
 - **Entrega**: commit `887e042` (DCO OK), push e **PR #36 aberto** para `dev` às 13:27:18Z (`state=OPEN`, `mergeable=MERGEABLE`). Sem merge, sem auto-merge, sem deleção de branches. 194 paths untracked alheios (`ast-*`, `cor-*`, `doc-*`, `srv-*`, `ev-*`) preservados e não staged.
 - **Verificação final (13:28:34Z)**: `./verify.sh` → `ALL STAGES OK`, `34 tests run: 34 passed`, `VERIFY_EXIT=0`; `pytest -q` → `no tests ran` (exit 5 = N/A); 5 gates PASS — hub-docs `0 erros`, SDD `spec_dirs=31 gaps=0`, converge `14/14`, task-id `0 duplicatas`, DAG `274 tarefas/0 ciclos`.
 - **Remoto ao vivo (13:19:29Z, `gh`)**: repo público, default `main`; 5 runs `deterministic-gates` `success`; proteção de `dev` exige **somente** o check `gates` (job `rust` não obrigatório), `enforce_admins=false`, sem approvers; `main` desprotegido (404). Endurecer `rust` exige mutação remota e autorização explícita da SE — escalado, não executado.
-- **[NV]**: check CI do PR #36, merge, confirmação visual final da SE, deploy/publicação, assinatura GPG.
+- **CI do PR #36 verificado ao vivo (13:35Z)**: run `44909322956` — `gates` **pass** (7s) e `rust` **pass** (3m30s); `state=OPEN`, `mergeable=MERGEABLE`. **Sem merge**: Bloco 7 exige aprovador distinto e revisão deliberada de `docs/governance/**` (baseline de converge alterado) — não disponível nesta sessão. **[NV] remanescentes**: merge, confirmação visual final da SE, deploy/publicação, assinatura GPG.
 
 ## Estado vivo — 2026-11-21T13:09Z (assess Slotbound 28/28 + ciclo 80/20 demo headless)
 
