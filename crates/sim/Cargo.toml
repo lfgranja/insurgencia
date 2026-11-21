@@ -1,0 +1,12 @@
+[package]
+name = "insurgencia-sim"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Contratos de rede compartilhados com o restante do núcleo (ADR-004).
+insurgencia-contratos = { path = "../contratos" }
+# Erros tipados: Result<(), CodigoRecusa> sem abortos por pânico.
+thiserror = "=2.0.0"
+# Hash SHA-256 canônico do estado para snapshots e determinismo.
+sha2 = "=0.10.9"
