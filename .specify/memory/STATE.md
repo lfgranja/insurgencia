@@ -1,5 +1,14 @@
 # STATE.md — Insurgência
 
+## Estado vivo — 2026-11-21T13:28Z (ciclo 031, PR #36 aberto, gates verdes)
+
+- **Âncora**: branch `031-fechamento-rastreabilidade`, HEAD `887e042`, `.specify/feature.json` → `specs/031-fechamento-rastreabilidade`; factory lida como fonte em `b1deab1`, nada transplantado. Gate autoritativo do alvo = `./verify.sh` + 5 gates Python; CI GitHub Actions; CLI `gh`. Bloco 0.a: divergência de provider/CLI/gate da factory classificada como decisão de governança do alvo; `check_production_gate.py` ausente → exit 2 = N/A, não RED.
+- **80/20 escolhido (I×C×F÷R = 2×3×3÷1 = 18)**: fechar exatidão documental e tarefas herdadas. Ciclo 031 completo: assess `go` → spec/plan/tasks T001–T012/checklist/analyze READ-ONLY/converge append-only → R4 → R7 `1.0.0`. Fechadas `028-T011` e `029-T004..T008` com notas datadas; errata de `verify.sh --all-targets` corrigida em 8 artefatos; `AGENTS.md` esclarece Lightyear (ADR-004, ausente das manifestações).
+- **Entrega**: commit `887e042` (DCO OK), push e **PR #36 aberto** para `dev` às 13:27:18Z (`state=OPEN`, `mergeable=MERGEABLE`). Sem merge, sem auto-merge, sem deleção de branches. 194 paths untracked alheios (`ast-*`, `cor-*`, `doc-*`, `srv-*`, `ev-*`) preservados e não staged.
+- **Verificação final (13:28:34Z)**: `./verify.sh` → `ALL STAGES OK`, `34 tests run: 34 passed`, `VERIFY_EXIT=0`; `pytest -q` → `no tests ran` (exit 5 = N/A); 5 gates PASS — hub-docs `0 erros`, SDD `spec_dirs=31 gaps=0`, converge `14/14`, task-id `0 duplicatas`, DAG `274 tarefas/0 ciclos`.
+- **Remoto ao vivo (13:19:29Z, `gh`)**: repo público, default `main`; 5 runs `deterministic-gates` `success`; proteção de `dev` exige **somente** o check `gates` (job `rust` não obrigatório), `enforce_admins=false`, sem approvers; `main` desprotegido (404). Endurecer `rust` exige mutação remota e autorização explícita da SE — escalado, não executado.
+- **[NV]**: check CI do PR #36, merge, confirmação visual final da SE, deploy/publicação, assinatura GPG.
+
 ## Estado vivo — 2026-11-21T13:09Z (assess Slotbound 28/28 + ciclo 80/20 demo headless)
 
 - **Assess concluído**: 28 propostas do vídeo `Z4ayMTXnkoQ` com `intake.md`/`research.md`/`problem.md`/`concept.md`/`decision.md` em `.specify/assessments/sb-*`. Vereditos: 3 ADOPT · 19 ADAPT · 4 DEFER · 2 AVOID · 0 REJECT integral (`sb-26` tem subparte REJECT). Síntese e 9 notas em `docs/research/slotbound-2026-11-21-*.md`.
