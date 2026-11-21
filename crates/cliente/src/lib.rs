@@ -20,6 +20,25 @@ pub const POSICAO_INICIAL: (f32, f32) = (0.0, -236.0);
 /// Deslocamento do avatar por segundo, em unidades de tela.
 pub const VELOCIDADE: f32 = 260.0;
 
+/// Silhueta 3D de uma ilha, derivada da forma 2D sem qualquer textura.
+#[derive(Clone, Copy, Debug)]
+pub enum Geometria3d {
+    /// Prisma retangular, com extensao total nos eixos X e Z.
+    Caixa {
+        /// Extensao total no eixo X.
+        largura: f32,
+        /// Extensao total no eixo Z.
+        profundidade: f32,
+    },
+    /// Prisma de poucos lados, com vertices a `raio` do centro.
+    Prisma {
+        /// Distancia do centro a cada vertice da base.
+        raio: f32,
+        /// Quantidade de lados da base (baixa poligonagem).
+        lados: u32,
+    },
+}
+
 /// Geometria usada para desenhar e testar uma ilha.
 #[derive(Clone, Copy, Debug)]
 pub enum Forma {
@@ -53,6 +72,18 @@ impl Forma {
         match self {
             Self::Retangulo { .. } => 0.0,
             Self::Losango { .. } => FRAC_PI_4,
+        }
+    }
+
+    /// Converte a forma 2D na silhueta 3D correspondente.
+    #[must_use]
+    pub fn geometria_3d(self) -> Geometria3d {
+        match self {
+            Self::Retangulo { largura, altura } => Geometria3d::Caixa {
+                largura,
+                profundidade: altura,
+            },
+            Self::Losango { raio } => Geometria3d::Prisma { raio, lados: 4 },
         }
     }
 
