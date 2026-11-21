@@ -88,3 +88,10 @@ passarem em duas partidas consecutivas, uma com cliente modificado (GDD:1567); (
 - Determinismo bit-a-bit do Núcleo GDScript, registro IANA da porta 7777 e federação em sentido
   forte: **[NV]** — ver `docs/research/`.
 - Gates de produção da factory no alvo: não materializados; ausência não é RED.
+
+## 6. Estado verificado — 2026-11-21T13:19Z (Blocos 0–4)
+
+- Âncora: HEAD `3709c56` em `dev`, igual a `refs/heads/dev` remoto (`git ls-remote`, 13:19Z); `feature.json` → `specs/030-demo-deterministica-headless`. Factory fonte `b1deab1`, nada transplantado.
+- Estoque real: 30 specs / 233 assessments / 30 validations / 30 releases / 0 bugs / 13 research; 5/5 gates SDD PASS às 13:18:27Z. Seção 5 acima conserva os **[NV]** históricos de 20/11.
+- Remoto verificado ao vivo às 13:19:29Z: 0 PRs abertos; 5 runs `deterministic-gates` `success`; `dev` protegido com check obrigatório `gates` (sem approver, `enforce_admins=false`); `main` sem proteção. **Risco de confiança**: o job `rust` (`./verify.sh`) não é check obrigatório na proteção — endurecê-lo exige mutação remota e autorização explícita da SE, fora deste ciclo.
+- **[NV]** remanescentes: `./verify.sh` completo; confirmação visual da SE; deploy e publicação; assinatura GPG.
