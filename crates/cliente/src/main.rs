@@ -455,7 +455,7 @@ fn configurar(
     criar_avatar(&mut commands, &mut meshes, &mut materiais, jogador.posicao);
 
     commands.spawn((
-        Text::new("INSURGÊNCIA — low-poly"),
+        Text::new("INSURGENCIA - low-poly"),
         TextFont {
             font_size: FontSize::Px(20.0),
             ..default()
@@ -552,7 +552,7 @@ fn atualizar_texto(jogador: Res<JogadorLocal>, mut textos: Query<&mut Text, With
         "nenhuma"
     };
     let conteudo = format!(
-        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nWASD ou setas para mover"
+        "INSURGENCIA - low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} / Y +/-{LIMITE_Y:.0}\nWASD ou setas para mover"
     );
 
     for mut texto in &mut textos {
