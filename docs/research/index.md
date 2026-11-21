@@ -76,3 +76,19 @@ Cada diretório numerado contém `intake.md` (captação da ideia, origem e inc�
 - **Gates:** os 4 checkers SDD passam com `spec_dirs=0` — cobertura vazia, não implementação.
 - **[NV]:** origens remotas dos documentos, execução de CI, merge, releases, publicação e
   qualquer estado de repositório externo (inclusive `o-moba/omoba-bevy` e a factory).
+
+## Atualização verificada — 2026-11-21T13:18Z
+
+As contagens abaixo são as vigentes; as seções anteriores permanecem como histórico de 19–20/11 e não foram reescritas.
+
+| Conjunto | Contagem | Comando |
+|:--|--:|:--|
+| specs numeradas | 30 | `find specs -maxdepth 1 -type d -name '[0-9][0-9][0-9]-*' \| wc -l` |
+| assessments | 233 (28 `sb-*`) | `find .specify/assessments -mindepth 1 -maxdepth 1 -type d \| wc -l` |
+| validations / releases | 30 / 30 | `find .specify/{validations,releases} -mindepth 1 -maxdepth 1 -type d \| wc -l` |
+| bugs | 0 | `find .specify/bugs ...` / `find . -name 'BUG-*.md'` |
+| research (md) | 13 (9 `slotbound-*`) | `find docs/research -name '*.md' \| wc -l` |
+
+- O gate **não é mais** `spec_dirs=0`: os 5 gates SDD PASSaram às 13:18:27Z com `spec_dirs=30 gaps=0`, converge `13/13`, DAG `262 tarefas/0 ciclos`, task-id `0 duplicatas`, hub-docs `0 erros`.
+- Nova família documental: `docs/research/slotbound-2026-11-21-*.md` (8 notas + síntese), com vereditos para 28 propostas do vídeo `Z4ayMTXnkoQ`.
+- **[NV]**: `./verify.sh` completo em execução; CI/merge/proteções/confirmação visual da SE — ver `docs/PROGRESSO.md` para a verificação ao vivo de 13:19:29Z via `gh`.

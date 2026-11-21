@@ -49,6 +49,14 @@
     "specs/029-hud-glyphs/converge.md": {
       "bytes": 622,
       "sha256": "57ca664061b9f5b87fc9b5f8d32660386f044f1d2ac9d5d38395645067571bc5"
+    },
+    "specs/030-demo-deterministica-headless/converge.md": {
+      "bytes": 1236,
+      "sha256": "eafddb5befb78aec835f4585b3f9375b68603f4b2fba550b0d66bdc8b5db4aec"
+    },
+    "specs/031-fechamento-rastreabilidade/converge.md": {
+      "bytes": 1919,
+      "sha256": "5084e1b1310c77e1a8430f937f75af9155c85eed6430ed6443ae0e714811674b"
     }
   },
   "_provenance": {
