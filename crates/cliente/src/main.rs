@@ -1,17 +1,23 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::pedantic)]
 
-//! Cliente low-poly jogável: um avatar caminha entre quatro ilhas sem textura.
+//! Cliente low-poly jogável: terreno irregular, ilhas em talude e avatar facetado.
 //!
-//! Toda a geometria é procedural e de baixa poligonagem: prismas de poucos
-//! lados representam as ilhas e um cone de seis lados representa o jogador.
+//! Toda a geometria é procedural e gerada em tempo de execução, sem texturas nem
+//! assets externos. As malhas não usam índices compartilhados, de modo que cada
+//! triângulo recebe sua própria normal e as facetas ficam visíveis.
 
-use bevy::mesh::{ConeMeshBuilder, CylinderMeshBuilder};
+use std::f32::consts::TAU;
+
+use bevy::asset::RenderAssetUsages;
+use bevy::mesh::{
+    ConeMeshBuilder, CylinderMeshBuilder, Mesh, PrimitiveTopology, SphereKind, SphereMeshBuilder,
+};
 use bevy::prelude::*;
 use bevy::text::FontSize;
 use bevy::window::PrimaryWindow;
 use insurgencia_cliente::{
-    deslocar, estado_inicial, ilha_em, EstadoJogador, Geometria3d, ILHAS, LIMITE_X, LIMITE_Y,
+    deslocar, estado_inicial, ilha_em, EstadoJogador, Geometria3d, Ilha, ILHAS, LIMITE_X, LIMITE_Y,
     VELOCIDADE,
 };
 use insurgencia_sim::Mundo;
@@ -19,14 +25,21 @@ use insurgencia_sim::Mundo;
 /// Identificador do jogador local no espelho da simulação.
 const PEER_ID: u64 = 1;
 
-/// Espessura dos prismas que formam as ilhas, em unidades do mundo.
-const ESPESSURA_ILHA: f32 = 18.0;
+/// Quantidade de vértices no contorno irregular de cada ilha.
+const LADOS_ILHA: u16 = 8;
 
-/// Altura do cone que representa o avatar, em unidades do mundo.
-const ALTURA_AVATAR: f32 = 44.0;
+/// Divisões do terreno nos eixos X e Z.
+const COLUNAS_TERRENO: u16 = 16;
+const LINHAS_TERRENO: u16 = 10;
 
-/// Raio da base do cone que representa o avatar, em unidades do mundo.
+/// Altura média do topo das ilhas, onde o avatar apoia os pés.
+const ALTURA_ILHA: f32 = 18.0;
+
+/// Raio da base do avatar, em unidades do mundo.
 const RAIO_AVATAR: f32 = 16.0;
+
+/// Tons de verde-oliva usados pelas manchas do terreno.
+const CORES_TERRENO: [[f32; 3]; 3] = [[0.29, 0.33, 0.18], [0.36, 0.39, 0.22], [0.24, 0.29, 0.16]];
 
 /// Estado do jogador controlado nesta instância.
 #[derive(Resource)]
@@ -40,7 +53,7 @@ struct Simulacao(Mundo);
 #[derive(Resource)]
 struct ModoJanela(bool);
 
-/// Marca a malha do avatar.
+/// Marca a entidade raiz do avatar.
 #[derive(Component)]
 struct Avatar;
 
@@ -70,9 +83,330 @@ fn main() {
 /// Monta a câmera 3D inclinada sobre o mapa, apontando para a origem.
 #[must_use]
 fn transformar_camera() -> Transform {
-    let mut transform = Transform::from_xyz(0.0, 700.0, 500.0);
+    let mut transform = Transform::from_xyz(0.0, 760.0, 540.0);
     transform.look_at(Vec3::ZERO, Dir3::NEG_Z);
     transform
+}
+
+/// Número determinístico entre zero e um, derivado de índices inteiros.
+#[must_use]
+fn fator(x: u16, z: u16, sal: u16) -> f32 {
+    let valor = f32::from(x) * 12.9898 + f32::from(z) * 78.233 + f32::from(sal) * 37.719;
+    (valor.sin() * 43_758.547).fract().abs()
+}
+
+/// Malha não indexada: `compute_normals` gera uma normal por triângulo.
+#[must_use]
+fn malha(posicoes: Vec<[f32; 3]>) -> Mesh {
+    let mut resultado = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
+    resultado.insert_attribute(Mesh::ATTRIBUTE_POSITION, posicoes);
+    resultado.compute_normals();
+    resultado
+}
+
+/// Converte uma malha de primitiva em facetas com normais próprias.
+#[must_use]
+fn achatar(builder: impl Into<Mesh>) -> Mesh {
+    let mut resultado: Mesh = builder.into();
+    resultado.duplicate_vertices();
+    resultado.compute_normals();
+    resultado
+}
+
+/// Altura de um vértice do terreno, variando de forma determinística.
+#[must_use]
+fn altura_terreno(coluna: u16, linha: u16) -> f32 {
+    -28.0 + fator(coluna, linha, 3) * 12.0
+}
+
+/// Posição de um vértice da malha do terreno no espaço do mundo.
+#[must_use]
+fn ponto_terreno(coluna: u16, linha: u16) -> [f32; 3] {
+    let x = -LIMITE_X + 2.0 * LIMITE_X * f32::from(coluna) / f32::from(COLUNAS_TERRENO);
+    let z = -LIMITE_Y + 2.0 * LIMITE_Y * f32::from(linha) / f32::from(LINHAS_TERRENO);
+    [x, altura_terreno(coluna, linha), z]
+}
+
+/// Distância do centro de uma ilha até a borda da sua forma, num dado ângulo.
+#[must_use]
+fn borda_ilha(geometria: Geometria3d, angulo: f32) -> f32 {
+    let cosseno = angulo.cos().abs().max(0.001);
+    let seno = angulo.sin().abs().max(0.001);
+    match geometria {
+        Geometria3d::Caixa {
+            largura,
+            profundidade,
+        } => (largura / 2.0 / cosseno).min(profundidade / 2.0 / seno),
+        Geometria3d::Prisma { raio, .. } => raio / (cosseno + seno),
+    }
+}
+
+/// Cria o terreno irregular em três manchas de verde-oliva.
+fn criar_terreno(
+    comandos: &mut Commands,
+    malhas: &mut Assets<Mesh>,
+    materiais: &mut Assets<StandardMaterial>,
+) {
+    let mut partes: [Vec<[f32; 3]>; 3] = [Vec::new(), Vec::new(), Vec::new()];
+    for coluna in 0..COLUNAS_TERRENO {
+        for linha in 0..LINHAS_TERRENO {
+            let p00 = ponto_terreno(coluna, linha);
+            let p01 = ponto_terreno(coluna, linha + 1);
+            let p10 = ponto_terreno(coluna + 1, linha);
+            let p11 = ponto_terreno(coluna + 1, linha + 1);
+            let tom = fator(coluna, linha, 7);
+            let indice = if tom < 0.34 {
+                0
+            } else if tom < 0.67 {
+                1
+            } else {
+                2
+            };
+            let alvo = &mut partes[indice];
+            if fator(coluna, linha, 11) < 0.5 {
+                alvo.extend_from_slice(&[p00, p01, p10, p10, p01, p11]);
+            } else {
+                alvo.extend_from_slice(&[p00, p01, p11, p00, p11, p10]);
+            }
+        }
+    }
+
+    for (posicoes, cor) in partes.iter().zip(CORES_TERRENO.iter()) {
+        let [vermelho, verde, azul] = *cor;
+        let material = materiais.add(StandardMaterial {
+            base_color: Color::srgb(vermelho, verde, azul),
+            perceptual_roughness: 1.0,
+            ..default()
+        });
+        comandos.spawn((
+            Mesh3d(malhas.add(malha(posicoes.clone()))),
+            MeshMaterial3d(material),
+            Transform::IDENTITY,
+        ));
+    }
+}
+
+/// Cria uma árvore de tronco pentagonal e copa hexagonal.
+fn criar_arvore(
+    comandos: &mut Commands,
+    malhas: &mut Assets<Mesh>,
+    tronco: Handle<StandardMaterial>,
+    copa: Handle<StandardMaterial>,
+    ponto: [f32; 3],
+) {
+    let madeira = achatar(CylinderMeshBuilder::new(3.2, 14.0, 5));
+    let folhagem = achatar(ConeMeshBuilder::new(11.0, 26.0, 6));
+    comandos.spawn((
+        Mesh3d(malhas.add(madeira)),
+        MeshMaterial3d(tronco),
+        Transform::from_xyz(ponto[0], ponto[1] + 7.0, ponto[2]),
+    ));
+    comandos.spawn((
+        Mesh3d(malhas.add(folhagem)),
+        MeshMaterial3d(copa),
+        Transform::from_xyz(ponto[0], ponto[1] + 27.0, ponto[2]),
+    ));
+}
+
+/// Cria uma rocha baixa de cinco lados.
+fn criar_rocha(
+    comandos: &mut Commands,
+    malhas: &mut Assets<Mesh>,
+    material: Handle<StandardMaterial>,
+    ponto: [f32; 3],
+    giracao: f32,
+) {
+    let pedra = achatar(ConeMeshBuilder::new(8.0, 7.0, 5));
+    comandos.spawn((
+        Mesh3d(malhas.add(pedra)),
+        MeshMaterial3d(material),
+        Transform::from_xyz(ponto[0], ponto[1] + 3.5, ponto[2])
+            .with_rotation(Quat::from_rotation_y(giracao)),
+    ));
+}
+
+/// Distribui árvores e rochas sobre o topo da ilha a partir dos vértices do contorno.
+fn decorar_ilha(
+    comandos: &mut Commands,
+    malhas: &mut Assets<Mesh>,
+    materiais: &mut Assets<StandardMaterial>,
+    indice: u16,
+    contorno: &[[f32; 3]],
+    centro_topo: [f32; 3],
+) {
+    let tronco = materiais.add(StandardMaterial {
+        base_color: Color::srgb(0.36, 0.23, 0.13),
+        perceptual_roughness: 1.0,
+        ..default()
+    });
+    let copa = materiais.add(StandardMaterial {
+        base_color: Color::srgb(0.11, 0.32, 0.16),
+        perceptual_roughness: 0.9,
+        ..default()
+    });
+    let pedra = materiais.add(StandardMaterial {
+        base_color: Color::srgb(0.44, 0.46, 0.47),
+        perceptual_roughness: 1.0,
+        ..default()
+    });
+
+    for ordem in [0_u16, 1, 2] {
+        let vertice = match ordem {
+            0 => 1_u16,
+            1 => 3_u16,
+            _ => 6_u16,
+        };
+        let alvo = contorno[usize::from(vertice)];
+        let proximidade = 0.45 + 0.3 * fator(ordem, indice, 23);
+        let ponto = [
+            centro_topo[0] + (alvo[0] - centro_topo[0]) * proximidade,
+            centro_topo[1] + (alvo[1] - centro_topo[1]) * proximidade,
+            centro_topo[2] + (alvo[2] - centro_topo[2]) * proximidade,
+        ];
+        criar_arvore(comandos, malhas, tronco.clone(), copa.clone(), ponto);
+    }
+
+    for ordem in [0_u16, 1] {
+        let vertice = if ordem == 0 { 0_u16 } else { 5_u16 };
+        let alvo = contorno[usize::from(vertice)];
+        let proximidade = 0.5 + 0.25 * fator(ordem, indice, 29);
+        let ponto = [
+            centro_topo[0] + (alvo[0] - centro_topo[0]) * proximidade,
+            centro_topo[1] + (alvo[1] - centro_topo[1]) * proximidade,
+            centro_topo[2] + (alvo[2] - centro_topo[2]) * proximidade,
+        ];
+        let giracao = TAU * fator(ordem, indice, 31);
+        criar_rocha(comandos, malhas, pedra.clone(), ponto, giracao);
+    }
+}
+
+/// Cria uma ilha irregular com topo triangulado, bordas em talude e vegetação.
+fn criar_ilha(
+    comandos: &mut Commands,
+    malhas: &mut Assets<Mesh>,
+    materiais: &mut Assets<StandardMaterial>,
+    ilha: &Ilha,
+    indice: u16,
+) {
+    let geometria = ilha.forma.geometria_3d();
+    let (centro_x, centro_y) = ilha.centro;
+    let mut contorno_base: Vec<[f32; 3]> = Vec::new();
+    let mut contorno_topo: Vec<[f32; 3]> = Vec::new();
+
+    for lado in 0..LADOS_ILHA {
+        let angulo = TAU * f32::from(lado) / f32::from(LADOS_ILHA);
+        let perturbacao = 0.88 + 0.24 * fator(lado, indice, 5);
+        let raio = borda_ilha(geometria, angulo) * perturbacao;
+        let deslocamento_x = angulo.cos() * raio;
+        let deslocamento_z = -angulo.sin() * raio;
+        contorno_base.push([
+            centro_x + deslocamento_x,
+            -14.0 + fator(lado, indice, 13) * 6.0,
+            -centro_y + deslocamento_z,
+        ]);
+        contorno_topo.push([
+            centro_x + deslocamento_x * 0.76,
+            ALTURA_ILHA - 3.0 + fator(lado, indice, 17) * 7.0,
+            -centro_y + deslocamento_z * 0.76,
+        ]);
+    }
+
+    let centro_topo = [centro_x, ALTURA_ILHA + 3.0, -centro_y];
+    let centro_base = [centro_x, -20.0, -centro_y];
+    let mut topo = Vec::new();
+    let mut talude = Vec::new();
+    for atual in 0..usize::from(LADOS_ILHA) {
+        let proximo = (atual + 1) % contorno_topo.len();
+        let t0 = contorno_topo[atual];
+        let t1 = contorno_topo[proximo];
+        let b0 = contorno_base[atual];
+        let b1 = contorno_base[proximo];
+        topo.extend_from_slice(&[centro_topo, t0, t1]);
+        talude.extend_from_slice(&[b0, b1, t1, b0, t1, t0, centro_base, b1, b0]);
+    }
+
+    let (vermelho, verde, azul) = ilha.cor;
+    let material_topo = materiais.add(StandardMaterial {
+        base_color: Color::srgb(vermelho, verde, azul),
+        perceptual_roughness: 0.85,
+        ..default()
+    });
+    let material_talude = materiais.add(StandardMaterial {
+        base_color: Color::srgb(vermelho * 0.55, verde * 0.55, azul * 0.55),
+        perceptual_roughness: 1.0,
+        ..default()
+    });
+    comandos.spawn((
+        Mesh3d(malhas.add(malha(topo))),
+        MeshMaterial3d(material_topo),
+        Transform::IDENTITY,
+    ));
+    comandos.spawn((
+        Mesh3d(malhas.add(malha(talude))),
+        MeshMaterial3d(material_talude),
+        Transform::IDENTITY,
+    ));
+    decorar_ilha(
+        comandos,
+        malhas,
+        materiais,
+        indice,
+        &contorno_topo,
+        centro_topo,
+    );
+}
+
+/// Cria o avatar com base, corpo cônico e cabeça esférica facetada.
+fn criar_avatar(
+    comandos: &mut Commands,
+    malhas: &mut Assets<Mesh>,
+    materiais: &mut Assets<StandardMaterial>,
+    posicao: (f32, f32),
+) {
+    let armadura = materiais.add(StandardMaterial {
+        base_color: Color::srgb(0.94, 0.95, 1.0),
+        perceptual_roughness: 0.7,
+        ..default()
+    });
+    let cabeca = materiais.add(StandardMaterial {
+        base_color: Color::srgb(0.96, 0.76, 0.55),
+        perceptual_roughness: 0.9,
+        ..default()
+    });
+    let base = achatar(CylinderMeshBuilder::new(RAIO_AVATAR, 8.0, 6));
+    let corpo = achatar(ConeMeshBuilder::new(RAIO_AVATAR * 0.82, 30.0, 6));
+    let cranio = achatar(SphereMeshBuilder::new(
+        9.0,
+        SphereKind::Ico { subdivisions: 1 },
+    ));
+    let material_corpo = armadura.clone();
+
+    comandos
+        .spawn((
+            Transform::from_xyz(posicao.0, ALTURA_ILHA + 3.0, -posicao.1),
+            Avatar,
+            Visibility::default(),
+        ))
+        .with_children(|filho| {
+            filho.spawn((
+                Mesh3d(malhas.add(base)),
+                MeshMaterial3d(material_corpo.clone()),
+                Transform::from_xyz(0.0, 4.0, 0.0),
+            ));
+            filho.spawn((
+                Mesh3d(malhas.add(corpo)),
+                MeshMaterial3d(material_corpo),
+                Transform::from_xyz(0.0, 23.0, 0.0),
+            ));
+            filho.spawn((
+                Mesh3d(malhas.add(cranio)),
+                MeshMaterial3d(cabeca),
+                Transform::from_xyz(0.0, 47.0, 0.0),
+            ));
+        });
 }
 
 #[expect(
@@ -96,58 +430,29 @@ fn configurar(
         Camera3d::default(),
         transformar_camera(),
         AmbientLight {
-            color: Color::srgb(0.72, 0.78, 0.92),
+            color: Color::srgb(0.68, 0.74, 0.86),
+            brightness: 55.0,
             ..default()
         },
     ));
 
     commands.spawn((
         DirectionalLight {
-            color: Color::srgb(1.0, 0.97, 0.9),
-            illuminance: 9_000.0,
+            color: Color::srgb(1.0, 0.96, 0.86),
+            illuminance: 9_500.0,
+            shadow_maps_enabled: true,
             ..default()
         },
-        Transform::from_xyz(-320.0, 760.0, 260.0).looking_at(Vec3::ZERO, Dir3::Y),
+        Transform::from_xyz(-360.0, 820.0, 280.0).looking_at(Vec3::ZERO, Dir3::Y),
     ));
 
     let jogador = estado_inicial();
-    let (x, y) = jogador.posicao;
-
-    let malha_avatar = meshes.add(ConeMeshBuilder::new(RAIO_AVATAR, ALTURA_AVATAR, 6));
-    let material_avatar = materiais.add(StandardMaterial {
-        base_color: Color::srgb(0.98, 0.98, 1.0),
-        ..default()
-    });
-    commands.spawn((
-        Mesh3d(malha_avatar),
-        MeshMaterial3d(material_avatar),
-        Transform::from_xyz(x, ALTURA_AVATAR / 2.0, -y),
-        Avatar,
-    ));
-
-    for ilha in &ILHAS {
-        let (vermelho, verde, azul) = ilha.cor;
-        let material = materiais.add(StandardMaterial {
-            base_color: Color::srgb(vermelho, verde, azul),
-            ..default()
-        });
-        let malha = match ilha.forma.geometria_3d() {
-            Geometria3d::Caixa {
-                largura,
-                profundidade,
-            } => meshes.add(Cuboid {
-                half_size: Vec3::new(largura / 2.0, ESPESSURA_ILHA / 2.0, profundidade / 2.0),
-            }),
-            Geometria3d::Prisma { raio, lados } => {
-                meshes.add(CylinderMeshBuilder::new(raio, ESPESSURA_ILHA, lados))
-            }
-        };
-        commands.spawn((
-            Mesh3d(malha),
-            MeshMaterial3d(material),
-            Transform::from_xyz(ilha.centro.0, ESPESSURA_ILHA / 2.0, -ilha.centro.1),
-        ));
+    criar_terreno(&mut commands, &mut meshes, &mut materiais);
+    for (indice, ilha) in ILHAS.iter().enumerate() {
+        let indice_u16 = u16::try_from(indice).unwrap_or(0);
+        criar_ilha(&mut commands, &mut meshes, &mut materiais, ilha, indice_u16);
     }
+    criar_avatar(&mut commands, &mut meshes, &mut materiais, jogador.posicao);
 
     commands.spawn((
         Text::new("INSURGÊNCIA — low-poly"),

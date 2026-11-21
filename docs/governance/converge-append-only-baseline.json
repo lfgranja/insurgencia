@@ -13,36 +13,34 @@
     "specs/020-engines-rust/converge.md": {
       "bytes": 1252,
       "sha256": "dc34a9dcbfc8654a552ee5c281ae28528897f1379905d9f17d03132231164282"
-    }
-    ,
+    },
     "specs/021-migracao-bevy/converge.md": {
       "bytes": 1260,
       "sha256": "379b033f5cb11d96cac4703a52576a03ad0225d41399ea9483f04fa68ab059d3"
-    }
-    ,
+    },
     "specs/022-simulacao-rust/converge.md": {
       "bytes": 672,
       "sha256": "f14a85a2369727626693550c1ebd8b10a29432266ef883022ed467cc0f11dc1e"
-    }
-    ,
+    },
     "specs/023-cliente-greybox/converge.md": {
       "bytes": 1088,
       "sha256": "ae40c7aea58a5e792ee76a6d0acab02528318e8dbf744ae9e6e26de383d3fc48"
-    }
-    ,
+    },
     "specs/024-instrumentacao-metricas/converge.md": {
       "bytes": 806,
       "sha256": "df250135420007bc80cf17ed37a39cbd6b5caa5a9645aeb2a49444a6c91cfd90"
-    }
-    ,
+    },
     "specs/025-soberania-exportacao/converge.md": {
       "bytes": 805,
       "sha256": "d511694621129cd80513021df576e2f2389365d06f39b99a2e27429ac12efb01"
-    }
-    ,
+    },
     "specs/026-cliente-lowpoly/converge.md": {
       "bytes": 858,
       "sha256": "cf8b64529202e3a5e21cd8f0251e5812f77fa84d7b8f6143e959747ea8a31b0a"
+    },
+    "specs/027-lowpoly-real/converge.md": {
+      "bytes": 957,
+      "sha256": "f86a61a021748c70735f6710145bb8675f955a5c634d8a2042f07f5b1e2ba7c8"
     }
   },
   "_provenance": {
