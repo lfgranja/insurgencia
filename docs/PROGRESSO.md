@@ -207,3 +207,43 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - **Zitadel substituído** por IAMAdapter/IAMInterface: ADR-003 e contrato em `docs/architecture/iam-interface.md`. Registros históricos (ciclo 007, append-only) mantêm a menção antiga como contexto datado.
 - **Escopo solo/single confirmado:** sem 5v5, sem lobby, sem testes de Internet/NAT nesta fase. Roteiro de validação para a SE em `docs/ROTEIRO-TESTE-SOLO.md`, com script `tests/roteiro_solo.sh`.
 - Marcadores remanescentes continuam **[NV]** por exigirem ambiente, credencial ou decisão de produto; nenhum foi reclassificado como verde por inferência.
+
+## 2026-11-20T11:34:04Z — Ciclo 018 (IAMAdapterLocal) concluído e mesclado
+
+- Branch `feature/018-iam-adapter-local` (NNN=018 por `create-new-feature.sh --dry-run`); PR #24 `MERGED` em `dev`, check `gates` SUCCESS observado ao vivo, sob a regra de merge autônomo com CI verde. Total 24 PRs mesclados, 0 abertos.
+- Todas as fases do SDD executadas em ordem, sem pular: intake, research, problem, concept, decision (`go`), specify com `## Clarifications` Q1–Q4, plan, checklist (25 itens de revisão), tasks T001..T010, analyze READ-ONLY (6 achados), implement, converge append-only, R4 aprovado e R7 `1.0.0`.
+- Entrega: IAMInterface (4 métodos, 9 códigos) e IAMAdapterLocal determinístico em processo, sem servidor, segredo, rede, credencial persistida ou login obrigatório; 6 permissões locais concedidas, todo o resto negado como caminho normal.
+- Evidência: `test_iam_adapter_local` 36 `PASS`, `OK`, exit 0; regressão 131 `PASS` em 11 suítes, 0 `FAIL`; `make check` exit 0; 5 gates PASS (`spec_dirs=18`, `converge files=1 baselined=1`).
+- Quatro correções determinísticas ao longo da verificação: herança por `class_name` → caminho literal; anotações de tipo → constants de preload; `\t` literal → TAB; bootstrap do baseline de converge executado pelo próprio gate após RED legítimo `UNBASELINED`. Todas registradas nos R4/converge.
+- GDD `16.7` recebe marcação de IAM local; provedor real, federação e deploy permanecem **[NV]**.
+
+## 2026-11-20T11:52:26Z — Ciclo 019 (tela de resultado) concluído; MVP fechado
+
+- Branch `feature/019-tela-resultado` (NNN=019 por `create-new-feature.sh --dry-run`); PR #25 `MERGED` em `dev`, check `gates` SUCCESS observado ao vivo, sob a regra de merge autônomo com CI verde. Total 25 PRs mesclados, 0 abertos.
+- Todas as fases executadas em ordem, sem pular: intake, research, problem, concept, decision (`go`), specify com Q1–Q4, plan, checklist (16 itens), tasks T001..T010, analyze READ-ONLY, implement, converge append-only, R4 aprovado e R7 `1.0.0`.
+- Entrega: `nucleo/apresentacao/tela_resultado.gd` (Control programático, sem .tscn/main scene; AGUARDANDO por padrão; VITORIA somente com evento do servidor) e `tests/test_tela_resultado.gd` (19 `PASS`).
+- Correções determinísticas registradas no converge: divergência impacto/timestamp no `decision.md`, estado inicial da tela e `DirAccess.close()` inexistente no Godot 4.
+- Evidência: 19 `PASS` tela + 167 `PASS` em 12 suítes, 0 `FAIL`; `make check` exit 0; 5 gates PASS (`spec_dirs=19`, `converge files=2 baselined=2`). Bootstrap do baseline de converge executado pelo próprio gate após RED legítimo `UNBASELINED`.
+- Porta 7777: CSV oficial IANA consultado às 11:38:06Z sem entradas `7777/tcp` ou `7777/udp`; marcador informativo resolvido, sem afirmar disponibilidade em rede pública.
+- GDD `16.7`: tela de resultado marcada; restam fora do MVP/NAT/lobby/5v5/deploy/serviços remotos/federação **[NV]**.
+
+## 2026-11-20T23:52:56Z — Ciclo 020 (engines Rust) concluído e mesclado
+
+- Branch `feature/020-engines-rust` (NNN=020 por `create-new-feature.sh --dry-run`); PR #26 `MERGED` em `dev`, check `gates` SUCCESS observado ao vivo. Total 26 PRs mesclados, 0 abertos.
+- Protocolo factory 019/040 (HEAD `b1deab15`, lido como fonte): ≥10 critérios, Σ pesos=100%, escala 0–10, score ponderado, ≥10 opções, Fase 0 com C1–C3 invioláveis, evidência primária e `[NV]`.
+- Entrega: `docs/AVALIACAO-ENGINES-RUST.md` com 10 opções (Godot baseline + 9 Rust/relacionadas), scores recalculados (82,6 / 77,1 / 76,4 / 68,6 / 66,8 / 65,2 / 60,4 / 57,0 / 54,8 / 54,5), 32 linhas de evidência e spikes A/B/C. Relatórios de pesquisa em `docs/avaliacao-engines/pesquisa/`.
+- Conclusão: Godot-first (ADR-001) permanece; Bevy 0.20.1+Lightyear 0.31 é ADAPT apenas como padrões em GDScript, não como troca de engine. Fyrox/macroquad/ggez/Rapier travados em C2/C3; Ambient pausada; gdext é binding, não engine.
+- Correções deterministicas: versões Bevy 0.19.1→0.20.1 e Lightyear 0.30→0.31; divergência Fyrox 62,6/65,2 resolvida no relatório dedicado; categoria de gdext corrigida.
+- Gates: 5/5 PASS (`spec_dirs=20`, `converge files=3 baselined=3` após bootstrap do próprio gate). Sem código, build, benchmark ou migração de motor neste ciclo.
+
+## 2026-11-21T00:22Z — Prioridade da SE redefinida: prova da tese
+
+- Interjeição da SE substitui a fila anterior: entregável = **MVP jogável single-player** que valide o que de fato prova a tese do GDD. Ordem: (1) cliente greybox jogável com main scene, câmera e ilhas geométricas; (2) duas partidas consecutivas, uma com cliente modificado (GDD:1567); (3) instrumentação no Núcleo + 20 partidas com as métricas da §17; (4) exportação de conta/personagem, `COPYRIGHT.txt` e commits assinados (GDD §15.9).
+- **DEFER explícito:** (5) dois servidores com Módulos diferentes e teste de queda do servidor de referência (GDD:50–53); (6) servidores comunitários e forks publicados — dependem de outras pessoas, não de código.
+- Stack mantida: Bevy 0.20.1 + Lightyear 0.31 (ADR-004), rust-toolchain 1.99.1, crates `contratos` e `sim` mesclados (PRs #27 e #28). O ciclo 023 anterior (servidor Lightyear isolado) foi cancelado antes do commit; seus artefatos untracked foram removidos e os gates restaurados (5/5 PASS; `verify.sh` ALL STAGES OK).
+
+## 2026-11-21T00:24Z — Ciclo 023 reaberto para cliente greybox
+
+- Branch `feature/023-cliente-greybox`, NNN=023 por `create-new-feature.sh --dry-run`; `feature.json` → `specs/023-cliente-greybox`.
+- Artefatos SDD e código Bevy do cliente entregues por agentes: `App` com `DefaultPlugins`, `Camera2d`, avatar com input WASD/setas, quatro ilhas geométricas (Topo/Meio/Inferior/Central) e painel de texto.
+- Resolução de dependência: `thiserror` unificado em `=2.0.21` nos crates `contratos` e `sim` (pin exato) para atender à cadeia Bevy 0.20.1 → `bevy_shader` → `wesl` → `wgsl-parse` (`^2.0.12`); nenhum pacote foi substituído por nome similar.
