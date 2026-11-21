@@ -4,8 +4,8 @@
 
 - **PR #33 mesclado** (ciclo 027), total 33 PRs, 0 abertos. Correção do report da SE ("continua greybox"). `main.rs` reescrito com terreno irregular (320 triângulos), ilhas com 32 triângulos cada, 3 árvores + 2 rochas por ilha e avatar com corpo/cabeça icosaédrica. `lib.rs` intacto (5 testes preservados).
 - **Correção B0004**: `Visibility::default()` no pai do avatar — sem isso os filhos ficavam invisíveis conforme doc oficial Bevy. `Transform::IDENTITY` nos spawns sem transform.
-- **Verificação:** `verify.sh` ALL STAGES OK, 34 testes; 5/5 gates do alvo PASS; runtime sem avisos/erros. Janela normal aberta para a SE (PID 703389); inspeção visual **[NV]** até confirmação.
-- Janela: padrão normal quando a SE pede; `--minimizado` em validação de agente (regra inalterada).
+- **Inspeção visual da SE confirmada (2026-11-21T04:33Z)**: imagem anexada mostra terreno irregular triangulado, 4 ilhas com taludos/cores, árvores/rochas e avatar low-poly com HUD. Resolve o `[NV]` de visual do ciclo 027 (SC-005). Captura de agente via `spectacle -b -n -f` funciona em Wayland (não mais "imagem preta" via Xwayland).
+- **Regra da janela reforçada pela SE (2026-11-21T04:33Z)**: agente SEMPRE usa `--minimizado` em dev/debug/teste/validação/segundo plano. **NUNCA** abrir janela normal enquanto a SE trabalha no notebook; janela normal só sob pedido explícito e momentâneo. Registrada em `AGENTS.md` §Development Commands/§Testing & QA.
 
 ## Anteriores — 2026-11-21T01:26Z (4 itens da SE entregues)
 

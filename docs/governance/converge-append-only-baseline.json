@@ -41,6 +41,10 @@
     "specs/027-lowpoly-real/converge.md": {
       "bytes": 957,
       "sha256": "f86a61a021748c70735f6710145bb8675f955a5c634d8a2042f07f5b1e2ba7c8"
+    },
+    "specs/028-ci-rust-governanca/converge.md": {
+      "bytes": 1478,
+      "sha256": "f0b63f2b133fe35577959816f80e59014d6129343db98d934a74245c36cd4f68"
     }
   },
   "_provenance": {

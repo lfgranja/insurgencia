@@ -274,3 +274,23 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - `lib.rs` intacto (5 testes); `verify.sh` ALL STAGES OK, 34 testes nextest; 5/5 gates do alvo PASS; runtime minizado com 0 avisos/0 erros, Vulkan RADV RAVEN.
 - Janela normal aberta para inspeção da SE (PID 696504); inspeção visual **[NV]** até confirmação. Regra da janela inalterada.
 
+## 2026-11-21T04:23Z — Estado verificado (orquestração autônoma, Blocos 0–4)
+
+- Âncora real: `feature.json` → `specs/027-lowpoly-real`; HEAD `2587647` em `dev`; factory fonte `b1deab15` (não transplantada). Nenhum PR aberto, nenhum worktree extra.
+- Gate autoritativo do alvo: `verify.sh` ALL STAGES OK, 34/34 testes (4 estágios). Gate da factory (`check_production_gate.py`) ausente → N/A conforme Bloco 0.a. CI: GitHub Actions `ci-gates.yml`, CLI `gh` — divergência da factory (Forgejo/`fj`) registrada em `SOURCE_FACTORY.md`.
+- 5/5 gates SDD PASS: sdd-completeness (27 specs, 0 gaps), work-order-dag (232 tasks, 0 ciclos), task-id-uniqueness (0 duplicatas), converge-append-only (10 arquivos), hub-docs-gate (0 erros). `pytest -q` = exit 5 (N/A — sem suíte Python).
+- Contagens: 27 specs, 202 assessments, 27 validations, 27 releases, 0 bugs, 4 research. `docs/PROGRESSO.md` é append-only; nota preserva histórico.
+- Dívidas documentais detectadas: `AGENTS.md` desatualizado (afirma "sem código/verify.sh" quando existem 5 crates Rust e gate verde); cabeçalho de `verify.sh` copiado do `casv-rust`. Não corrigidas nesta nota — candidatas ao 80/20.
+- Status remoto/CI/merge/proteções: **[NV]** nesta auditoria (sem confirmação ao vivo via UI/API além do gate local e do `gh pr view` do ciclo anterior).
+
+## 2026-11-21T04:35Z — Orquestração: confirmação visual, regra da janela e CI 028
+
+- **Inspeção visual da SE confirmada por imagem anexada às 04:33Z**: cena low-poly visível — terreno irregular triangulado, 4 ilhas com taludos/cores (azul, verde, violeta, laranja), árvores e rochas em cada ilha, avatar com corpo/cabeça e HUD. Resolve o `[NV]` de inspeção visual do ciclo 027 (SC-005). Captura de agente via `spectacle -b -n -f` funciona em Wayland (`/tmp/test-spectacle.png`, PNG 1366×768) — o limite técnico anterior de "imagem preta via Xwayland" não se aplica.
+- **Regra da janela reforçada pela SE às 04:33Z**: agente SEMPRE roda o cliente com `--minimizado` em desenvolvimento, depuração, inspeção, teste, validação e segundo plano. **NUNCA** abrir janela normal enquanto a SE trabalha no notebook. Janela normal apenas sob pedido explícito e momentâneo. Registrada em `AGENTS.md` §Development Commands e §Testing & QA; janela aberta pelo agente foi encerrada imediatamente.
+- **CI do PR #34 (ciclo 028)**: job `gates` SUCCESS; job `rust` FAILURE em `Setup Rust` — `dtolnay/rust-toolchain@master` exige input `toolchain` e não lê `rust-toolchain.toml`. Corrigido com `toolchain: '1.99.1'` explícito, espelhando a fonte local. Artefatos SDD revisados (spec/plan/analyze C6/validate/release/converge append-only). Status remoto após correção: **[NV]** até check verde observado.
+
+## 2026-11-21T04:43Z — Ciclo 028: segunda falha do CI corrigida
+
+- CI run `44866958727` (após `toolchain: '1.99.1'`): job `gates` SUCCESS; job `rust` FAILURE em `verify.sh` stage 1 — `wayland-sys` panicked: `Package 'wayland-client' not found` no runner Ubuntu (Fedora local tem a lib). Corrigido com step `Install system libraries`: `pkg-config libwayland-dev libxkbcommon-dev libx11-dev libudev-dev`.
+- Verificação local após correção: YAML parse (4 steps no job rust), `pkg-config --exists wayland-client` OK, `./verify.sh` ALL STAGES OK, 5/5 gates SDD PASS. Status remoto do novo check: **[NV]** até observação ao vivo.
+
