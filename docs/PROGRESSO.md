@@ -300,3 +300,10 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - Ciclo 028 completo: R1 go, R4 aprovado, R7 1.0.0. Três falhas reais do CI corrigidas: input `toolchain` ausente, `wayland-sys` sem `libwayland.pc`, `alsa-sys` sem `alsa.pc`. O job `rust` agora executa `verify.sh` com toolchain fixada e conjunto completo de libs Bevy no Ubuntu.
 - Autoridade documental alinhada: `AGENTS.md` reescrito (stack Rust, 34 testes, regra da janela reforçada), `verify.sh:2` e GDD:1627 corrigidos. A factory foi usada apenas como fonte (HEAD `b1deab15`), nada transplantado.
 
+## 2026-11-21T05:12Z — Orquestração concluída (Blocos 0–8)
+
+- 4 agentes de pesquisa paralelos (core src, tests, configs/build, scripts/docs) sintetizaram um único `AGENTS.md` na raiz, com as 8 seções obrigatórias. Correção material: `Makefile` **existe** (alvos Godot legados) — a versão anterior afirmava o contrário; regra da janela reforçada preservada (agente sempre `--minimizado`, nunca janela normal). `hub_docs_gate.py` PASS.
+- Ciclo 029 (HUD glyphs) mesclado via PR #35 (`970af4e`, 05:11:50Z): duas strings ASCII seguro, verificador isolado PASS, `verify.sh` ALL STAGES OK (34 testes), 5/5 gates. Ambos os checks SUCCESS observados ao vivo (run `44869231266`). Total 35 PRs mesclados, 0 abertos.
+- Estado final: HEAD `970af4e` em `dev`; factory usada apenas como fonte (HEAD `b1deab15`), nada transplantado; trabalho alheio untracked (ast-*, cor-*, doc-*, ev-*, srv-*) preservado.
+- **[NV]** remanescente: confirmação visual final da SE sobre o HUD ASCII; itens 5-6 do entregável, assinatura GPG, deploy/serviços remotos — todos exigem intervenção/autorização humana. Fila 80/20 esgotada para trabalho autônomo no alvo.
+

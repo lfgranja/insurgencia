@@ -1,7 +1,8 @@
 # STATE.md — Insurgência
 
-## Estado vivo — 2026-11-21T04:58Z (CI reforçado, PR #34 mesclado)
+## Estado vivo — 2026-11-21T05:12Z (HUD ASCII e AGENTS sintetizado, PR #35 mesclado)
 
+- **PR #35 mesclado** (ciclo 029, merge `970af4e`, 05:11:50Z): total 35 PRs, 0 abertos. HUD com ASCII seguro (`INSURGENCIA - low-poly`, `/`), eliminando "tofu" da fonte padrão do Bevy (imagem da SE 04:33Z); 2 inserções/2 remoções, verificador isolado PASS. `AGENTS.md` sintetizado de 4 pesquisas paralelas (core src, tests, configs/build, scripts/docs) — corrige afirmação obsoleta sobre `Makefile`, reforça regra da janela. CI `gates` + `rust` SUCCESS (run `44869231266`, 05:11Z). Inspeção visual final **[NV]** até SE.
 - **PR #34 mesclado** (ciclo 028, merge `d2b23e4`, 04:57:38Z): total 34 PRs, 0 abertos. CI `ci-gates.yml` agora tem job `rust` (`./verify.sh`) além de `gates`; toolchain 1.99.1 explícita e libs de sistema (Wayland/ALSA/X11/GL) instaladas no runner. Check `rust` SUCCESS observado ao vivo (run `44868073016`, 04:56:22Z) após 3 iterações de correção (C6/C7/C8). `AGENTS.md` reescrito com realidade Rust; `verify.sh:2` e GDD:1627 corrigidos. 5/5 gates + verify.sh PASS.
 - **PR #33 mesclado** (ciclo 027), total 33 PRs, 0 abertos. Correção do report da SE ("continua greybox"). `main.rs` reescrito com terreno irregular (320 triângulos), ilhas com 32 triângulos cada, 3 árvores + 2 rochas por ilha e avatar com corpo/cabeça icosaédrica. `lib.rs` intacto (5 testes preservados).
 - **Correção B0004**: `Visibility::default()` no pai do avatar — sem isso os filhos ficavam invisíveis conforme doc oficial Bevy. `Transform::IDENTITY` nos spawns sem transform.
