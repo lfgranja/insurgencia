@@ -1,7 +1,8 @@
 # STATE.md — Insurgência
 
-## Estado vivo — 2026-11-21T02:58Z (low-poly visual real mesclado)
+## Estado vivo — 2026-11-21T04:58Z (CI reforçado, PR #34 mesclado)
 
+- **PR #34 mesclado** (ciclo 028, merge `d2b23e4`, 04:57:38Z): total 34 PRs, 0 abertos. CI `ci-gates.yml` agora tem job `rust` (`./verify.sh`) além de `gates`; toolchain 1.99.1 explícita e libs de sistema (Wayland/ALSA/X11/GL) instaladas no runner. Check `rust` SUCCESS observado ao vivo (run `44868073016`, 04:56:22Z) após 3 iterações de correção (C6/C7/C8). `AGENTS.md` reescrito com realidade Rust; `verify.sh:2` e GDD:1627 corrigidos. 5/5 gates + verify.sh PASS.
 - **PR #33 mesclado** (ciclo 027), total 33 PRs, 0 abertos. Correção do report da SE ("continua greybox"). `main.rs` reescrito com terreno irregular (320 triângulos), ilhas com 32 triângulos cada, 3 árvores + 2 rochas por ilha e avatar com corpo/cabeça icosaédrica. `lib.rs` intacto (5 testes preservados).
 - **Correção B0004**: `Visibility::default()` no pai do avatar — sem isso os filhos ficavam invisíveis conforme doc oficial Bevy. `Transform::IDENTITY` nos spawns sem transform.
 - **Inspeção visual da SE confirmada (2026-11-21T04:33Z)**: imagem anexada mostra terreno irregular triangulado, 4 ilhas com taludos/cores, árvores/rochas e avatar low-poly com HUD. Resolve o `[NV]` de visual do ciclo 027 (SC-005). Captura de agente via `spectacle -b -n -f` funciona em Wayland (não mais "imagem preta" via Xwayland).

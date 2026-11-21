@@ -294,3 +294,9 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - CI run `44866958727` (após `toolchain: '1.99.1'`): job `gates` SUCCESS; job `rust` FAILURE em `verify.sh` stage 1 — `wayland-sys` panicked: `Package 'wayland-client' not found` no runner Ubuntu (Fedora local tem a lib). Corrigido com step `Install system libraries`: `pkg-config libwayland-dev libxkbcommon-dev libx11-dev libudev-dev`.
 - Verificação local após correção: YAML parse (4 steps no job rust), `pkg-config --exists wayland-client` OK, `./verify.sh` ALL STAGES OK, 5/5 gates SDD PASS. Status remoto do novo check: **[NV]** até observação ao vivo.
 
+## 2026-11-21T04:58Z — Ciclo 028 mesclado (PR #34)
+
+- PR #34 `MERGED` em `dev`, merge commit `d2b23e4`; total 34 PRs mesclados, 0 abertos. Ambos os checks obrigatórios (`gates`, `rust`) SUCCESS observados ao vivo no run `44868073016` (04:56:22Z).
+- Ciclo 028 completo: R1 go, R4 aprovado, R7 1.0.0. Três falhas reais do CI corrigidas: input `toolchain` ausente, `wayland-sys` sem `libwayland.pc`, `alsa-sys` sem `alsa.pc`. O job `rust` agora executa `verify.sh` com toolchain fixada e conjunto completo de libs Bevy no Ubuntu.
+- Autoridade documental alinhada: `AGENTS.md` reescrito (stack Rust, 34 testes, regra da janela reforçada), `verify.sh:2` e GDD:1627 corrigidos. A factory foi usada apenas como fonte (HEAD `b1deab15`), nada transplantado.
+
