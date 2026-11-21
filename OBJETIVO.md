@@ -124,3 +124,11 @@ Nenhuma percentagem é declarada — a governança proíbe. Contagens verificada
   (ADR-001 permanece válida; Bevy é 0.20.1) e `docs/research/2026-11-20-paisagem-foss-licencas.md`
   (MIT/AGPL, federação **[NV]**). Índice: `docs/research/index.md`.
 - Decisões: `docs/adr/001-excecao-linguagem-gdscript.md`, `docs/adr/002-licenca-mit-nucleo.md`.
+
+## 6. Estado verificado — 2026-11-21T13:19Z (Blocos 0–4)
+
+- **Autoridade**: gate do alvo = `./verify.sh` (check/clippy/testes/fmt) + 5 gates Python; CI = GitHub Actions; CLI de PR = `gh`. Factory `mdmv-dark-factory` @ `b1deab1` é **fonte** (ideias/scripts), nunca autoridade; Forgejo/`fj` e `check_production_gate.py` não são importados (divergência classificada no Bloco 0.a).
+- **Contagens por script (13:18:39Z)**: 30 specs, 233 assessments (28 `sb-*`), 30 validations, 30 releases, 0 bugs, 13 notas de research (9 Slotbound). As seções anteriores permanecem como histórico de 19–20/11.
+- **Gates SDD (13:18:27Z)**: 5/5 PASS — SDD `spec_dirs=30 gaps=0`, DAG `262 tarefas/0 ciclos`, task-id `0 duplicatas`, converge `13/13`, hub-docs `0 erros/0 avisos`. `check_production_gate.py` ausente no alvo → exit 2 = N/A, não RED.
+- **Remoto ao vivo (13:19:29Z, `gh`)**: `lfgranja/insurgencia` público, default `main`; **0 PRs abertos**; 5 runs recentes de `deterministic-gates` com `conclusion=success`; proteção de `dev` exige check `gates`, `enforce_admins=false`, sem reviews obrigatórios; `main` desprotegido (HTTP 404). `ls-remote` confirma `dev=3709c56` igual ao HEAD local.
+- **[NV]**: `./verify.sh` completo em execução; confirmação visual final da SE (PR #35); deploy/publicação; assinatura GPG; detalhes de required checks do job `rust` na proteção remota (só `gates` é exigido).

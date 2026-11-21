@@ -1,5 +1,14 @@
 # STATE.md — Insurgência
 
+## Estado vivo — 2026-11-21T13:09Z (assess Slotbound 28/28 + ciclo 80/20 demo headless)
+
+- **Assess concluído**: 28 propostas do vídeo `Z4ayMTXnkoQ` com `intake.md`/`research.md`/`problem.md`/`concept.md`/`decision.md` em `.specify/assessments/sb-*`. Vereditos: 3 ADOPT · 19 ADAPT · 4 DEFER · 2 AVOID · 0 REJECT integral (`sb-26` tem subparte REJECT). Síntese e 9 notas em `docs/research/slotbound-2026-11-21-*.md`.
+- **Correções factuais**: o salto de wishlists veio da **demo**, não do Next Fest; Valve documenta que wishlists "mostly aren't a factor"; voz/stills IA e o suposto "walk-back" são inferências do youtuber, não evidência primária; percentuais regionais `[NV]`, 79% global confirmado (1.598 reviews em 21/11).
+- **Ciclo 80/20 executado (`sb-16`)**: novo `crates/sim/examples/demo_deterministica.rs` — 30 ticks, 2 jogadores, `hash_estado` por tick, sem Bevy/janela/rede; `./verify.sh` (que executa `--all-targets` internamente) cobre o exemplo automaticamente. Verificado: `rustc --edition 2021 -D warnings` PASS; `clippy-driver -D warnings -W clippy::pedantic` `CLIPPY_EXIT=0`; duas execuções idênticas (`DETERMINISTIC_OK`), `hash_final=6fcc2f9e…`, `segundos=1`.
+- **[NV]**: `verify.sh` completo e CI/merge remotos — duas tentativas estouraram 180 s e 600 s por processos `cargo` concorrentes de outros repositórios na máquina. Nenhum verde afirmado sem saída observada (constituição VI).
+- 14 subagentes em segundo plano; 5 skills lidas via `npx skills use` (research, competitive-brief, novelty-assessment, research-intake, kickstart-assess), nenhuma instalada. Trabalho alheio untracked (`ast-*`, `cor-*`, `doc-*`, `srv-*`, `ev-*`) preservado.
+- **Ciclo 030 fechado**: `specs/030-demo-deterministica-headless/` (spec, plan, tasks T001–T011, checklist, converge), validação R4 e release R7 `1.0.0`, assessment equivalente em `.specify/assessments/demo-deterministica-headless/`; `.specify/feature.json` aponta para o ciclo 030. **5/5 gates Python PASS**: SDD `spec_dirs=30 gaps=0`, converge `13/13` (baseline atualizado), DAG `262 tarefas/0 ciclos`, task-id `0 duplicatas`, hub-docs `0 erros`.
+
 ## Estado vivo — 2026-11-21T05:12Z (HUD ASCII e AGENTS sintetizado, PR #35 mesclado)
 
 - **PR #35 mesclado** (ciclo 029, merge `970af4e`, 05:11:50Z): total 35 PRs, 0 abertos. HUD com ASCII seguro (`INSURGENCIA - low-poly`, `/`), eliminando "tofu" da fonte padrão do Bevy (imagem da SE 04:33Z); 2 inserções/2 remoções, verificador isolado PASS. `AGENTS.md` sintetizado de 4 pesquisas paralelas (core src, tests, configs/build, scripts/docs) — corrige afirmação obsoleta sobre `Makefile`, reforça regra da janela. CI `gates` + `rust` SUCCESS (run `44869231266`, 05:11Z). Inspeção visual final **[NV]** até SE.

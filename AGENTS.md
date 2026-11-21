@@ -60,7 +60,7 @@ cargo run -p insurgencia-cliente -- --minimizado   # DEFAULT for all agent work
 
 ## Runtime/Tooling Preferences
 
-- **Rust 1.99.1** pinned; `cargo`/`cargo nextest` (fallback `cargo test --locked`) through `verify.sh`; `Cargo.lock` is the only lockfile. Bevy 0.20.1 (`3d`,`ui`), Lightyear 0.31 declared; thiserror 2.0.21, serde_json 1.0.140, sha2 0.10.9 — all `=`-pinned.
+- **Rust 1.99.1** pinned; `cargo`/`cargo nextest` (fallback `cargo test --locked`) through `verify.sh`; `Cargo.lock` is the only lockfile. Bevy 0.20.1 (`3d`,`ui`), Lightyear 0.31 declarado em ADR-004; ausente de `Cargo.toml`/`Cargo.lock` (verificado 21/11); thiserror 2.0.21, serde_json 1.0.140, sha2 0.10.9 — all `=`-pinned.
 - **Python 3** (`3.x` in CI), stdlib only; no `requirements.txt`/`pyproject.toml`, no pytest suite.
 - **Godot 4.7** is legacy tooling for `Makefile`/`tests/*.gd` only; no engine binary in repo **[NV]**. Docker/Postgres fixtures are documented scripts; no `Dockerfile`, `package.json`, npm/Justfile/CMake in repo. No active git hooks (`verify.sh --install-hook` is opt-in).
 - CI: GitHub Actions, `ubuntu-latest`; toolchain 1.99.1 + Wayland/ALSA/X11/GL system libs for Bevy. Factory (Forgejo/`fj`) is not applied here — use `gh`.
