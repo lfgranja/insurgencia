@@ -61,6 +61,10 @@
     "specs/032-endurecimento-check-rust/converge.md": {
       "bytes": 2830,
       "sha256": "cc12a7de3bed1630d8c358adfbe30dd4d72ddfb520958ede76114a2736d0595a"
+    },
+    "specs/033-manifesto-compatibilidade-rust/converge.md": {
+      "bytes": 3933,
+      "sha256": "f12504795c2e137a1becb615a0ccd1866f0a5a2583f7b43e95c71b262081568a"
     }
   },
   "_provenance": {
