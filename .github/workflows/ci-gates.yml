@@ -39,3 +39,20 @@ jobs:
 
       - name: Hub docs gate
         run: python3 scripts/ci/hub_docs_gate.py
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Toolchain fixada em rust-toolchain.toml (1.99.1 + rustfmt/clippy).
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          components: clippy, rustfmt
+
+      # verify.sh usa cargo nextest quando disponível e faz fallback para
+      # cargo test --locked --workspace; nenhuma action de terceiros é exigida.
+      - name: Gate Rust (verify.sh)
+        run: ./verify.sh

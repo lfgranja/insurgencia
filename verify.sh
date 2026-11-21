@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# verify.sh — a única fonte de verdade do gate local do casv-rust.
+# verify.sh — a única fonte de verdade do gate local da Insurgência.
 #
 # Estágios, na ordem (AGENTS.md):
 #   1. cargo check   --workspace --all-targets --locked

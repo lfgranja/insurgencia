@@ -274,3 +274,12 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - `lib.rs` intacto (5 testes); `verify.sh` ALL STAGES OK, 34 testes nextest; 5/5 gates do alvo PASS; runtime minizado com 0 avisos/0 erros, Vulkan RADV RAVEN.
 - Janela normal aberta para inspeção da SE (PID 696504); inspeção visual **[NV]** até confirmação. Regra da janela inalterada.
 
+## 2026-11-21T04:23Z — Estado verificado (orquestração autônoma, Blocos 0–4)
+
+- Âncora real: `feature.json` → `specs/027-lowpoly-real`; HEAD `2587647` em `dev`; factory fonte `b1deab15` (não transplantada). Nenhum PR aberto, nenhum worktree extra.
+- Gate autoritativo do alvo: `verify.sh` ALL STAGES OK, 34/34 testes (4 estágios). Gate da factory (`check_production_gate.py`) ausente → N/A conforme Bloco 0.a. CI: GitHub Actions `ci-gates.yml`, CLI `gh` — divergência da factory (Forgejo/`fj`) registrada em `SOURCE_FACTORY.md`.
+- 5/5 gates SDD PASS: sdd-completeness (27 specs, 0 gaps), work-order-dag (232 tasks, 0 ciclos), task-id-uniqueness (0 duplicatas), converge-append-only (10 arquivos), hub-docs-gate (0 erros). `pytest -q` = exit 5 (N/A — sem suíte Python).
+- Contagens: 27 specs, 202 assessments, 27 validations, 27 releases, 0 bugs, 4 research. `docs/PROGRESSO.md` é append-only; nota preserva histórico.
+- Dívidas documentais detectadas: `AGENTS.md` desatualizado (afirma "sem código/verify.sh" quando existem 5 crates Rust e gate verde); cabeçalho de `verify.sh` copiado do `casv-rust`. Não corrigidas nesta nota — candidatas ao 80/20.
+- Status remoto/CI/merge/proteções: **[NV]** nesta auditoria (sem confirmação ao vivo via UI/API além do gate local e do `gh pr view` do ciclo anterior).
+
