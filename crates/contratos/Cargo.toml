@@ -1,0 +1,10 @@
+[package]
+name = "insurgencia-contratos"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Erros tipados: Result<T, ErroProtocolo> e `?` em vez de abortos por panico.
+thiserror = "=2.0.0"
+# Contrato de rede serializável: normalizar_pacote usa BTreeMap<String, Value>.
+serde_json = "=1.0.140"
