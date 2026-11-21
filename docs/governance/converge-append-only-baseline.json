@@ -57,6 +57,10 @@
     "specs/031-fechamento-rastreabilidade/converge.md": {
       "bytes": 1919,
       "sha256": "5084e1b1310c77e1a8430f937f75af9155c85eed6430ed6443ae0e714811674b"
+    },
+    "specs/032-endurecimento-check-rust/converge.md": {
+      "bytes": 2830,
+      "sha256": "cc12a7de3bed1630d8c358adfbe30dd4d72ddfb520958ede76114a2736d0595a"
     }
   },
   "_provenance": {

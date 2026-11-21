@@ -95,3 +95,9 @@ passarem em duas partidas consecutivas, uma com cliente modificado (GDD:1567); (
 - Estoque real: 30 specs / 233 assessments / 30 validations / 30 releases / 0 bugs / 13 research; 5/5 gates SDD PASS às 13:18:27Z. Seção 5 acima conserva os **[NV]** históricos de 20/11.
 - Remoto verificado ao vivo às 13:19:29Z: 0 PRs abertos; 5 runs `deterministic-gates` `success`; `dev` protegido com check obrigatório `gates` (sem approver, `enforce_admins=false`); `main` sem proteção. **Risco de confiança**: o job `rust` (`./verify.sh`) não é check obrigatório na proteção — endurecê-lo exige mutação remota e autorização explícita da SE, fora deste ciclo.
 - **[NV]** remanescentes: `./verify.sh` completo; confirmação visual da SE; deploy e publicação; assinatura GPG.
+
+### Atualização verificada — 2026-11-21T20:25Z
+
+- O risco registrado na seção 6 ("job `rust` não obrigatório") foi **corrigido**: required checks de `dev` = `["gates","rust"]`, confirmado por `gh api` PUT + GET. `enforce_admins=false`, `reviews=null`, `restrictions=null` preservados.
+- PR #36 mesclado em `dev` (`ce2d1f0`) com CI verde; 0 PRs abertos. Ciclo 032 registra o endurecimento como mudança de governança remota autorizada.
+- `[NV]/DEFER`: confirmação visual da SE, deploy/publicação, assinatura GPG.

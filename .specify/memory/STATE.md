@@ -1,5 +1,12 @@
 # STATE.md — Insurgência
 
+## Estado vivo — 2026-11-21T20:25Z (PR #36 mesclado, proteção de `dev` endurecida)
+
+- **Merge autorizado**: `gh pr merge 36 --merge` às 20:25:32Z → `MERGED` em `2026-11-21T20:25:35Z`, merge commit `ce2d1f0`; `git ls-remote origin refs/heads/dev` = `ce2d1f0`; 0 PRs abertos. Precedido de `gh pr checks 36`: `gates pass 9s`, `rust pass 3m48s` e `./verify.sh ALL STAGES OK (34/34)` às 20:25:17Z, mais 5/5 gates Python PASS.
+- **Endurecimento autorizado e verificado (20:25:48Z)**: proteção de `dev` passou de `contexts=["gates"]` para `contexts=["gates","rust"]`, preservando `strict=true`, `enforce_admins=false`, `reviews=null`, `restrictions=null`. PUT + GET via `gh api` com respostas coladas em `docs/PROGRESSO.md`. Risco de confiança corrigido.
+- **Ciclo 032 em curso** (`032-endurecimento-check-rust`, base `ce2d1f0`, `feature.json → specs/032-endurecimento-check-rust`): artefatos SDD registram a mutação remota, R4/R7 `1.0.0` com rollback documentado.
+- **[NV]/DEFER**: confirmação visual final da SE; deploy/publicação e assinatura GPG (DEFER, sem autorização); nenhum outro status remoto afirmado sem comando executado. Factory lida como fonte em `b1deab1`, nada transplantado.
+
 ## Estado vivo — 2026-11-21T13:28Z (ciclo 031, PR #36 aberto, gates verdes)
 
 - **Âncora**: branch `031-fechamento-rastreabilidade`, HEAD `887e042`, `.specify/feature.json` → `specs/031-fechamento-rastreabilidade`; factory lida como fonte em `b1deab1`, nada transplantado. Gate autoritativo do alvo = `./verify.sh` + 5 gates Python; CI GitHub Actions; CLI `gh`. Bloco 0.a: divergência de provider/CLI/gate da factory classificada como decisão de governança do alvo; `check_production_gate.py` ausente → exit 2 = N/A, não RED.
