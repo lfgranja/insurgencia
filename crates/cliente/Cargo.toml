@@ -1,0 +1,10 @@
+[package]
+name = "insurgencia-cliente"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Renderizador 2D e interface: as features padrão são necessárias para desenhar.
+bevy = "=0.20.1"
+# Espelho autoritativo do estado do jogador (ADR-004).
+insurgencia-sim = { path = "../sim" }

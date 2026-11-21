@@ -24,6 +24,11 @@
       "bytes": 672,
       "sha256": "f14a85a2369727626693550c1ebd8b10a29432266ef883022ed467cc0f11dc1e"
     }
+    ,
+    "specs/023-cliente-greybox/converge.md": {
+      "bytes": 1088,
+      "sha256": "ae40c7aea58a5e792ee76a6d0acab02528318e8dbf744ae9e6e26de383d3fc48"
+    }
   },
   "_provenance": {
     "origem": "alvo-local",

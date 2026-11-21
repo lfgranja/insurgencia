@@ -1,6 +1,38 @@
 # STATE.md — Insurgência
 
-## Estado vivo — 2026-11-20T10:58Z (diretrizes da SE)
+## Estado vivo — 2026-11-21T00:22Z (prioridade da SE redefinida)
+
+- **Alvo agora:** MVP jogável **single-player** que prove a tese: (1) cliente greybox jogável (main scene, câmera, ilhas geométricas); (2) duas partidas consecutivas, uma com cliente modificado (GDD:1567); (3) instrumentação no Núcleo + 20 partidas com as métricas da §17; (4) exportação de conta/personagem, `COPYRIGHT.txt` e commits assinados (GDD §15.9).
+- **DEFER explícito:** (5) dois servidores com Módulos diferentes e teste de queda do servidor de referência (GDD:50–53); (6) servidores comunitários e forks publicados — dependem de outras pessoas, não de código.
+- **Reorientação:** o ciclo 023 anterior (servidor Lightyear) foi cancelado antes do commit; seus artefatos untracked foram removidos. Gates restaurados: 5/5 PASS e `verify.sh` ALL STAGES OK. Histórico Git preservado até o ciclo 022 (PR #28).
+- **Stack mantida:** Bevy 0.20.1 + Lightyear 0.31 (ADR-004); rust-toolchain 1.99.1; crates `contratos` e `sim` mesclados. Cliente greybox entra como próximo ciclo, não servidor isolado.
+
+## Anteriores — 2026-11-20T23:52Z (ciclo 020 mesclado; PR #26)
+
+- **Âncora:** `.specify/feature.json` → `specs/020-engines-rust`; branch `feature/020-engines-rust`; PR #26 `MERGED` em `dev` às 23:52:56Z, check `gates` SUCCESS observado ao vivo. Total 26 PRs mesclados, 0 abertos.
+- **Entrega:** `docs/AVALIACAO-ENGINES-RUST.md` (10 opções, 10 critérios C1–C10 com Σ=100%, matriz Score/Fase 0, 32 linhas de evidência, spikes A/B/C) e 5 relatórios em `docs/avaliacao-engines/pesquisa/`. Godot 82,6 ADOPT inalterado; Bevy+Lightyear 77,1 ADAPT só como padrões em GDScript; Fyrox/macroquad/ggez/Rapier REJECT; Ambient/gdext DEFER. ADR-001 não reaberta.
+- **Protocolo:** factory HEAD `b1deab15` lido como fonte; specs 019/040; hosts restritos à allowlist (github.com); cobertura idiomática real = inglês; `[UNVERIFIED — fetch skipped]` para sites externos. Correções registradas no converge: Fyrox 65,2 vs 62,6, O10 derivada, C6 proxy, cobertura linguística.
+- **Verificação:** 5/5 gates PASS (`spec_dirs=20`, `files=20`, `converge files=3 baselined=3` via bootstrap do próprio gate); `make check` e `make test-rede-e2e` permanecem exit 0 (estado técnico prévio, sem alteração de código).
+- **[NV] remanescentes:** benchmark pareado Godot vs Bevy+Lightyear, reconexão Rust, migração de toolchain, sites fora da allowlist, conexão UDP externa/NAT, lobby, 5v5, deploy e serviços remotos.
+
+## Anteriores — 2026-11-20T11:52Z (ciclo 019 mesclado; MVP fechado)
+
+- **Âncora:** `.specify/feature.json` → `specs/019-tela-resultado`; branch `feature/019-tela-resultado`; PR #25 `MERGED` em `dev` às 11:52:26Z, check `gates` SUCCESS observado ao vivo. Total 25 PRs mesclados, 0 abertos.
+- **Entrega:** `nucleo/apresentacao/tela_resultado.gd` — componente `Control` programático, sem `.tscn` e sem `main scene`; estado inicial `AGUARDANDO` e `VITORIA` somente se `evento="vitoria_ilha_central"` e `declarada_por="servidor"`. `tests/test_tela_resultado.gd` com 19 `PASS`.
+- **Ciclo completo:** intake → research → problem → concept → decision (`go`) → specify (4 clarifications) → plan → checklist → tasks → analyze READ-ONLY → implement → converge append-only → R4 → R7 `1.0.0`, sem fase pulada. Três corretivas registradas no converge.
+- **[NV] IANA resolvido:** CSV oficial consultado em 2026-11-20T11:38:06Z; nenhuma entrada `7777/tcp` ou `7777/udp`. Porta livre no registro — marcador informativo fechado, sem afirmar disponibilidade em rede.
+- **Verificação:** 19 `PASS` tela + 167 `PASS` em 12 suítes, 0 `FAIL`; `make check` exit 0; 5/5 gates PASS (`spec_dirs=19`, `converge files=2 baselined=2`); bootstrap do baseline executado pelo próprio gate.
+- **[NV] restantes:** NAT/Internet, lobby, 5v5/escala de produção, renderização visual inspecionada, deploy, Postgres/Coolify remotos, `pgmq`, federação, IAM remoto, chaves do jogador e aprovador humano (não exigido pela regra atual).
+
+## Anteriores — 2026-11-20T11:34Z (ciclo 018 mesclado; PR #24)
+
+- **Âncora:** `.specify/feature.json` → `specs/018-iam-adapter-local`; branch `feature/018-iam-adapter-local`; PR #24 `MERGED` em `dev` às 11:34:04Z, check `gates` SUCCESS observado ao vivo. Total 24 PRs mesclados, 0 abertos.
+- **Entrega:** `nucleo/iam/iam_interface.gd` (4 métodos) e `nucleo/iam/iam_adapter_local.gd` (determinístico, em processo, sem servidor/segredo/credencial) + `tests/test_iam_adapter_local.gd` com 36 `PASS`. ADR-003 e contrato de arquitetura inalterados.
+- **Ciclo completo:** intake → research → problem → concept → decision (`go`) → specify (4 clarifications) → plan → checklist → tasks → analyze READ-ONLY → implement → converge append-only → R4 → R7 `1.0.0`. Nenhuma fase pulada.
+- **Verificação:** 36 `PASS` IAM + 131 `PASS` em regressão, 0 `FAIL`; `make check` exit 0; 5/5 gates PASS (`spec_dirs=18`, `files=18`, `converge files=1 baselined=1`). Bootstrap do baseline de converge executado pelo próprio gate (`--bootstrap`).
+- **[NV] restantes:** IAM remoto, login obrigatório, chaves do jogador, NAT/Internet, lobby, 5v5, escala de produção, UI de resultado, deploy, Postgres/Coolify remotos, `pgmq`, federação e aprovador humano (não mais necessário para merge sob a nova regra).
+
+## Anteriores — 2026-11-20T10:58Z (diretrizes da SE)
 
 - **Governança:** check CI/CD verde observado autoriza merge autônomo em `dev`/`main` via `gh`, **sem aprovação humana** (`.specify/memory/constitution.md:22`, `AGENTS.md:60`). PRs #13–#22 aprovados retroativamente pela autorização da SE. Se o CI não inspirar confiança, o próximo 80/20 **imediato** é reforçá-lo.
 - **Identidade:** Zitadel substituído por **IAMAdapter / IAMInterface** (ADR-003 + contrato em `docs/architecture/iam-interface.md`). Nenhum SDK concreto no domínio; adaptador local para solo; provedor real remoto **[NV]**.

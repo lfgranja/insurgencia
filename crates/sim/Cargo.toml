@@ -7,6 +7,6 @@ edition = "2021"
 # Contratos de rede compartilhados com o restante do núcleo (ADR-004).
 insurgencia-contratos = { path = "../contratos" }
 # Erros tipados: Result<(), CodigoRecusa> sem abortos por pânico.
-thiserror = "=2.0.0"
+thiserror = "=2.0.21"
 # Hash SHA-256 canônico do estado para snapshots e determinismo.
 sha2 = "=0.10.9"
