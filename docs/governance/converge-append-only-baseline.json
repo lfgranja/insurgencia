@@ -65,6 +65,10 @@
     "specs/033-manifesto-compatibilidade-rust/converge.md": {
       "bytes": 3933,
       "sha256": "f12504795c2e137a1becb615a0ccd1866f0a5a2583f7b43e95c71b262081568a"
+    },
+    "specs/034-gate-manifesto-cli/converge.md": {
+      "bytes": 3811,
+      "sha256": "300b7a7063fd994db6c4acf414974e97bf9d0da1f7641b387e7c4d7b02daaa86"
     }
   },
   "_provenance": {
