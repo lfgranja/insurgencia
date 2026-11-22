@@ -14,7 +14,8 @@
 | 8 | Rastreabilidade SDD | 14 artefatos; `analyze.md` antes de `tasks.md`; R4 aprovado antes de R7 `1.0.0`; roteiro escrito antes do PR | PASS | leitura dos artefatos |
 | 9 | Isolamento da SE | nenhuma janela no desktop; `xvfb-run` com `BEVY_ASSET_ROOT` apontando para o worktree; 0 processos do jogo ao fim | PASS | comandos executados |
 | 10 | Fronteira | nenhum `Cargo.toml`/lockfile/gate/workflow alterado;fonte e licença versionadas como assets | PASS | `git status --short` no worktree |
+| 11 | Captura sem `BEVY_ASSET_ROOT` (blocker P1 da ACR) | `env -u BEVY_ASSET_ROOT` em Xvfb/lavapipe: HUD `INSURGÊNCIA — low-poly` / `·` sem `▯`; log sem `TextError::NoSuchFont`; cena 3D renderizada | PASS | `docs/evidencias/hud-acento-confirmado-2026-11-22.png` (SHA-256 `e1769d91…8fa1`) |
 
-**Resultado**: 10/10 PASS. `evidence_status: passed`. Rollback do roteiro: remover a captura temporária em `/tmp`; a fonte e a licença são artefatos do ciclo e não do roteiro.
+**Resultado**: 11/11 PASS. `evidence_status: passed`. Rollback do roteiro: remover a captura temporária em `/tmp`; a fonte e a licença são artefatos do ciclo e não do roteiro.
 
-**Observação**: uma primeira captura falhou com `Path not found: .../target/debug/assets/fonts/...`; corrigida definindo `BEVY_ASSET_ROOT` para o worktree. Isso é comportamento do AssetPlugin do Bevy 0.20, não defeito do código entregue.
+**Observação (final 2026-11-22T21:37Z)**: a primeira captura falhou com `Path not found: .../target/debug/assets/fonts/...` porque, sem `BEVY_ASSET_ROOT`, o Bevy 0.20 usa o diretório do executável como base. Isso era **defeito de configuração de caminho no código entregue**, não comportamento inevitável da engine; corrigido em `crates/cliente/src/main.rs` pela função `caminho_assets()` com `AssetPlugin { file_path: caminho_assets(), ..default() }`. A captura do passo 6 usou `BEVY_ASSET_ROOT` e permanece como registro histórico; a captura final do passo 11, **sem env externo**, confirma a correção e a cena 3D completa.

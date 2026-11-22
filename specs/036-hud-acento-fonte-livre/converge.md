@@ -19,3 +19,15 @@ FR-001..FR-009 e SC-001..SC-006 registrados na spec com rastreabilidade até o r
 - **Captura visual isolada (21:28:03Z)**: `INSURGÊNCIA — low-poly` e `Limites: X +/-580 · Y +/-310`, sem `▯`. Arquivo `docs/evidencias/hud-acento-confirmado-2026-11-22.png`, SHA-256 `8d35389501b4e45cdb29c2b39a8e02c94ea33e55c32a793162f76d1e58c770ce`. Nenhuma janela foi aberta no desktop da SE — Xvfb + lavapipe/Vulkan por software.
 - **Gates Python (21:23:11Z)**: SDD `36/0`; DAG `350 tarefas/51 arestas/0 ciclos`; task-id `0 duplicatas`; hub-docs `0 erros`. Converge baselinado por bootstrap após esta entrada.
 - **Evidência**: `.specify/validations/hud-acento-fonte-livre/evidence.md`, 10/10 PASS. Fonte 621572 bytes / hash `478c558e…3823`; licença OFL 1.1 integral e proveniência registrada.
+
+### Correção do blocker P1 da ACR — 2026-11-22T21:34Z
+
+- **Blocker**: comentário `7086132823` na ACR do PR #44 apontou que a fonte da HUD só carrega com `BEVY_ASSET_ROOT` definido; sem essa variável externa o Bevy 0.20 usa o diretório do executável como base (`target/debug`), resultando em `TextError::NoSuchFont`.
+- **Correção na fonte**: `crates/cliente/src/main.rs` agora configura `DefaultPlugins.set(AssetPlugin { file_path: caminho_assets(), ..default() })`. A função `caminho_assets()` resolve a pasta `assets` do workspace procurando ao lado do executável, na raiz do workspace (`target/debug/../..`) e no caminho derivado de `CARGO_MANIFEST_DIR` em tempo de compilação, com fallback seguro — sem `unwrap`/`expect`, `unsafe` ou dependências novas.
+- **Documentação**: passo 11 acrescentado ao `test-roadmap.md`; `evidence.md` corrigida — a falha anterior era defeito de configuração de caminho, não comportamento inevitável da engine. A nova captura sem env externo está **[NV]** até execução pelo orquestrador.
+- **Pendente [NV]**: revalidação visual sem `BEVY_ASSET_ROOT` (HUD acentuado sem `▯` e nenhum `TextError::NoSuchFont` no log).
+
+### Revalidação final sem env externo — 2026-11-22T21:37Z
+
+- **Verificação**: `env -u BEVY_ASSET_ROOT` em Xvfb/lavapipe, com `CARGO_TARGET_DIR` compartilhado: `./verify.sh` `ALL STAGES OK`, 41/41; captura final mostra `INSURGÊNCIA — low-poly`, `Limites: X +/-580 · Y +/-310`, sem `▯`, nenhum `TextError::NoSuchFont` no log, e a cena 3D completa.
+- **Evidência**: `docs/evidencias/hud-acento-confirmado-2026-11-22.png` substituída pela captura sem env, SHA-256 `e1769d91cb2016a3a46ea30813d7a0c1ff7f5076ab35aa03647704a8ec018fa1`. `evidence.md` atualizado para 11/11 PASS. O `[NV]` da entrada anterior está fechado; histórico preservado.
