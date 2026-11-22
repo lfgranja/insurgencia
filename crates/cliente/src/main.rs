@@ -3,9 +3,10 @@
 
 //! Cliente low-poly jogável: terreno irregular, ilhas em talude e avatar facetado.
 //!
-//! Toda a geometria é procedural e gerada em tempo de execução, sem texturas nem
-//! assets externos. As malhas não usam índices compartilhados, de modo que cada
-//! triângulo recebe sua própria normal e as facetas ficam visíveis.
+//! Toda a geometria é procedural e gerada em tempo de execução, sem texturas; a
+//! fonte TrueType da HUD é o único asset externo. As malhas não usam índices
+//! compartilhados, de modo que cada triângulo recebe sua própria normal e as
+//! facetas ficam visíveis.
 
 use std::f32::consts::TAU;
 
@@ -419,12 +420,15 @@ fn configurar(
     mut materiais: ResMut<Assets<StandardMaterial>>,
     mut janelas: Query<&mut Window, With<PrimaryWindow>>,
     modo: Res<ModoJanela>,
+    fontes: Res<AssetServer>,
 ) {
     if modo.0 {
         if let Some(mut janela) = janelas.iter_mut().next() {
             janela.set_minimized(true);
         }
     }
+
+    let fonte: Handle<Font> = fontes.load("fonts/NotoSans-Regular.ttf");
 
     commands.spawn((
         Camera3d::default(),
@@ -455,8 +459,9 @@ fn configurar(
     criar_avatar(&mut commands, &mut meshes, &mut materiais, jogador.posicao);
 
     commands.spawn((
-        Text::new("INSURGENCIA - low-poly"),
+        Text::new("INSURGÊNCIA — low-poly"),
         TextFont {
+            font: fonte.into(),
             font_size: FontSize::Px(20.0),
             ..default()
         },
@@ -552,7 +557,7 @@ fn atualizar_texto(jogador: Res<JogadorLocal>, mut textos: Query<&mut Text, With
         "nenhuma"
     };
     let conteudo = format!(
-        "INSURGENCIA - low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} / Y +/-{LIMITE_Y:.0}\nWASD ou setas para mover"
+        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nWASD ou setas para mover"
     );
 
     for mut texto in &mut textos {

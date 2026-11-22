@@ -1,5 +1,15 @@
 # STATE.md — Insurgência
 
+## HUD com acento e fonte livre — 2026-11-22T21:17Z (ciclo 036 em curso)
+
+- **Sessão/pedido**: `insurgencia - HUD com acento e fonte livre`; `session_id=20261122T211548Z-hud-acento-fonte`. Pedido explícito do SWE: restaurar `Ê`, `—` e `·` no HUD.
+- **Âncora/80-20**: ciclo **036** em curso, branch `036-hud-acento-fonte-livre`, base `7c5c0f3`. 80/20 registrado — a escolha do usuário tem prioridade; critério interno impacto 5 × confiança 4 × facilidade 3 × segurança 4 ÷ 625 = **240/625**.
+- **Superação**: o paliativo ASCII do ciclo 029 (`INSURGENCIA - low-poly`, `/` no lugar de `·`) é superado por esta mudança. O histórico do ciclo 029 permanece intacto (append-only).
+- **Fonte**: Noto Sans Regular, 621572 bytes, OFL 1.1, cobertura de U+00CA/U+2014/U+00B7 confirmada por `fc-match`; licença e proveniência em `assets/fonts/OFL.txt` e `docs/governance/font-provenance.md` (escritos pelo agente de código).
+- **PR #40 mesclado pelo SWE** às 20:52:35Z, merge commit `c126b6e`; `origin/main=c126b6e`. Isso **encerra o [NV]** de promoção `dev → main` das sessões anteriores — registrado como fato observado, não como pendência.
+- **Evidência visual**: captura anterior (ASCII, sem tofu) em `docs/evidencias/hud-confirmacao-visual-2026-11-22.png`; a nova captura com acento será executada pelo orquestrador em Xvfb isolado, sem janela no desktop.
+- **[NV] remanescentes**: CI/merge do ciclo 036, deploy, assinatura GPG e qualquer efeito de produção. Nota append-only; nenhum gate/build/format/commit/push/PR executado.
+
 ## Escalonamento ao SWE — 2026-11-22T19:06Z (sessão "insurgencia - fechamento de advisories ACR e rastreabilidade")
 
 - **Contexto**: o ciclo 80/20 de fechamento de advisories de ACR e deriva documental terminou com o merge do PR #42 em `dev` (`87c8099`, 19:05:43Z). A promoção `dev → main` é a continuação normativa do ciclo (Bloco 7b), mas a decisão final e o deploy pertencem exclusivamente ao SWE — nenhum agente mesclou `main`.

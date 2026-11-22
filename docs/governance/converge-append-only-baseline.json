@@ -73,6 +73,10 @@
     "specs/035-advisories-acr-rastreabilidade/converge.md": {
       "bytes": 4414,
       "sha256": "9b606524120622323b7fb9e8881fb903bff68664e6faed7c7778dfceb9372895"
+    },
+    "specs/036-hud-acento-fonte-livre/converge.md": {
+      "bytes": 3455,
+      "sha256": "0e8ca900748e9d9853065950998e8e8ccc6578c57e3c7574747f837b1d870331"
     }
   },
   "_provenance": {
