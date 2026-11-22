@@ -342,3 +342,11 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - REDs reais corrigidos: `clippy::double_must_use` em `manifesto.rs:77,124` (removidos os `#[must_use]` redundantes) e `cargo fmt --all -- --check` (formatador aplicado). Ambos registrados por append no converge; baseline reatualizado por bootstrap.
 - Verificação final (21:31:15Z): `./verify.sh` `ALL STAGES OK`, `41 tests run: 41 passed, 0 skipped`, `VERIFY_EXIT=0`. Gates Python (21:29:01Z): SDD `33/0`, DAG `296/0`, task-id `0 duplicatas`, converge `16/16`, hub-docs `0 erros`.
 - **[NV]**: CI/merge do PR deste ciclo, confirmação visual final da SE, deploy/publicação e assinatura GPG (DEFER).
+
+## 2026-11-22T16:59Z — Sessão "insurgencia - gate CLI de manifesto" (Blocos 0–5)
+
+- Autoridade do alvo confirmada ao vivo: `./verify.sh` + 5 gates Python; GitHub Actions/`gh`; `dev` exige contexts `gates` + `rust`; `main` desprotegido; factory `b1deab1` (origin/dev `d5d796f`) apenas fonte. Divergência de provider/CLI/gate classificada como governança do alvo — nada importado.
+- Drenagem 0.0: 0 PRs abertos, 1 worktree, 0 stashes, 193 paths alheios preservados; ledger `.specify/queue/concurrency.jsonl` criado e runtime ignorado via `.gitignore` (diff explícito). Nenhum trabalho herdável pendente.
+- Gate autoritativo (16:54:17Z): `ALL STAGES OK`, `41 tests run: 41 passed`, `VERIFY_EXIT=0` após uma tentativa estourada por `cargo` concorrente (não classificada como RED); 5 gates PASS; CI remota `success` no head exato `7329c53`, run `44952738240`.
+- SDD: 33 specs / 236 assessments / 33 validations / 33 releases / 0 bugs / 13 research; nenhuma divergência de fase; âncora `feature.json → specs/033`.
+- 80/20: `impacto × confiança × facilidade × segurança / 625`; escolhido gate CLI de manifesto (320/625), à frente de proveniência (200/625) e `avancar_tick` (90/625). Gap de deploy em `main` registrado para escalonamento ao SWE (competência humana).

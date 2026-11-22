@@ -1,5 +1,14 @@
 # STATE.md — Insurgência
 
+## Estado verificado — 2026-11-22T16:59Z (sessão "insurgencia - gate CLI de manifesto")
+
+- **Autoridade (Bloco 0.a)**: gate do alvo = `./verify.sh` + 5 gates Python; CI GitHub Actions; CLI `gh`; contexts obrigatórios em `dev` = `gates` + `rust` (`enforce_admins=false`, sem approvers). Factory `b1deab1` (origin/dev `d5d796f` capturado ao vivo) é apenas fonte: Forgejo/`fj`/`check_production_gate.py` **não** são importados. Superfície de teste = CLI/HTTP (sem UI de produto utilizável para `browser-use` nesta sessão — capturas do cliente **[NV]**).
+- **Drenagem (0.0)**: 0 PRs abertos para `dev`/`main`; 1 worktree, 0 stashes, 193 paths untracked alheios preservados; ledger criado nesta sessão (`.specify/queue/concurrency.jsonl`, agora gitignorado). Nada a herdar.
+- **Gates (16:54:17Z)**: `./verify.sh` → `ALL STAGES OK`, `41 tests run: 41 passed`, `VERIFY_EXIT=0`; 5 gates PASS (SDD `33/0`, DAG `296/0`, task-id `0 duplicatas`, converge `16/16`, hub-docs `0 erros`). Tentativa anterior estourou 900 s por `cargo` concorrente — **não** foi RED. CI remota no head exato `7329c53`: run `44952738240` `success`.
+- **Contagens**: 33 specs, 236 assessments, 33 validations, 33 releases, 0 bugs, 13 research. Scripts de docs atualizados em 21/11; nota de 22/11 registrada em `docs/PROGRESSO.md`.
+- **80/20 escolhido (Bloco 5)**: critério `impacto × confiança × facilidade × segurança / 625`, escala 1–5. A = **gate CLI de manifesto** 4×5×4×4 = **320/625 = 0,512**; B = proveniência de assets 2×4×5×5 = 200/625 = 0,320; C = `avancar_tick` no cliente 5×3×3×2 = 90/625 = 0,144. Escolhido A: converte o validador de biblioteca do ciclo 033 em consumidor executável determinístico, sem dependências novas.
+- **Gap escalado (0.7)**: workflow `ci-gates.yml` não tem job de deploy em push `main` — configuração de deploy é competência do SWE; registrado, não alterado.
+
 ## Estado vivo — 2026-11-21T21:31Z (ciclo 033: manifesto de compatibilidade em Rust)
 
 - **80/20 escolhido**: portar para Rust o contrato de manifesto **já existente** (`manifesto.json` 6 campos, `specs/011` FR-001..FR-006, ordem formato→versão→módulo→64 hex→regras→hash), não criar segundo esquema. GDD §1/§14.2 fundamenta a camada de framework; `contratos` só tinha constantes e `REJEICAO_MANIFESTO`, sem validador.
