@@ -378,3 +378,21 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - **PR #40 mesclado pelo SWE** às 20:52:35Z, merge commit `c126b6e`; `origin/main=c126b6e`. Encerra o [NV] de promoção `dev → main` das sessões anteriores — fato observado, não pendência.
 - **Evidência visual**: captura ASCII anterior (sem tofu) em `docs/evidencias/hud-confirmacao-visual-2026-11-22.png`; nova captura com acento a ser executada pelo orquestrador em Xvfb isolado, sem janela no desktop.
 - **[NV] remanescentes**: CI/merge do ciclo 036, deploy, assinatura GPG e qualquer efeito de produção. Nota append-only; nenhum gate/build/format/commit/push/PR executado.
+
+## 2026-11-22T23:01Z — Escalonamento ao SWE: estado verificado, PR #44 mesclado e PR #45 escalado (ciclo 037)
+
+- **Sessão**: `insurgencia - estado verificado e escalonamento 45` (`session_id=20261122T225813Z-estado-escalonamento`). Nota didática append-only; nenhuma ação remota executada.
+- **Âncora (Bloco 0.a)**: HEAD/`dev` `efb4d4b`, `main=c126b6e`; PR #44 mesclado em `dev` às 21:44:38Z (`efb4d4b`). Divergência v4.6 — prompt pede constituição v1.2.0/tasks antes de analyze/R6; alvo adota v1.0.0/analyze antes de tasks, sem R6, e `resolve-tasks.sh` ausente — registrada como decisão de governança do alvo, não como dívida executada.
+- **80/20**: documentação/escalonamento = 375/625 (impacto × confiança × facilidade × segurança ÷ 625); nenhuma mudança de código.
+- **Checks/roteiro/evidência (observados, não reexecutados)**: `./verify.sh` 41/41, 5 gates PASS; contagens reais 36 specs, 238 assessments, 36 validations, 36 releases, 0 bugs, 13 research. Ciclo 036 (HUD acentuado, Noto Sans OFL 1.1): blocker P1 `BEVY_ASSET_ROOT` corrigido em `01ff4d0`; captura final sem env; roteiro 11/11 em `.specify/validations/hud-acento-fonte-livre/evidence.md`.
+- **PRs**: #44 mesclado em `dev` (`efb4d4b`, 21:44:38Z). #45 `dev → main` OPEN, head `efb4d4b`, `mergeable`, sem auto-merge, checks `gates`/`rust` success (runs `45073795205`/`45073823941`), ACR sem blockers (comentário `7086327685`); escalado ao SWE em https://github.com/lfgranja/insurgencia/pull/45. Nenhum merge de `main`.
+- **Dívidas/gaps**: deploy em `main` sem job no workflow (previamente escalado, aberto); R6 não ratificado (governança v4.6, não executado).
+- **[NV]**: decisão do SWE sobre #45, estado remoto após esta nota, deploy/publicação, efeitos de produção e assinatura GPG. Histórico preservado por append; 0 linhas removidas.
+
+## 2026-11-22T23:05Z — Correção de contagens do snapshot 23:01Z (ciclo 037)
+
+- **Correção (append-only)**: a nota de 23:01Z imediatamente acima registra 36 specs, 238 assessments, 36 validations, 36 releases, 0 bugs, 13 research; esse snapshot é superado — não apagado — pelos números abaixo.
+- **Contagens VERIFICADAS às 23:05:02Z (worktree, árvore versionada a partir de `origin/dev`)**: **37 specs, 65 assessments, 37 validations, 37 releases, 0 bugs, 10 research** (versionadas).
+- **Comandos e saídas**: `find specs -maxdepth 1 -type d -name '[0-9][0-9][0-9]-*' | wc -l` → 37; `find .specify/assessments -mindepth 1 -maxdepth 1 -type d | wc -l` → 65; `find .specify/validations -mindepth 1 -maxdepth 1 -type d | wc -l` → 37; `find .specify/releases -mindepth 1 -maxdepth 1 -type d | wc -l` → 37; `find docs/research -maxdepth 1 -type f -name '*.md' | wc -l` → 10; `find docs/research -type f -name '*.md' | wc -l` → 10.
+- **Explicação da divergência**: o checkout compartilhado apresenta 238 assessments / 13 research porque inclui 173 diretórios untracked históricos (`ast-*`, `cor-*`, `doc-*`, `srv-*`, `ev-*`) e 3 notas untracked em `docs/research/2026-11-20-*`, preservados por decisão registrada; não são versionados. 36 specs/validations/releases era o estado pré-037; agora são 37 cada, incluindo o ciclo 037 em curso.
+- **Inalterado**: âncora `efb4d4b`/`c126b6e`, PR #44 mesclado e PR #45 escalado, `./verify.sh` 41/41, decisão de governança/R6. Nada executado: nenhum gate/build/formatter/commit/push/PR/deploy; 0 linhas removidas.
