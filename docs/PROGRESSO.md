@@ -360,3 +360,11 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - **PR #40** `dev→main`, head `f9d87e0`: `OPEN`, `gates pass` (run `45050452465`), `rust pass` (run `45050458892`); na fila do SWE, **sem merge de `main`** (deploy é competência do SWE). Estado posterior: **[NV]**.
 - Nenhum gate/build/format/commit/push/PR executado por esta correção documental; histórico preservado por append.
 - **[NV]/DEFER**: confirmação visual da SE, deploy/publicação, assinatura GPG.
+
+## 2026-11-22T19:06Z — Escalonamento ao SWE (ciclo 035, PR #42 mesclado em dev)
+
+- **Contexto**: sessão `insurgencia - fechamento de advisories ACR e rastreabilidade` (`session_id=20261122T183153Z-acr-advisories-trace`). O 80/20 escolhido (400/625) foi fechar 10 advisories de ACR e a deriva documental; o PR #42 foi mesclado em `dev` às 19:05:43Z, merge commit `87c8099`.
+- **Evidência**: PR #42 — run `45058283735`, `gates pass` (6s) e `rust pass` (4m37s); ACR sem blockers (comentário `7084068822`); roteiro de 10 passos 10/10 PASS com capturas em `/tmp/tmp.FAhaahvF3D/capturas/` e relatório em `.specify/validations/advisories-acr-rastreabilidade/evidence.md`. No worktree: `./verify.sh` `ALL STAGES OK`, 41/41; gates Python SDD `35/0`, DAG `332 tarefas/34 arestas/0 ciclos`, task-id `0 duplicatas`, converge `18/18`, hub-docs `0 erros`.
+- **O que resta ao SWE**: decidir a promoção `dev → main` no PR #40 e, se decidir, disparar o deploy em produção. Nenhum agente mesclou `main`, habilitou auto-merge, alterou proteção ou executou deploy.
+- **Riscos, limitações e rollback**: rollback do ciclo 035 por reversão de `87c8099` em `dev`; rollback de eventual promoção por reversão do merge em `main`. **[NV]**: check final do PR #40 no head exato, deploy, efeitos de produção, confirmação visual da SE e assinatura GPG.
+- **Issues/PRs**: Refs #39, #40, #41, #011; PR #42 mesclado em `dev`; PR #40 escalado.

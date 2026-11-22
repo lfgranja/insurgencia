@@ -1,5 +1,13 @@
 # STATE.md — Insurgência
 
+## Escalonamento ao SWE — 2026-11-22T19:06Z (sessão "insurgencia - fechamento de advisories ACR e rastreabilidade")
+
+- **Contexto**: o ciclo 80/20 de fechamento de advisories de ACR e deriva documental terminou com o merge do PR #42 em `dev` (`87c8099`, 19:05:43Z). A promoção `dev → main` é a continuação normativa do ciclo (Bloco 7b), mas a decisão final e o deploy pertencem exclusivamente ao SWE — nenhum agente mesclou `main`.
+- **Evidência**: PR #42 — `gates pass` (6s, run `45058283735`) e `rust pass` (4m37s, mesmo run), ACR sem blockers (comentário `7084068822`), roteiro 10/10 PASS com capturas em `/tmp/tmp.FAhaahvF3D/capturas/` e tabela em `.specify/validations/advisories-acr-rastreabilidade/evidence.md`. `./verify.sh` no worktree: `ALL STAGES OK`, 41/41; gates Python: SDD `35/0`, DAG `332/34/0`, task-id `0`, converge `18/18`, hub-docs `0`. PR #40 (`dev → main`) permanece `OPEN`; seu head será reobservado no SHA final antes do escalonamento.
+- **O que resta ao SWE**: decidir a promoção de `dev` para `main` no PR #40 e, se aprovada, disparar o deploy em produção conforme a configuração de release do repositório. O agente não executa nenhum desses passos, não habilita auto-merge e não altera proteções.
+- **Riscos, limitações e rollback**: blast radius limitado à promoção documental/canônica já validada; rollback do ciclo 035 é por reversão do merge commit `87c8099` em `dev` (ou do merge da promoção em `main`, se ela ocorrer). **[NV]**: estado final do PR #40, deploy, efeitos em produção, confirmação visual da SE (PR #35) e assinatura GPG.
+- **Issues relacionadas**: Refs #39, #40, #41, #011; PRs #42 (mergeado em `dev`) e #40 (escalado).
+
 ## Estado verificado — 2026-11-22T18:34Z (sessão "insurgencia - fechamento de advisories ACR e rastreabilidade"; ciclo 035 em curso)
 
 - **Sessão**: `session_title=insurgencia - fechamento de advisories ACR e rastreabilidade`; `session_id=20261122T183153Z-acr-advisories-trace`. Decisão 80/20 (impacto × confiança × facilidade × segurança ÷ 625) = fechar advisories ACR + corrigir deriva documental, **400/625**.
