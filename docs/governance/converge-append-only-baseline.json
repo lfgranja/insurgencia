@@ -77,6 +77,10 @@
     "specs/036-hud-acento-fonte-livre/converge.md": {
       "bytes": 5291,
       "sha256": "8c23b6f8a3f1401daf74c46422d15e059d8e22c994f8baa9b1ff59f6b8c66166"
+    },
+    "specs/037-estado-escalonamento-45/converge.md": {
+      "bytes": 3795,
+      "sha256": "2ef0cd07e15dcdc52492becd78f61ac1ec8cd6c65742686f19c85ea8fd83f9df"
     }
   },
   "_provenance": {
