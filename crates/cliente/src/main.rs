@@ -3,13 +3,15 @@
 
 //! Cliente low-poly jogável: terreno irregular, ilhas em talude e avatar facetado.
 //!
-//! Toda a geometria é procedural e gerada em tempo de execução, sem texturas nem
-//! assets externos. As malhas não usam índices compartilhados, de modo que cada
-//! triângulo recebe sua própria normal e as facetas ficam visíveis.
+//! Toda a geometria é procedural e gerada em tempo de execução, sem texturas; a
+//! fonte TrueType da HUD é o único asset externo. As malhas não usam índices
+//! compartilhados, de modo que cada triângulo recebe sua própria normal e as
+//! facetas ficam visíveis.
 
 use std::f32::consts::TAU;
+use std::path::Path;
 
-use bevy::asset::RenderAssetUsages;
+use bevy::asset::{AssetPlugin, RenderAssetUsages};
 use bevy::mesh::{
     ConeMeshBuilder, CylinderMeshBuilder, Mesh, PrimitiveTopology, SphereKind, SphereMeshBuilder,
 };
@@ -65,7 +67,10 @@ fn main() {
     let minimizado = std::env::args().any(|arg| arg == "--minimizado");
     App::new()
         .insert_resource(ModoJanela(minimizado))
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(AssetPlugin {
+            file_path: caminho_assets(),
+            ..default()
+        }))
         .add_systems(Startup, configurar)
         .add_systems(
             Update,
@@ -78,6 +83,36 @@ fn main() {
                 .chain(),
         )
         .run();
+}
+
+/// Caminho absoluto da pasta `assets`, sem depender de `BEVY_ASSET_ROOT`.
+///
+/// O Bevy 0.20 usa o diretório do executável como base quando não há variável
+/// de ambiente, o que aponta para `target/debug` e não encontra a fonte da HUD.
+/// Procuramos a pasta ao lado do executável, na raiz do workspace
+/// (`target/debug/../..`) e, por fim, no caminho derivado do manifesto da crate
+/// cliente em tempo de compilação.
+#[must_use]
+fn caminho_assets() -> String {
+    let raiz_exe = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(Path::to_path_buf));
+    let raiz_manifesto = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent);
+
+    [
+        raiz_exe.as_deref().map(|raiz| raiz.join("assets")),
+        raiz_exe.as_deref().map(|raiz| raiz.join("../../assets")),
+        raiz_manifesto.map(|raiz| raiz.join("assets")),
+    ]
+    .into_iter()
+    .flatten()
+    .find_map(|caminho| caminho.canonicalize().ok().filter(|real| real.is_dir()))
+    .map_or_else(
+        || format!("{}/../../assets", env!("CARGO_MANIFEST_DIR")),
+        |caminho| caminho.to_string_lossy().into_owned(),
+    )
 }
 
 /// Monta a câmera 3D inclinada sobre o mapa, apontando para a origem.
@@ -419,12 +454,15 @@ fn configurar(
     mut materiais: ResMut<Assets<StandardMaterial>>,
     mut janelas: Query<&mut Window, With<PrimaryWindow>>,
     modo: Res<ModoJanela>,
+    fontes: Res<AssetServer>,
 ) {
     if modo.0 {
         if let Some(mut janela) = janelas.iter_mut().next() {
             janela.set_minimized(true);
         }
     }
+
+    let fonte: Handle<Font> = fontes.load("fonts/NotoSans-Regular.ttf");
 
     commands.spawn((
         Camera3d::default(),
@@ -455,8 +493,9 @@ fn configurar(
     criar_avatar(&mut commands, &mut meshes, &mut materiais, jogador.posicao);
 
     commands.spawn((
-        Text::new("INSURGENCIA - low-poly"),
+        Text::new("INSURGÊNCIA — low-poly"),
         TextFont {
+            font: fonte.into(),
             font_size: FontSize::Px(20.0),
             ..default()
         },
@@ -552,7 +591,7 @@ fn atualizar_texto(jogador: Res<JogadorLocal>, mut textos: Query<&mut Text, With
         "nenhuma"
     };
     let conteudo = format!(
-        "INSURGENCIA - low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} / Y +/-{LIMITE_Y:.0}\nWASD ou setas para mover"
+        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nWASD ou setas para mover"
     );
 
     for mut texto in &mut textos {

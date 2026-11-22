@@ -368,3 +368,13 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - **O que resta ao SWE**: decidir a promoção `dev → main` no PR #40 e, se decidir, disparar o deploy em produção. Nenhum agente mesclou `main`, habilitou auto-merge, alterou proteção ou executou deploy.
 - **Riscos, limitações e rollback**: rollback do ciclo 035 por reversão de `87c8099` em `dev`; rollback de eventual promoção por reversão do merge em `main`. **[NV]**: check final do PR #40 no head exato, deploy, efeitos de produção, confirmação visual da SE e assinatura GPG.
 - **Issues/PRs**: Refs #39, #40, #41, #011; PR #42 mesclado em `dev`; PR #40 escalado.
+
+## 2026-11-22T21:17Z — Ciclo 036: HUD com acento e fonte livre
+
+- **Sessão/pedido**: `insurgencia - HUD com acento e fonte livre` (`session_id=20261122T211548Z-hud-acento-fonte`). Pedido explícito do SWE: restaurar `Ê`, `—` e `·` no HUD.
+- **Âncora/80-20**: ciclo 036 em curso, branch `036-hud-acento-fonte-livre`, base `7c5c0f3`. 80/20 registrado — escolha do usuário tem prioridade; critério interno impacto 5 × confiança 4 × facilidade 3 × segurança 4 ÷ 625 = 240/625.
+- **Superação (append-only)**: o paliativo ASCII do ciclo 029 (`INSURGENCIA - low-poly`, `/` no lugar de `·`) é superado por esta mudança; histórico do ciclo 029 intacto.
+- **Fonte**: Noto Sans Regular, 621572 bytes, OFL 1.1, cobertura de U+00CA/U+2014/U+00B7 confirmada por `fc-match`; licença e proveniência em `assets/fonts/OFL.txt` e `docs/governance/font-provenance.md` (escritos pelo agente de código).
+- **PR #40 mesclado pelo SWE** às 20:52:35Z, merge commit `c126b6e`; `origin/main=c126b6e`. Encerra o [NV] de promoção `dev → main` das sessões anteriores — fato observado, não pendência.
+- **Evidência visual**: captura ASCII anterior (sem tofu) em `docs/evidencias/hud-confirmacao-visual-2026-11-22.png`; nova captura com acento a ser executada pelo orquestrador em Xvfb isolado, sem janela no desktop.
+- **[NV] remanescentes**: CI/merge do ciclo 036, deploy, assinatura GPG e qualquer efeito de produção. Nota append-only; nenhum gate/build/format/commit/push/PR executado.
