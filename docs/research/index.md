@@ -107,3 +107,36 @@ As contagens abaixo são as vigentes; a atualização de 13:18Z (30 specs / 233 
 
 - Gates (18:32:17Z, observado pela orquestração via `gh`/`git`): `./verify.sh` ALL STAGES OK, 41/41; SDD 34/0; DAG 314/17/0; task-id 0; converge 17/17; hub-docs 0 erros. Âncora `feature.json → specs/034-gate-manifesto-cli`; HEAD `f9d87e0`.
 - PR #40 `dev→main` `OPEN` na fila do SWE (`gates`/`rust` pass); **sem merge de `main`**. **[NV]**: estado remoto posterior e qualquer afirmação remota não observada nesta sessão.
+
+## Atualização verificada — 2026-11-22T23:01Z (ciclo 037)
+
+A tabela de 18:34Z acima permanece como histórico; a tabela abaixo é a vigente. Números do snapshot da orquestração (22:58–23:01Z); comandos executados somente leitura neste worktree, com as saídas reais registradas na última coluna.
+
+| Conjunto | Vigente | Verificação (comando) | Observação local (worktree 037) |
+|:--|--:|:--|:--|
+| specs numeradas | 36 | `find specs -maxdepth 1 -type d -name '[0-9][0-9][0-9]-*' \| wc -l` | 37 diretórios: 36 versionados + `037-estado-escalonamento-45` não versionado |
+| assessments | 238 | `find .specify/assessments -mindepth 1 -maxdepth 1 -type d \| wc -l` | 64 dirs no worktree / 71 na árvore canônica; 238 vem do snapshot, **[NV]** quanto à recontagem local |
+| validations | 36 | `find .specify/validations -mindepth 1 -maxdepth 1 -type d \| wc -l` | 36 |
+| releases | 36 | `find .specify/releases -mindepth 1 -maxdepth 1 -type d \| wc -l` | 36 |
+| bugs | 0 | `find .specify/bugs ...` / `find . -name 'BUG-*.md'` | 0 / 0 |
+| research (md) | 13 | `find docs/research -name '*.md' \| wc -l` | 10 no worktree; 13 na árvore canônica (3 notas `2026-11-20-*` não propagadas) |
+
+- Âncora local `efb4d4b`; gates observados pela orquestração: `./verify.sh` ALL STAGES OK, 41/41 (não reexecutado — **[NV]**). Resultados SDD/DAG/task-id/converge/hub-docs do ciclo 036 permanecem em `docs/PROGRESSO.md`.
+- Remoto **[NV]** nesta sessão: `dev=efb4d4b`, `main=c126b6e`, PR #44 mesclado, PR #45 `dev→main` OPEN/green/CR sem blockers na fila SWE, sem merge/deploy; proteção de `dev` = `contexts=["gates","rust"]`, `strict=true`, `enforce_admins=false`, `main` desprotegido (observado anteriormente).
+- Decisão de governança: divergência v4.6 vs constituição v1.0.0 do alvo registrada como tal; R6 não adotado. Nenhum gate/build/formatter/commit/push/PR executado nesta correção.
+
+## Correção de contagens — 2026-11-22T23:05Z
+
+A tabela de 23:01Z acima permanece como histórico. Contagens VERIFICADAS às 23:05:02Z no worktree, árvore versionada a partir de `origin/dev`:
+
+| Conjunto | Versionadas | Comando (saída) |
+|:--|--:|:--|
+| specs numeradas | 37 | `find specs -maxdepth 1 -type d -name '[0-9][0-9][0-9]-*' \| wc -l` → 37 |
+| assessments | 65 | `find .specify/assessments -mindepth 1 -maxdepth 1 -type d \| wc -l` → 65 |
+| validations | 37 | `find .specify/validations -mindepth 1 -maxdepth 1 -type d \| wc -l` → 37 |
+| releases | 37 | `find .specify/releases -mindepth 1 -maxdepth 1 -type d \| wc -l` → 37 |
+| bugs | 0 | 0 (sem `BUG-*.md` versionados) |
+| research (md) | 10 | `find docs/research -maxdepth 1 -type f -name '*.md' \| wc -l` → 10; `find docs/research -type f -name '*.md' \| wc -l` → 10 |
+
+- O checkout compartilhado apresenta 238 assessments / 13 research porque inclui 173 diretórios untracked históricos (`ast-*`, `cor-*`, `doc-*`, `srv-*`, `ev-*`) e 3 notas untracked em `docs/research/2026-11-20-*`, preservados por decisão registrada; não são versionados. O 36 de specs/validations/releases antecedia o ciclo 037; agora são 37 cada, incluindo o ciclo em curso.
+- Âncora `efb4d4b`/`c126b6e`, PR #45 escalado, 41/41 testes e a decisão de governança/R6 permanecem inalterados. Correção append-only; nenhum gate/build/formatter/commit/push/PR executado; 0 linhas removidas.

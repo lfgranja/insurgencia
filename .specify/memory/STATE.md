@@ -1,5 +1,33 @@
 # STATE.md — Insurgência
 
+## Correção de contagens — 2026-11-22T23:05Z (snapshot 22:58–23:01Z superado)
+
+- **Motivo**: o snapshot 22:58–23:01Z (36 specs, 238 assessments, 36 validations, 36 releases, 0 bugs, 13 research) misturou a árvore versionada do worktree com untracked históricos do checkout compartilhado. A nota imediatamente abaixo permanece como histórico, não apagada.
+- **Contagens VERIFICADAS (2026-11-22T23:05:02Z, árvore versionada a partir de `origin/dev`)**: **37 specs, 65 assessments, 37 validations, 37 releases, 0 bugs, 10 research**.
+- **Comandos (saídas verificadas)**: `find specs -maxdepth 1 -type d -name '[0-9][0-9][0-9]-*' | wc -l` → 37; `find .specify/assessments -mindepth 1 -maxdepth 1 -type d | wc -l` → 65; `find .specify/validations -mindepth 1 -maxdepth 1 -type d | wc -l` → 37; `find .specify/releases -mindepth 1 -maxdepth 1 -type d | wc -l` → 37; `find docs/research -maxdepth 1 -type f -name '*.md' | wc -l` → 10; `find docs/research -type f -name '*.md' | wc -l` → 10.
+- **Por que o checkout compartilhado apresenta 238/13**: ele inclui 173 diretórios untracked históricos (`ast-*`, `cor-*`, `doc-*`, `srv-*`, `ev-*`) e 3 notas untracked em `docs/research/2026-11-20-*`, preservados por decisão registrada — não são versionados. O 36 de specs/validations/releases era o estado antes da criação do ciclo 037; agora são 37 cada (incluindo o ciclo 037 em curso).
+- **Inalterado**: âncora `efb4d4b`/`c126b6e`, PR #45 escalado ao SWE, `./verify.sh` 41/41, escalonamento e decisão de governança/R6. Nota append-only; nenhum gate/build/format/commit/push/PR/deploy executado; 0 linhas removidas.
+
+## Escalonamento ao SWE — 2026-11-22T23:01Z (sessão "insurgencia - estado verificado e escalonamento 45")
+
+- **Sessão/pedido**: `insurgencia - estado verificado e escalonamento 45`; `session_id=20261122T225813Z-estado-escalonamento`. Escalonamento didático do estado verificado ao SWE — nada executado além destas notas append-only.
+- **Âncora (Bloco 0.a)**: HEAD/`dev` `efb4d4b`; `main=c126b6e`. PR #44 mesclado em `dev` às 21:44:38Z, merge commit `efb4d4b`. Autoridade do alvo = `./verify.sh` + 5 gates Python; CI GitHub Actions; CLI `gh`; factory apenas fonte. Divergência v4.6 (prompt pede constituição v1.2.0/tasks antes de analyze/R6; alvo adota v1.0.0/analyze antes de tasks, sem R6, e `resolve-tasks.sh` ausente) registrada como **decisão de governança do alvo**, não como dívida executada (Bloco 0.a).
+- **80/20 registrado**: critério interno impacto × confiança × facilidade × segurança ÷ 625 = **375/625** — documentação/escalonamento (375) sobre execução (250). Nenhuma mudança de código.
+- **Checks/roteiro/evidência (observados pela orquestração, não reexecutados nesta nota)**: `./verify.sh` `41/41` (`ALL STAGES OK`); 5 gates Python PASS; contagens reais da auditoria **36 specs, 238 assessments, 36 validations, 36 releases, 0 bugs, 13 research**. Roteiro de 11 passos **11/11 PASS** do ciclo 036, evidência em `.specify/validations/hud-acento-fonte-livre/evidence.md`.
+- **PRs**: #44 `dev` — **mesclado** 21:44:38Z (`efb4d4b`). #45 `dev → main` — **OPEN**, head `efb4d4b`, `mergeable`, `autoMergeRequest=null`, checks `gates`/`rust` success (runs `45073795205`/`45073823941`), ACR sem blockers (comentário `7086327685`); escalado ao SWE em https://github.com/lfgranja/insurgencia/pull/45. **Não mesclar `main`**: promoção/deploy é competência exclusiva do SWE.
+- **Dívidas/gaps em aberto**: (1) deploy em `main` ainda sem job no workflow `ci-gates.yml` — gap previamente escalado, segue aberto; (2) R6 não ratificado no alvo (divergência v4.6, governança registrada, não executada).
+- **[NV] remanescentes**: decisão do SWE sobre o PR #45, estado remoto após esta nota, deploy/publicação, efeitos em produção e assinatura GPG. Nota append-only; nenhum gate/build/format/commit/push/PR/deploy executado.
+
+## HUD com acento e fonte livre — 2026-11-22T21:17Z (ciclo 036 em curso)
+
+- **Sessão/pedido**: `insurgencia - HUD com acento e fonte livre`; `session_id=20261122T211548Z-hud-acento-fonte`. Pedido explícito do SWE: restaurar `Ê`, `—` e `·` no HUD.
+- **Âncora/80-20**: ciclo **036** em curso, branch `036-hud-acento-fonte-livre`, base `7c5c0f3`. 80/20 registrado — a escolha do usuário tem prioridade; critério interno impacto 5 × confiança 4 × facilidade 3 × segurança 4 ÷ 625 = **240/625**.
+- **Superação**: o paliativo ASCII do ciclo 029 (`INSURGENCIA - low-poly`, `/` no lugar de `·`) é superado por esta mudança. O histórico do ciclo 029 permanece intacto (append-only).
+- **Fonte**: Noto Sans Regular, 621572 bytes, OFL 1.1, cobertura de U+00CA/U+2014/U+00B7 confirmada por `fc-match`; licença e proveniência em `assets/fonts/OFL.txt` e `docs/governance/font-provenance.md` (escritos pelo agente de código).
+- **PR #40 mesclado pelo SWE** às 20:52:35Z, merge commit `c126b6e`; `origin/main=c126b6e`. Isso **encerra o [NV]** de promoção `dev → main` das sessões anteriores — registrado como fato observado, não como pendência.
+- **Evidência visual**: captura anterior (ASCII, sem tofu) em `docs/evidencias/hud-confirmacao-visual-2026-11-22.png`; a nova captura com acento será executada pelo orquestrador em Xvfb isolado, sem janela no desktop.
+- **[NV] remanescentes**: CI/merge do ciclo 036, deploy, assinatura GPG e qualquer efeito de produção. Nota append-only; nenhum gate/build/format/commit/push/PR executado.
+
 ## Escalonamento ao SWE — 2026-11-22T19:06Z (sessão "insurgencia - fechamento de advisories ACR e rastreabilidade")
 
 - **Contexto**: o ciclo 80/20 de fechamento de advisories de ACR e deriva documental terminou com o merge do PR #42 em `dev` (`87c8099`, 19:05:43Z). A promoção `dev → main` é a continuação normativa do ciclo (Bloco 7b), mas a decisão final e o deploy pertencem exclusivamente ao SWE — nenhum agente mesclou `main`.
