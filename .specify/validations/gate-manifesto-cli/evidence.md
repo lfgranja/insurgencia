@@ -6,7 +6,7 @@
 
 | Passo | Ação | Saída observada | Resultado | Captura |
 |:--|:--|:--|:--|:--|
-| 1 | `$BIN` sem args / 1 arg / 5 args / `versao_local=abc` | quatro execuções, exit **2**, stderr de uso ou `versao_local deve ser um inteiro entre 0 e 255`, nenhuma linha `COMPAT_*` | PASS | `uso0-*`, `uso1-*`, `uso1b-*`, `uso5-*`, `usoabc-*` |
+| 1 | `$BIN` sem args / 1 arg / 5 args / `versao_local=abc` | cinco grupos de captura do passo 1, exit **2**, stderr de uso ou `versao_local deve ser um inteiro entre 0 e 255`, nenhuma linha `COMPAT_*` | PASS | `uso0-*`, `uso1-*`, `uso1b-*`, `uso5-*`, `usoabc-*` |
 | 2 | `$BIN` com `{}` e com `nao-e-json`, regras válidas | `COMPAT_FALHA MANIFEST_INVALID` na stderr, exit **1**, stdout vazio (ambos) | PASS | `vazio-*`, `ruido-*` |
 | 3 | manifesto aceito gerado com hash real do arquivo de regras | `COMPAT_OK module_id=insurgencia.exemplo content_hash=8b6c…1f1f` em stdout, stderr vazia, exit **0** | PASS | `aceito-*`, `manifesto-aceito.json` |
 | 4 | `protocol_version=2` | `COMPAT_FALHA VERSAO_PROTOCOLO_DIVERGENTE`, exit **1** | PASS | `versao-*` |
@@ -19,4 +19,6 @@
 
 **Resultado**: 10/10 PASS. `evidence_status: passed`. Nenhum passo exigiu intervenção humana; nenhuma captura de UI (superfície inexistente). Rollback do roteiro: `rm -rf /tmp/tmp.t9J9ly2h8z` — nenhum arquivo do repositório modificado pela execução.
 
-**Gates da unidade**: `./verify.sh` (17:12:43Z) → `ALL STAGES OK`, `41 tests run: 41 passed`, `VERIFY_EXIT=0`; um RED real anterior (`unused import OsString`) foi corrigido na fonte e registrado no converge. Gates Python (17:06:29Z): SDD `34/0`, DAG `314 tarefas/17 arestas/0 ciclos`, task-id `0 duplicatas`, hub-docs `0 erros`; converge pendente apenas do bootstrap do novo `converge.md`.
+**Gates da unidade**: `./verify.sh` (17:12:43Z) → `ALL STAGES OK`, `41 tests run: 41 passed`, `VERIFY_EXIT=0`; um RED real anterior (`unused import OsString`) foi corrigido na fonte e registrado no converge. Gates Python (17:06:29Z): SDD `34/0`, DAG `314 tarefas/17 arestas/0 ciclos`, task-id `0 duplicatas`, hub-docs `0 erros`; baseline aplicado e gate `converge-append-only` PASSOU com `17/17` às 21:23:25Z de 22/11.
+
+**Nota (ciclo 035)**: o caso de `content_hash` em maiúsculo passa a ser coberto pelo roteiro do ciclo 035; a linha de sucesso do CLI imprime agora o SHA-256 calculado em minúsculo (`hash_das_regras`), canônico e byte a byte idêntico para manifestos com a mesma hash em caixas diferentes.

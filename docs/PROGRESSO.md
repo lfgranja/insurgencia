@@ -350,3 +350,13 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - Gate autoritativo (16:54:17Z): `ALL STAGES OK`, `41 tests run: 41 passed`, `VERIFY_EXIT=0` após uma tentativa estourada por `cargo` concorrente (não classificada como RED); 5 gates PASS; CI remota `success` no head exato `7329c53`, run `44952738240`.
 - SDD: 33 specs / 236 assessments / 33 validations / 33 releases / 0 bugs / 13 research; nenhuma divergência de fase; âncora `feature.json → specs/033`.
 - 80/20: `impacto × confiança × facilidade × segurança / 625`; escolhido gate CLI de manifesto (320/625), à frente de proveniência (200/625) e `avancar_tick` (90/625). Gap de deploy em `main` registrado para escalonamento ao SWE (competência humana).
+
+## 2026-11-22T18:34Z — Fechamento de advisories ACR: correção de deriva documental (ciclo 035)
+
+- **Sessão**: `insurgencia - fechamento de advisories ACR e rastreabilidade` (`session_id=20261122T183153Z-acr-advisories-trace`); 80/20 = advisories ACR + deriva documental, 400/625. Worktree isolado, branch `035-advisories-acr-rastreabilidade`, base `f9d87e0`.
+- **Contagens reais (auditoria 18:31–18:34Z)**: 34 specs, 237 assessments, 34 validations, 34 releases, 0 bugs, 13 research. A nota de 16:59Z (33/236/33/33, âncora `specs/033`) era snapshot pré-034 — preservada e superada.
+- **Gates (18:32:17Z, observado pela orquestração via `gh`/`git`, não reexecutado)**: `./verify.sh` ALL STAGES OK, 41/41; SDD 34/0; DAG 314/17/0; task-id 0; converge 17/17; hub-docs 0 erros.
+- **Âncora**: HEAD `f9d87e0` em `dev`; `feature.json → specs/034-gate-manifesto-cli`. Proteção de `dev` = `contexts=["gates","rust"]`, `strict=true`, `enforce_admins=false` — avisos antigos ("rust não obrigatório", `dev=3709c56`) superados.
+- **PR #40** `dev→main`, head `f9d87e0`: `OPEN`, `gates pass` (run `45050452465`), `rust pass` (run `45050458892`); na fila do SWE, **sem merge de `main`** (deploy é competência do SWE). Estado posterior: **[NV]**.
+- Nenhum gate/build/format/commit/push/PR executado por esta correção documental; histórico preservado por append.
+- **[NV]/DEFER**: confirmação visual da SE, deploy/publicação, assinatura GPG.

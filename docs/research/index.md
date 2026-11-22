@@ -92,3 +92,18 @@ As contagens abaixo são as vigentes; as seções anteriores permanecem como his
 - O gate **não é mais** `spec_dirs=0`: os 5 gates SDD PASSaram às 13:18:27Z com `spec_dirs=30 gaps=0`, converge `13/13`, DAG `262 tarefas/0 ciclos`, task-id `0 duplicatas`, hub-docs `0 erros`.
 - Nova família documental: `docs/research/slotbound-2026-11-21-*.md` (8 notas + síntese), com vereditos para 28 propostas do vídeo `Z4ayMTXnkoQ`.
 - **[NV]**: `./verify.sh` completo em execução; CI/merge/proteções/confirmação visual da SE — ver `docs/PROGRESSO.md` para a verificação ao vivo de 13:19:29Z via `gh`.
+
+## Atualização verificada — 2026-11-22T18:34Z
+
+As contagens abaixo são as vigentes; a atualização de 13:18Z (30 specs / 233 assessments, `spec_dirs=30`) permanece como histórico de 21/11 e não foi reescrita.
+
+| Conjunto | Contagem | Verificação |
+|:--|--:|:--|
+| specs numeradas | 34 | `find specs -maxdepth 1 -type d -name '[0-9][0-9][0-9]-*' \| wc -l` |
+| assessments | 237 | `find .specify/assessments -mindepth 1 -maxdepth 1 -type d \| wc -l` |
+| validations / releases | 34 / 34 | `find .specify/{validations,releases} -mindepth 1 -maxdepth 1 -type d \| wc -l` |
+| bugs | 0 | `find .specify/bugs ...` / `find . -name 'BUG-*.md'` |
+| research (md) | 13 | `find docs/research -name '*.md' \| wc -l` |
+
+- Gates (18:32:17Z, observado pela orquestração via `gh`/`git`): `./verify.sh` ALL STAGES OK, 41/41; SDD 34/0; DAG 314/17/0; task-id 0; converge 17/17; hub-docs 0 erros. Âncora `feature.json → specs/034-gate-manifesto-cli`; HEAD `f9d87e0`.
+- PR #40 `dev→main` `OPEN` na fila do SWE (`gates`/`rust` pass); **sem merge de `main`**. **[NV]**: estado remoto posterior e qualquer afirmação remota não observada nesta sessão.

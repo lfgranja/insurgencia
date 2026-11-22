@@ -138,3 +138,11 @@ Nenhuma percentagem é declarada — a governança proíbe. Contagens verificada
 - PR #36 mesclado em `dev` (`ce2d1f0`, 20:25:35Z) sob autorização expressa do SE, com `gates` e `rust` verdes e `./verify.sh` 34/34. 0 PRs abertos.
 - Proteção de `dev` endurecida com autorização expressa: required checks agora `["gates","rust"]` (antes só `gates`), `strict=true`, `enforce_admins=false`, sem reviews/restrições. Verificado por PUT e GET via `gh api`; evidência em `docs/PROGRESSO.md`.
 - `[NV]/DEFER`: confirmação visual da SE, deploy/publicação e assinatura GPG.
+
+### Atualização verificada — 2026-11-22T18:34Z
+
+- Âncora: HEAD `f9d87e0` em `dev`; `feature.json → specs/034-gate-manifesto-cli`; ciclo 035 em curso. Autoridade inalterada (`./verify.sh` + gates Python; GitHub Actions/`gh`; factory apenas fonte).
+- Contagens reais (auditoria 18:31–18:34Z): 34 specs, 237 assessments, 34 validations, 34 releases, 0 bugs, 13 research — superam o snapshot de 30 specs/233 assessments de 13:18Z (preservado acima como histórico).
+- Gates (18:32:17Z, observado pela orquestração via `gh`/`git`): `./verify.sh` ALL STAGES OK, 41/41; SDD 34/0; DAG 314/17/0; task-id 0; converge 17/17; hub-docs 0 erros.
+- Proteção de `dev` = `contexts=["gates","rust"]`, `strict=true`, `enforce_admins=false` (21/11), confirmada; aviso antigo de "rust não obrigatório"/`dev=3709c56` superado.
+- PR #40 `dev→main` `OPEN` na fila do SWE; **sem merge de `main`** (deploy é competência do SWE). **[NV]**: estado remoto posterior, confirmação visual da SE, deploy/publicação, assinatura GPG.

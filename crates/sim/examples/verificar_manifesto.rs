@@ -132,7 +132,13 @@ fn executar() -> Result<(), Falha> {
     .map_err(Falha::Compatibilidade)?;
 
     let modulo_id = &manifesto.module_id;
-    let content_hash = &manifesto.content_hash;
+    // `conferir` só retorna Ok com hash presente (linha 147 do contrato garante
+    // REGRAS_AUSENTES), então o ramo Some é o caminho de sucesso: imprime o
+    // SHA-256 calculado em minúsculo, canônico e independente da caixa do manifesto.
+    let content_hash = match hash_regras.as_deref() {
+        Some(hash) => hash,
+        None => manifesto.content_hash.as_str(),
+    };
     println!("COMPAT_OK module_id={modulo_id} content_hash={content_hash}");
     Ok(())
 }
