@@ -69,6 +69,10 @@
     "specs/034-gate-manifesto-cli/converge.md": {
       "bytes": 3811,
       "sha256": "300b7a7063fd994db6c4acf414974e97bf9d0da1f7641b387e7c4d7b02daaa86"
+    },
+    "specs/035-advisories-acr-rastreabilidade/converge.md": {
+      "bytes": 4414,
+      "sha256": "9b606524120622323b7fb9e8881fb903bff68664e6faed7c7778dfceb9372895"
     }
   },
   "_provenance": {

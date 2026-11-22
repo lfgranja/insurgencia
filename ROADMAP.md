@@ -101,3 +101,10 @@ passarem em duas partidas consecutivas, uma com cliente modificado (GDD:1567); (
 - O risco registrado na seção 6 ("job `rust` não obrigatório") foi **corrigido**: required checks de `dev` = `["gates","rust"]`, confirmado por `gh api` PUT + GET. `enforce_admins=false`, `reviews=null`, `restrictions=null` preservados.
 - PR #36 mesclado em `dev` (`ce2d1f0`) com CI verde; 0 PRs abertos. Ciclo 032 registra o endurecimento como mudança de governança remota autorizada.
 - `[NV]/DEFER`: confirmação visual da SE, deploy/publicação, assinatura GPG.
+
+### Atualização verificada — 2026-11-22T18:34Z
+
+- Âncora: HEAD `f9d87e0` em `dev`; `feature.json → specs/034-gate-manifesto-cli`; ciclo 035 em curso. A seção 6 (30 specs, `dev=3709c56`, "job `rust` não obrigatório") permanece como histórico de 21/11.
+- Estoque real (auditoria 18:31–18:34Z): 34 specs / 237 assessments / 34 validations / 34 releases / 0 bugs / 13 research. Gates (18:32:17Z, observado pela orquestração via `gh`/`git`): `verify.sh` 41/41, SDD 34/0, DAG 314/17/0, task-id 0, converge 17/17, hub-docs 0 erros.
+- Proteção de `dev` = `contexts=["gates","rust"]`, `strict=true`, `enforce_admins=false`: risco de confiança da seção 6 corrigido em 21/11. PR #40 `dev→main` `OPEN` na fila do SWE; **sem merge de `main`** (deploy é competência do SWE).
+- **[NV]** remanescentes: estado remoto posterior, deploy/publicação, confirmação visual da SE, assinatura GPG.

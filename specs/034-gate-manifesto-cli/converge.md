@@ -22,3 +22,7 @@ Nenhuma entrada adicional nesta entrega. Resultados do roteiro, `./verify.sh` p�
 - **Gate verde**: `./verify.sh` (17:12:43Z) → `ALL STAGES OK`, `41 tests run: 41 passed`, `VERIFY_EXIT=0`.
 - **Roteiro 100% autônomo**: 10/10 PASS (17:21:57–58Z), capturas em `/tmp/tmp.t9J9ly2h8z/capturas/`, relatório em `.specify/validations/gate-manifesto-cli/evidence.md`. `evidence_status: passed`; nenhuma UI fingida.
 - **Gates Python**: SDD `34/0`; DAG `314 tarefas/17 arestas/0 ciclos`; task-id `0 duplicatas`; hub-docs `0 erros`. Converge baselinado por bootstrap após esta entrada.
+
+### Correção append-only — 2026-11-22
+
+- **`.gitignore`**: a afirmação histórica da entrada original (".gitignore ... intactos") precisou de correção porque `.gitignore:5-6` passou a conter `/.specify/queue/`, excluindo a fila de worktrees. O histórico permanece integralmente preservado; esta entrada é a correção, sem reescrita da linha antiga (converge append-only).

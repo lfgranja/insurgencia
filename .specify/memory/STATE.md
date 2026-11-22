@@ -1,5 +1,16 @@
 # STATE.md — Insurgência
 
+## Estado verificado — 2026-11-22T18:34Z (sessão "insurgencia - fechamento de advisories ACR e rastreabilidade"; ciclo 035 em curso)
+
+- **Sessão**: `session_title=insurgencia - fechamento de advisories ACR e rastreabilidade`; `session_id=20261122T183153Z-acr-advisories-trace`. Decisão 80/20 (impacto × confiança × facilidade × segurança ÷ 625) = fechar advisories ACR + corrigir deriva documental, **400/625**.
+- **Âncora**: HEAD `f9d87e0` em `dev`; `.specify/feature.json → specs/034-gate-manifesto-cli`. Ciclo **035** (`035-advisories-acr-rastreabilidade`, base `f9d87e0`) em curso neste worktree isolado. Autoridade do alvo = `./verify.sh` + gates Python; CI GitHub Actions; CLI `gh`; factory apenas fonte (Bloco 0.a). **[NV]**: estado remoto após esta nota.
+- **Contagens reais (auditoria 18:31–18:34Z)**: **34 specs, 237 assessments, 34 validations, 34 releases, 0 bugs, 13 research**. A nota de 16:59Z imediatamente abaixo (33/236/33/33, âncora `specs/033`) é **snapshot pré-034** — preservada como histórico e **superada** por esta.
+- **Gates (18:32:17Z)**: `./verify.sh` → `ALL STAGES OK`, `41 tests run: 41 passed`; SDD `34/0`; DAG `314/17/0`; task-id `0 duplicatas`; converge `17/17`; hub-docs `0 erros`. Observado pela orquestração via `gh`/`git`; não reexecutado nesta nota.
+- **Proteção de `dev`**: `contexts=["gates","rust"]`, `strict=true`, `enforce_admins=false` (verificado 21/11, `docs/PROGRESSO.md`). Avisos antigos ("rust não obrigatório", `dev=3709c56`) estão superados.
+- **PR #40 (`dev→main`, head `f9d87e0`)**: `OPEN` na fila do SWE; checks `gates pass` (run `45050452465`) e `rust pass` (run `45050458892`). **Sem merge de `main`** nesta sessão — deploy/publicação é competência do SWE, não autorizada a agente. Estado do PR após esta nota: **[NV]**.
+- **Dívidas documentais corrigidas nesta nota**: contagens, âncora e proteção em `STATE.md`, `docs/PROGRESSO.md`, `OBJETIVO.md`, `ROADMAP.md` e `docs/research/index.md` — notas datadas, append-only; nenhum gate/build/format/commit/push/PR executado.
+- **[NV]/DEFER remanescentes**: confirmação visual final da SE, deploy/publicação e assinatura GPG.
+
 ## Estado verificado — 2026-11-22T16:59Z (sessão "insurgencia - gate CLI de manifesto")
 
 - **Autoridade (Bloco 0.a)**: gate do alvo = `./verify.sh` + 5 gates Python; CI GitHub Actions; CLI `gh`; contexts obrigatórios em `dev` = `gates` + `rust` (`enforce_admins=false`, sem approvers). Factory `b1deab1` (origin/dev `d5d796f` capturado ao vivo) é apenas fonte: Forgejo/`fj`/`check_production_gate.py` **não** são importados. Superfície de teste = CLI/HTTP (sem UI de produto utilizável para `browser-use` nesta sessão — capturas do cliente **[NV]**).
