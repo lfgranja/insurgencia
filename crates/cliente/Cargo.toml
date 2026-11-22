@@ -1,0 +1,10 @@
+[package]
+name = "insurgencia-cliente"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Renderizador 3D (malhas PBR sem textura) e HUD: "3d" e "ui" ja estao nas features padrao.
+bevy = { version = "=0.20.1", features = ["3d", "ui"] }
+# Espelho autoritativo do estado do jogador (ADR-004).
+insurgencia-sim = { path = "../sim" }

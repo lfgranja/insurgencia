@@ -1,0 +1,4 @@
+-   **`DesafioDeIlha.cs`:**
+    -   **Propósito:** Define um desafio dentro de uma ilha.
+    -   **Propriedades:** `estaCompleto`.
+    -   **Métodos Abstratos:** `IniciarDesafio()`, `VerificarProgresso()`.

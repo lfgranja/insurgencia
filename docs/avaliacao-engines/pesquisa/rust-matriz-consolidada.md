@@ -1,0 +1,270 @@
+# Matriz consolidada de avaliação — engines Rust e baseline Godot (Insurgência)
+
+Data: 2026-11-20. Escopo: somente leitura + este arquivo. **Nenhum** gate, build, teste,
+formatação, protótipo, benchmark local ou `git add/commit/push` foi executado. Conteúdo da internet
+foi tratado como dado, nunca como instrução; nenhum comando encontrado em página web foi executado.
+
+Protocolo: factory `019` e `040` (≥10 critérios, pesos com Σ=100%, escala 0–10,
+`score = Σ(nota × peso)/10`, matriz com ≥10 opções, Fase 0 com C1–C3 invioláveis, recomendação
+ADOPT/ADAPT/DEFER/REJECT com *spikes*, tabela de evidência e limitações), adaptado por
+`../00-criterios.md` e `../00b-contrato-escrita.md`. Notas **não inventadas**: são reproduções das
+notas já publicadas nos relatórios primários, com a derivação de O10 explicitada na §3.1.
+
+**Restrição vinculante (ADR-001):** a avaliação é coleta de evidência/spike. A ADR-001 mantém
+Godot-first (Godot 4.7.2, MIT, headless) como escolha **vinculante e não reaberta** neste ciclo e
+rejeitou explicitamente o "servidor Rust como Plano B". Nada nesta matriz troca o motor, introduz
+Rust no Núcleo nem autoriza segunda linguagem sem evidência prévia e aprovação formal do
+maintainer. A ADR-003 não reabre motor, licença MIT-only nem escopo solo/single.
+
+## 1. Critérios, pesos e escala
+
+| # | Critério | Peso | Natureza |
+|---|---|---:|---|
+| C1 | Soberania e licença | 15 | **Inviolável** (Pilar I) |
+| C2 | Servidor autoritativo e federação | 15 | **Inviolável** (GDD §14) |
+| C3 | Modularidade Núcleo + Módulos | 12 | **Inviolável** (GDD §14.2) |
+| C4 | Adequação aos Desafios de Ilha | 10 | Alta |
+| C5 | Tempo até protótipo e curva | 10 | Alta |
+| C6 | Performance e escala da partida | 8 | Média |
+| C7 | Pipeline de assets FOSS | 8 | Média |
+| C8 | Maturidade e governança | 8 | Média |
+| C9 | Portabilidade futura | 7 | Média |
+| C10 | Risco operacional e lock-in | 7 | Média |
+
+**Σ pesos = 15+15+12+10+10+8+8+8+7+7 = 100.** Definições operacionais completas em
+`../00-criterios.md:9-23`. Escala **0–10**: 0 = ausente/incompatível por princípio; 3 = exige
+trabalho desproporcional; 5 = adequação com esforço, sem evidência primária forte; 7 = bom,
+evidência documental primária; 9 = excelente, verificado em fonte primária; 10 = canônico.
+
+- `score = Σ(nota × peso) / 10`, arredondado a 1 casa decimal, intervalo 0–100.
+- `*` = evidência parcial, proxy ou `[NV]`; nota conservadora e recalibrável, com justificativa
+  explícita na §3.1 e no relatório de origem.
+- `[NV]` = não verificado ao vivo/localmente (sem build, protótipo ou benchmark nesta rodada).
+- **Trava inviolável:** nota < 5 em C1, C2 ou C3 impede adoção na Fase 0, independentemente do
+  score (C4–C10 não compensam). **Fase 0** = resultado dessa trava; **Fase 1** = score e rótulo.
+- Termos estrangeiros são explicados na 1ª ocorrência: *headless* (sem interface gráfica),
+  *snapshot* (foto de estado), *tick* (passo fixo de simulação), *rollback* (retrocesso de
+  simulação), ECS (*Entity Component System* — entidades/componentes/sistemas), *binding*
+  (ligação/ponte), FFI (interface de função estrangeira), MSRV (versão mínima suportada),
+  *edition* (edição da linguagem), *lock-in* (dependência tecnológica), *spike* (experimento
+  técnico de curto prazo), PNJ (personagem não jogável).
+
+## 2. Opções avaliadas
+
+| ID | Opção | Classificação correta | Fonte primária |
+|---|---|---|---|
+| O1 | Godot 4.7.2 | Engine (baseline **não-Rust**) | `01-matriz.md` / `godot.md` |
+| O2 | Bevy 0.20.1 | Engine Rust (ECS) | `rust-bevy.md` |
+| O3 | Bevy 0.20.1 + Lightyear 0.31 | Engine Rust + netcode de terceiros | `rust-bevy.md` |
+| O4 | Fyrox 1.0.0 / 2.0.0-rc.1 | Engine Rust com editor de cena | `rust-fyrox.md` |
+| O5 | macroquad | Biblioteca/framework 2D (**não engine**) | `rust-outras.md` (R1) |
+| O6 | ggez | Framework 2D leve (**não engine**) | `rust-outras.md` (R2) |
+| O7 | Ambient (pausada indefinitely) | Engine/runtime multiplayer Rust (**pausada**) | `rust-outras.md` (R3) |
+| O8 | godot-rust/gdext | Binding GDExtension (**não engine**; a engine é Godot/C++) | `rust-outras.md` (R4) |
+| O9 | Rapier | Biblioteca de física 2D/3D (**não engine**) | `rust-outras.md` (R5) |
+| O10 | Bevy + Lightyear + Rapier | Derivada de O3 + física Rapier (**não verificada**) | derivação desta (§3.1) |
+
+Nota de categoria: classificar gdext, Rapier, macroquad ou ggez como "engines Rust" inflaria a
+amostra e mascararia a trava de C2/C3. O10 é uma composição hipotética, não um produto avaliado.
+
+## 3. Matriz comparativa
+
+Notas na ordem C1…C10. Pesos: 15/15/12/10/10/8/8/8/7/7.
+
+| Opção | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 | Score | Fase 0 (C1–C3) | Fase 1 | Recomendação |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|
+| **O1 Godot 4.7.2** | 9 | 8 | 8 | 8 | 9 | 7* | 9 | 9 | 8 | 7 | **82,6** | PASSA (9/8/8) | 1º | **ADOPT** (inalterado) |
+| **O3 Bevy 0.20.1 + Lightyear 0.31** | 10 | 9* | 7* | 7* | 5* | 8* | 8 | 7* | 8* | 6* | **77,1** | PASSA (10/9/7) | 2º | **ADAPT** (padrões em GDScript) |
+| **O10 Bevy+Lightyear+Rapier (derivada)** | 10 | 9* | 7* | 7* | 5* | 8* | 8 | 7* | 8* | 5* | **76,4** | PASSA (10/9/7) | 3º | **ADAPT** (padrões em GDScript) |
+| **O8 godot-rust/gdext** | 8* | 7* | 7* | 7 | 4* | 6* | 8 | 8 | 7* | 6* | **68,6** | PASSA (8/7/7) | 4º | **DEFER** (binding, não engine) |
+| **O2 Bevy 0.20.1** | 10 | 4* | 7* | 4* | 6 | 7* | 8 | 7* | 8 | 6 | **66,8** | **TRAVADA (C2=4*)** | 5º | **REJECT** (C2) |
+| **O4 Fyrox 1.0/2.0rc** | 10 | 4* | 6* | 6* | 5* | 7* | 8 | 7* | 7 | 5* | **65,2** | **TRAVADA (C2=4*)** | 6º | **REJECT** (C2) |
+| **O9 Rapier** | 10 | 3* | 3* | 4* | 6 | 8* | 5* | 8 | 8 | 7 | **60,4** | **TRAVADA (C2=3, C3=3)** | 7º | **REJECT** (C2/C3) |
+| **O7 Ambient (pausada)** | 9* | 7* | 5* | 4* | 4* | 6* | 7 | **2** | 7 | 3 | **57,0** | PASSA (9/7/5) | 8º | **DEFER** (pausada; C8=2) |
+| **O6 ggez** | 10 | 3* | 3 | 3 | 6 | 5* | 6 | 6 | 7 | 6 | **54,8** | **TRAVADA (C2=3, C3=3)** | 9º | **REJECT** (C2/C3) |
+| **O5 macroquad** | 9 | 5* | **3** | 3 | 5 | 6* | 5* | 5 | 8 | 5 | **54,5** | **TRAVADA (C3=3)** | 10º | **REJECT** (C3) |
+
+### 3.1 Proveniência das notas e derivação de O10
+
+- **O1** — `01-matriz.md:49` (score 82,6 verificado em `01-matriz.md:96`). Única nota `*`: C6 7*
+  (sem benchmark 5v5+bots `[NV]`; proxies documentais: headless, Strip Visuals, ALWAYS/ON_CHANGE,
+  `max_sync_packet_size=1350`). Baseline não-Rust, inalterado.
+- **O2** — `rust-bevy.md:52-69`: C1 10, C2 4*, C3 7*, C4 4*, C5 6, C6 7*, C7 8, C8 7*, C9 8,
+  C10 6 → 66,8. Versão observada 0.20.1 (28/10/2026), não 0.19.1; `main` declara `0.20.0-dev`,
+  `edition = 2024`, `rust-version = 1.100.0`. C2 4* = trava. C6 7* e C8 7* recalibrados para
+  baixo em relação a `bevy.md` porque a alegação "55 mil entidades/60 fps" e a de fundação vieram
+  de `bevy.org`, fora da política de hosts (`[UNVERIFIED — fetch skipped]`).
+- **O3** — `rust-bevy.md:52-69`: C1 10, C2 9*, C3 7*, C4 7*, C5 5*, C6 8*, C7 8, C8 7*, C9 8*,
+  C10 6* → 77,1. C2 9*: autoritativo, inputs por *tick*, replicação determinística, predição
+  com *rollback*; reconexão robusta não verificada `[NV]`. C3 7*: hash/versão na aplicação, sem
+  loader de primeira parte para notação de cena. C8 7*: projeto concentrado no mantenedor.
+  C10 6*: acrescenta `aeronet`/`postcard`/`bevy_replicon`/Leafwing e acoplamento de versões.
+- **O4** — `rust-fyrox.md:38-49`: C1 10, C2 4*, C3 6*, C4 6*, C5 5*, C6 7*, C7 8, C8 7*, C9 7,
+  C10 5* → 65,2. C2 4*: `fyrox-core/src/net.rs` só TCP não-bloqueante + `bincode`; sem
+  validação de input, *snapshots* versionados, *rollback*, reconexão com restauração de sessão ou
+  gestão de interesse. C10 5*: `ARCHITECTURE.md` declara engine monolítica e fortemente acoplada.
+  Divergência registrada: `rust-outras.md` (R6) dá C2=3/score 62,6; prevalece o relatório
+  dedicado, mais estrito e detalhado (mesma trava C2).
+- **O5–O9** — `rust-outras.md:125-157` (R1…R5), scores 54,5 / 54,8 / 57,0 / 68,6 / 60,4.
+  C2/C3 de O5 (3), O6 (3/3) e O9 (3/3) são ausência estrutural, não falta de evidência.
+  O7 C8=2 é o aviso literal "Work on the Ambient runtime is paused indefinitely"; O7 C1 9*
+  diverge (README diz dupla licença, API detecta só Apache-2.0). O8 C1 8* = MPL-2.0 copyleft
+  por arquivo (OSI, mas não a preferência MIT); C2/C3 7* são capacidades **herdadas** do Godot,
+  não implementadas pelo binding. O9 C6 8* = proxy SIMD/rayon/variante f64, sem 5v5 `[NV]`.
+- **O10 (derivada)** — copia O3 integralmente e altera **apenas** C10: 6* → **5\*** por
+  acoplamento extra (Rapier + `bevy_rapier` na árvore de dependências,MSRV/edition e camada de
+  física no servidor). **C6 8\* é mantido** conforme instrução: o Rapier `parallel`/SIMD é proxy
+  documental, não benchmark 5v5+bots. Cálculo: O3 771 − 7 (C10 6→5) = 764 → **76,4**.
+  O10 não foi construída, executada ou medida: `[NV]` integral; é cenário de sensibilidade, não
+  evidência de que a composição funcione.
+
+### 3.2 Verificação aritmética (conferência de cada conta)
+
+Pesos C1…C10 = 15, 15, 12, 10, 10, 8, 8, 8, 7, 7 (Σ=100).
+
+- O1: (135+120+96+80+90+56+72+72+56+49)/10 = 826/10 = **82,6**
+- O2: (150+60+84+40+60+56+64+56+56+42)/10 = 668/10 = **66,8**
+- O3: (150+135+84+70+50+64+64+56+56+42)/10 = 771/10 = **77,1**
+- O4: (150+60+72+60+50+56+64+56+49+35)/10 = 652/10 = **65,2**
+- O5: (135+75+36+30+50+48+40+40+56+35)/10 = 545/10 = **54,5**
+- O6: (150+45+36+30+60+40+48+48+49+42)/10 = 548/10 = **54,8**
+- O7: (135+105+60+40+40+48+56+16+49+21)/10 = 570/10 = **57,0**
+- O8: (120+105+84+70+40+48+64+64+49+42)/10 = 686/10 = **68,6**
+- O9: (150+45+36+40+60+64+40+64+56+49)/10 = 604/10 = **60,4**
+- O10: (150+135+84+70+50+64+64+56+56+35)/10 = 764/10 = **76,4**
+
+## 4. Análise explicativa por critério
+
+- **C1 (soberania):** O2/O4/O9 têm 10 (MIT/Apache-2.0 confirmados em manifesto + README +
+  arquivo de licença); O1 tem 9 (MIT/FOSS, ressalva documental); O8 tem 8* (MPL-2.0 é OSI, mas
+  copyleft por arquivo e política de marca da Godot Foundation); O7 9* e O5 9 refletem divergência
+  entre README (dupla licença) e detecção da API (só Apache-2.0). Nenhuma trava por C1.
+- **C2 (autoridade/federação):** critério mais seletivo. O3/O10 (9*) são os únicos com netcode
+  autoritativo de terceiros verificável (Lightyear: inputs por *tick* protegidos contra perda,
+  replicação determinística, predição/*rollback*, gestão de banda); O1 (8) e O8 (7*, herdado do
+  Godot) vêm do headless + replicação do Godot. Travam O2 (4*), O4 (4*), O6 (3*), O9 (3*).
+  O5 (5*) passa no limiar, mas cai em C3. Reconexão robusta pós-desconexão e hash de conteúdo no
+  handshake (aperto de mão de conexão) permanecem `[NV]` para **todas** as opções (spike B).
+- **C3 (modularidade):** O1 (8) lidera por Cena/Nó/sinal ↔ Ilha/Módulo/desafio; O2/O3/O10 (7*)
+  com ECS e plugins, sem loader de notação de cena de primeira parte; O8 (7*) herda `Resource`/PCK
+  do Godot. Travam O5 (3), O6 (3), O9 (3*). O4 (6*) fica acima do mínimo com cenas RON `.rgs`.
+- **C4 (Desafios de Ilha):** O1 (8) tem editor de lógica; nenhuma engine Rust tem editor de lógica
+  equivalente — O4 (6*) tem editor de **cena** (FyroxEd), O2 (4*) não tem editor oficial (issue #85
+  aberta desde 05/08/2020, atualizada em 01/10/2026), O3/O10 (7*) cobrem a janela de sincronia de
+  2 jogadores/5 s por predição/interpolação, mas exigem código para coleta, sabotagem e negociação
+  com PNJs. C4 é "Alta", não inviolável: não gera trava.
+- **C5 (curva):** O1 (9) é o melhor caminho para 1 mantenedor com base em engenharia de software;
+  todas as opções Rust pagam Rust + *borrow checker* (verificador de empréstimos) e toolchain
+  recente (MSRV 1.86–1.100, edition 2024). O3/O10 (5*) sofrem com o book do Lightyear WIP e a
+  matriz rígida de versões (0.31 exige Rust 1.97.1+); O7 (4*) é penalizada pelo runtime parado.
+- **C6 (performance):** **todas** as notas são proxies documentais; nenhum benchmark 5v5+bots,
+  custo por *tick*, memória ou latência foi medido nesta rodada `[NV]`. O9 (8*) tem o melhor proxy
+  (SIMD em lote, rayon, variante f64), O3/O10 (8*) têm suítes Criterion/Divan e banda/lag
+  compensation no repositório; O1/O4 (7*) usam proxies headless. Spike A é a única forma de
+  transformar C6 em evidência primária.
+- **C7 (assets FOSS):** O1/O8 (9/8) herdam importação do Godot; O4 (8) tem glTF 2.0 e loader FBX
+  próprio; O2/O3/O10 (8) têm `bevy_gltf`, KTX2, PNG, zstd no manifesto; extensões avançadas de
+  compressão (Draco/meshopt) ficam `[NV]`. O5 (5*) só `png`/`tga` no crate `image` lido.
+- **C8 (maturidade):** O1 (9) lidera; O7 (2) é o risco de abandono explícito (pausa indefinida,
+  `pushed_at` 07/01/2025, release v0.2.1 de 06/05/2023). Comunidades ativas em O2/O3 (49.894
+  estrelas, 20/11/2026) e O4 (9.689 estrelas, 1.0.0 estável em 29/03/2026) não compensam
+  fundação/roadmap não verificáveis sob a política de hosts (`[UNVERIFIED — fetch skipped]`).
+- **C9 (portabilidade):** desktop primeiro em todas; WebGL2/wasm e exemplos móveis verificados em
+  O2/O3/O10; WebTransport + crate `platform/web` no Lightyear; console `[NV]` em todas as opções
+  Rust. O5 (8) cobre desktop/HTML5/Android/iOS; O6/O7 (7) têm cobertura móvel parcial `[NV]`.
+- **C10 (lock-in):** O1 (7) e O2 (6) têm árvores extensas e churn; O3 (6*) soma
+  `aeronet`/`postcard`/`bevy_replicon`/Leafwing; O10 (5*) soma Rapier/`bevy_rapier`; O4 (5*) é
+  monolítica; O7 (3) tem risco de plataforma central ("plataforma" de deploy no README, não
+  confirmado `[NV]`). O8 (6*) soma MPL + acoplamento `api-4-2`…`api-4-7`.
+
+## 5. Tabela de evidência
+
+Confiança: **Alta** = dado primário confirmado em manifesto/README/licença/API; **Média** = proxy
+documental ou fonte única sem verificação local; **Baixa/[NV]** = não verificado ao vivo/localmente.
+
+| Opção | Fonte | URL/ID | Data | *Claim* | Confiança |
+|---|---|---|---|---|---|
+| O1 | `01-matriz.md:49,96` | local (`godot.md`) | 19/11/2026 | Godot 4.7.2, score 82,6; headless, MIT; C6 7* sem benchmark | Alta (score); Média (C6) |
+| O2/O3 | `bevyengine/bevy — README.md` | https://github.com/bevyengine/bevy | 20/11/2026 | Dupla licença MIT/Apache-2.0; mudanças quebram API ~3/3 meses; sem editor | Alta |
+| O2/O3 | `bevy — Cargo.toml (main)` | https://github.com/bevyengine/bevy/blob/main/Cargo.toml | 20/11/2026 | `edition = 2024`, `rust-version = 1.100.0`, features headless/gltf/ktx2 | Alta |
+| O2/O3 | `bevy — issue #85` | https://github.com/bevyengine/bevy/issues/85 | 20/11/2026 | Editor sem implementação oficial; aberta desde 05/08/2020, atualizada 01/10/2026 | Alta |
+| O2/O3 | `bevy — headless.rs (v0.20.1)` | https://github.com/bevyengine/bevy/blob/v0.20.1/examples/app/headless.rs | 20/11/2026 | `ScheduleRunnerPlugin` + `default-features = false`: headless real | Alta |
+| O3 | `lightyear — README.md` | https://github.com/cBournhonesque/lightyear | 20/11/2026 | "server-authoritative"; inputs por *tick*, replicação determinística, predição/*rollback*, wasm via WebTransport | Alta |
+| O3 | `lightyear — Cargo.toml` | https://github.com/cBournhonesque/lightyear/blob/main/Cargo.toml | 20/11/2026 | v0.31.0, Rust 1.97.1, `MIT OR Apache-2.0`, `aeronet`, `postcard`, `bevy_replicon 0.45.2` | Alta |
+| O3 | `lightyear — releases` | https://github.com/cBournhonesque/lightyear/releases | 20/11/2026 | Divergência UI (0.30.0 "Latest") vs. `main`/README (0.31.0) | Alta (divergência) |
+| O4 | `FyroxEngine/Fyrox — LICENSE.md` | https://raw.githubusercontent.com/FyroxEngine/Fyrox/master/LICENSE.md | 20/11/2026 | MIT/Expat; sem EULA/SDK proprietário | Alta |
+| O4 | `fyrox-core — src/net.rs` | https://raw.githubusercontent.com/FyroxEngine/Fyrox/master/fyrox-core/src/net.rs | 20/11/2026 | TCP não-bloqueante + `bincode`, prefixo `u32`: sem autoridade/*snapshots*/reconexão | Alta |
+| O4 | `Fyrox — ARCHITECTURE.md` | https://raw.githubusercontent.com/FyroxEngine/Fyrox/master/ARCHITECTURE.md | 20/11/2026 | Engine monolítica, poucas partes substituíveis, arenas generacionais | Alta |
+| O4 | `API — repos/FyroxEngine/Fyrox` | https://api.github.com/repos/FyroxEngine/Fyrox | 20/11/2026 | 9.689 estrelas; `pushed_at 2026-11-20`; release 1.0.0 (29/03/2026) vs. master 2.0.0-rc.1 | Alta |
+| O5 | `not-fl3/macroquad — Cargo.toml/README` | https://raw.githubusercontent.com/not-fl3/macroquad/master/Cargo.toml | 20/11/2026 | `v0.4.16`, `MIT OR Apache-2.0`, "game library" 2D; sem rede/loader/editor | Alta (categoria); Média (C3/C6/C7) |
+| O6 | `ggez — README.md` | https://raw.githubusercontent.com/ggez/ggez/master/README.md | 20/11/2026 | "Networking" e ECS listados como **Non-Features** explícitas | Alta |
+| O6 | `API — repos/ggez/ggez` | https://api.github.com/repos/ggez/ggez | 20/11/2026 | MIT; `pushed_at 26/10/2026`; release 0.9.3 (10/07/2023) vs. crate 0.10.0 | Alta |
+| O7 | `AmbientRun/Ambient — README.md` | https://raw.githubusercontent.com/AmbientRun/Ambient/main/README.md | 20/11/2026 | "Work on the Ambient runtime is paused indefinitely"; sincronia automática | Alta |
+| O7 | `API — repos/AmbientRun/Ambient` | https://api.github.com/repos/AmbientRun/Ambient | 20/11/2026 | `pushed_at 07/01/2025`; release v0.2.1 (06/05/2023) → C8=2 | Alta |
+| O8 | `godot-rust/gdext — ReadMe.md` | https://raw.githubusercontent.com/godot-rust/gdext/master/ReadMe.md | 20/11/2026 | "library to integrate the Rust language with Godot 4": binding, não engine | Alta |
+| O8 | `godot — Cargo.toml` | https://raw.githubusercontent.com/godot-rust/gdext/master/godot/Cargo.toml | 20/11/2026 | v0.5.5, `MPL-2.0`, features `api-4-2`…`api-4-7` | Alta |
+| O9 | `dimforge/rapier — README/Cargo.toml` | https://raw.githubusercontent.com/dimforge/rapier/master/Cargo.toml | 20/11/2026 | `v0.36.1`, `Apache-2.0`, edition 2024, MSRV 1.86; física pura, sem rede/render/editor | Alta |
+| O9 | `dimforge/rapier — README.md` | https://raw.githubusercontent.com/dimforge/rapier/master/README.md | 20/11/2026 | "2D and 3D physics engines"; solver SIMD, `parallel` via rayon, variante f64 | Alta (feature); Média (C6) |
+| O10 | derivação desta + `rust-outras.md:132` | local (`rust-bevy.md`, `rust-outras.md`) | 20/11/2026 | O3 com C6 8* mantido e C10 5*; score 76,4; composição não executada | Baixa/[NV] |
+| Todas | política de hosts | `bevy.org`, `docs.rs`, `crates.io`, `fyrox.rs`, `rapier.rs`, `ambient.run`, `ggez.rs`, `godot-rust.github.io`, `fyrox-book.github.io` | 20/11/2026 | Hosts fora da política não buscados | `[UNVERIFIED — fetch skipped]` |
+| Todas | ausência de medição local | — | 20/11/2026 | Nenhum benchmark 5v5+bots, reconexão, replay ou importador `.tscn` executado | `[NV]` |
+
+## 6. Recomendação final e *spikes*
+
+| Opção | Rótulo | Fundamento |
+|---|---|---|
+| **O1 Godot 4.7.2** | **ADOPT** (inalterado) | 82,6; Fase 0 passa; ADR-001 vinculante; nenhuma evidência Rust reabre o motor. |
+| **O3 Bevy + Lightyear 0.31** | **ADAPT** — **apenas como padrões reescritos em GDScript** | 77,1; Fase 0 passa, mas reconexão `[NV]`; autoridade/inputs por *tick*/predição são padrões a importar, não motor a adotar. |
+| **O10 Bevy+Lightyear+Rapier** | **ADAPT** — **apenas como padrões reescritos em GDScript** | 76,4; C10 5* por acoplamento extra; derivada `[NV]`, sem validação de composição. |
+| **O8 gdext** | **DEFER** | Binding, **não engine**: útil como camada Rust *sobre* O1, mas MPL-2.0 e `api-4-x` acrescentam risco sem Autoridade própria (herdada). |
+| **O7 Ambient** | **DEFER** | Runtime pausado indefinitely (C8=2); multiprocessado por design, mas sem suporte futuro verificável. |
+| **O2 Bevy 0.20.1** | **REJECT** | C2=4* — trava inviolável: sem validação/snapshots/reconexão nativos. |
+| **O4 Fyrox** | **REJECT** | C2=4* — trava inviolável: `net.rs` só TCP cru + `bincode`; servidor autoritativo teria de ser escrito do zero. |
+| **O5 macroquad** | **REJECT** | C3=3 — trava inviolável: sem loader declarativo; exige recompilar. |
+| **O6 ggez** | **REJECT** | C2=3 e C3=3 — "Networking" é Non-Feature; foco 2D incompatível com ilhas 3D low-poly. |
+| **O9 Rapier** | **REJECT** (como engine-base) | C2=3 e C3=3 — biblioteca de física: útil no servidor, inadequada como base de jogo. |
+
+**Compatibilidade ADR-001:** nenhum rótulo autoriza troca de motor, introdução de Rust no Núcleo,
+reabertura de Godot-first ou exceção adicional de linguagem neste ciclo. ADAPT significa
+**reexpressar padrões em GDScript**, não importar crates. F3 (servidor custom) continua DEFER e
+fora do escopo decisório. Reavaliação futura exige evidência prévia (spikes abaixo) e aprovação
+formal do maintainer.
+
+### Spikes (M5–M6, somente evidência; sem efeito decisório automático)
+
+- **Spike A — benchmark pareado Godot vs. Bevy+Lightyear:** medir headless 5v5 + bots em condições
+  idênticas — custo por *tick*, overhead de servidor, memória, latência p50/p99 e largura de banda;
+  substituir C6 7*/8*/8* por medição primária. Critério de saída: tabela pareada com mesma cena,
+  mesmo número de entidades e reprodutibilidade; sem isso C6 permanece proxy `[NV]`.
+- **Spike B — reconexão:** testar reconexão robusta pós-desconexão no Lightyear (restauração de
+  sessão, inputs em voo, *snapshots* versionados) e hash/versão de conteúdo no handshake, em
+  oposição a O1. Critério de saída: cenário de queda e retorno com estado consistente; hoje `[NV]`
+  para todas as opções — é o ponto que sustenta C2 9* de O3/O10 e a trava de O2/O4.
+- **Spike C — *Migrations*/edition 2024:** medir custo de atualização do toolchain Rust entre
+  releases 0.x do Bevy (0.20.1 → próximas), `edition = 2024`, MSRV (1.100.0 no Bevy; 1.97.1 no
+  Lightyear; 1.94 no Fyrox; 1.86 no Rapier) e features `api-4-x` do gdext. Critério de saída:
+  registro de quebras de API e tempo de migração; sem isso C5/C10 seguem com `*` e a alegação
+  de "migrações não garantidas" do README do Bevy não é contrastada localmente.
+
+## 7. Limitações e próxima verificação
+
+- `[NV]` — sem build, protótipo ou benchmark: **todas** as notas C6 são proxies documentais; custo
+  por *tick*, memória e latência 5v5+bots não medidos.
+- `[NV]` — reconexão que restaure sessão e hash de conteúdo no handshake não executados em
+  nenhuma opção (bloqueio direto de C2/C3 em O3/O10 e das travas de O2/O4).
+- `[NV]` — replay/*demo recorder*, suporte a console e importador automático de `.tscn` em
+  Bevy/Lightyear não localizados em `github.com`.
+- `[NV]` — Draco/meshopt/KTX2 no loader glTF de Fyrox e primitivos 3D de macroquad não confirmados
+  nos arquivos lidos; iOS e rede em WASM no Fyrox não verificados.
+- `[NV]` — bus factor, fundação/entidade neutra, roadmap, serviço central no Ambient e política de
+  marca não confirmados em fonte primária.
+- `[UNVERIFIED — fetch skipped]` — `bevy.org`, `docs.rs`, `crates.io`, `fyrox.rs`,
+  `rapier.rs`, `ambient.run`, `ggez.rs`, `godot-rust.github.io`, `fyrox-book.github.io` por
+  política de hosts. Cobertura real restrita a `github.com` e domínios de conteúdo; inglês apenas
+  (triangulação entre idiomas não foi possível nesta rodada).
+- Divergências registradas, não resolvidas: Lightyear UI 0.30.0 vs. `main`/README 0.31.0; macroquad
+  e Ambient `MIT OR Apache-2.0` no manifesto vs. só `Apache-2.0` na API; ggez release 0.9.3 vs.
+  crate 0.10.0; Fyrox 1.0.0 estável vs. 2.0.0-rc.1 no `master`; O4 C2 4* (`rust-fyrox.md`) vs. 3
+  (`rust-outras.md` R6), prevalecendo o relatório dedicado; O10 é derivada e não validada.
+- Próxima verificação: executar A, B e C no M5–M6 e reabrir esta matriz **apenas** para atualizar
+  notas com `*`; qualquer mudança de motor permanece condicionada à ADR-001 e à aprovação formal.

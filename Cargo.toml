@@ -1,0 +1,5 @@
+# Workspace Rust do Núcleo Insurgência (ADR-004).
+# Perfil padrão do Cargo: sem personalizações de perfil.
+[workspace]
+resolver = "2"
+members = ["crates/*"]

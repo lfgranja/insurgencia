@@ -1,0 +1,87 @@
+{
+  "schema_version": "087.1.0",
+  "enforce_unbaselined": true,
+  "files": {
+    "specs/018-iam-adapter-local/converge.md": {
+      "bytes": 1056,
+      "sha256": "22286499c0d9209d0c9cca93ab545e8485b59a8140ee3bbcabe1824f9e7ee6af"
+    },
+    "specs/019-tela-resultado/converge.md": {
+      "bytes": 1034,
+      "sha256": "7e7b993f96b96a9e626c2dd97acb3dbb104fa6b7275a6c878ffdbccc4a799c25"
+    },
+    "specs/020-engines-rust/converge.md": {
+      "bytes": 1252,
+      "sha256": "dc34a9dcbfc8654a552ee5c281ae28528897f1379905d9f17d03132231164282"
+    },
+    "specs/021-migracao-bevy/converge.md": {
+      "bytes": 1260,
+      "sha256": "379b033f5cb11d96cac4703a52576a03ad0225d41399ea9483f04fa68ab059d3"
+    },
+    "specs/022-simulacao-rust/converge.md": {
+      "bytes": 672,
+      "sha256": "f14a85a2369727626693550c1ebd8b10a29432266ef883022ed467cc0f11dc1e"
+    },
+    "specs/023-cliente-greybox/converge.md": {
+      "bytes": 1088,
+      "sha256": "ae40c7aea58a5e792ee76a6d0acab02528318e8dbf744ae9e6e26de383d3fc48"
+    },
+    "specs/024-instrumentacao-metricas/converge.md": {
+      "bytes": 806,
+      "sha256": "df250135420007bc80cf17ed37a39cbd6b5caa5a9645aeb2a49444a6c91cfd90"
+    },
+    "specs/025-soberania-exportacao/converge.md": {
+      "bytes": 805,
+      "sha256": "d511694621129cd80513021df576e2f2389365d06f39b99a2e27429ac12efb01"
+    },
+    "specs/026-cliente-lowpoly/converge.md": {
+      "bytes": 858,
+      "sha256": "cf8b64529202e3a5e21cd8f0251e5812f77fa84d7b8f6143e959747ea8a31b0a"
+    },
+    "specs/027-lowpoly-real/converge.md": {
+      "bytes": 957,
+      "sha256": "f86a61a021748c70735f6710145bb8675f955a5c634d8a2042f07f5b1e2ba7c8"
+    },
+    "specs/028-ci-rust-governanca/converge.md": {
+      "bytes": 1478,
+      "sha256": "f0b63f2b133fe35577959816f80e59014d6129343db98d934a74245c36cd4f68"
+    },
+    "specs/029-hud-glyphs/converge.md": {
+      "bytes": 622,
+      "sha256": "57ca664061b9f5b87fc9b5f8d32660386f044f1d2ac9d5d38395645067571bc5"
+    },
+    "specs/030-demo-deterministica-headless/converge.md": {
+      "bytes": 1236,
+      "sha256": "eafddb5befb78aec835f4585b3f9375b68603f4b2fba550b0d66bdc8b5db4aec"
+    },
+    "specs/031-fechamento-rastreabilidade/converge.md": {
+      "bytes": 1919,
+      "sha256": "5084e1b1310c77e1a8430f937f75af9155c85eed6430ed6443ae0e714811674b"
+    },
+    "specs/032-endurecimento-check-rust/converge.md": {
+      "bytes": 2830,
+      "sha256": "cc12a7de3bed1630d8c358adfbe30dd4d72ddfb520958ede76114a2736d0595a"
+    },
+    "specs/033-manifesto-compatibilidade-rust/converge.md": {
+      "bytes": 3933,
+      "sha256": "f12504795c2e137a1becb615a0ccd1866f0a5a2583f7b43e95c71b262081568a"
+    },
+    "specs/034-gate-manifesto-cli/converge.md": {
+      "bytes": 3811,
+      "sha256": "300b7a7063fd994db6c4acf414974e97bf9d0da1f7641b387e7c4d7b02daaa86"
+    },
+    "specs/035-advisories-acr-rastreabilidade/converge.md": {
+      "bytes": 4414,
+      "sha256": "9b606524120622323b7fb9e8881fb903bff68664e6faed7c7778dfceb9372895"
+    }
+  },
+  "_provenance": {
+    "origem": "alvo-local",
+    "repo": "lfgranja/insurgencia",
+    "head": "9dadc68",
+    "data": "2026-11-20",
+    "metodo": "python3 scripts/ci/check_converge_append_only.py --bootstrap",
+    "factory_utilizada": false,
+    "nota": "Entradas 018, 019 e 020 adicionadas por bootstrap deterministico apos materializacao legitima de converge.md. Nenhum arquivo preexistente reescrito; ratchet ativo."
+  }
+}

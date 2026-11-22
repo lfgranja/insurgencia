@@ -1,0 +1,8 @@
+# Concept — Gate CLI determinístico de manifesto de compatibilidade
+
+- **Opção 1 (recomendada)**: adaptador fino em `crates/sim/examples/verificar_manifesto.rs`. O exemplo lê argumentos, arquivos e imprime saída; calcula SHA-256 com `sha2` (já presente) e formata hex minúsculo manualmente; chama `insurgencia_contratos::manifesto::conferir` com `Option<&str>` e traduz `ErroCompatibilidade::codigo()` para `COMPAT_FALHA <codigo>`. Nenhuma lógica de validação é duplicada; nenhuma dependência nova; nenhum outro arquivo de código tocado.
+- **Opção 2**: reimplementar a validação dos 6 campos e dos 5 códigos dentro do exemplo. Rejeitada — duplicaria a autoridade do contrato de 011/033 e abriria margem para divergência de ordem e literais; o exemplo deve ser somente porta de entrada.
+- **Opção 3**: acrescentar leitura de arquivo e cálculo de hash a `conferir` na biblioteca. Rejeitada — viola a Constituição II (adaptadores/portas) e desfaz a propriedade testada no ciclo 033 de que a validação é pura.
+- **Opção 4**: criar um crate ou binário novo com `clap`/`hex`. Rejeitada — sai da fronteira de escrita, adiciona dependências e contraria o padrão de exemplos headless já usado em `demo_deterministica.rs`.
+
+**Recomendação**: Opção 1. Argparse manual sobre `args_os()` (sem pânico com argumentos não UTF-8), `fs::read_to_string` para o manifesto e `fs::read` para as regras, `Sha256::digest` + tabela `b"0123456789abcdef"` para o hex. `NotFound` nas regras é mapeado a `None` (`REGRAS_AUSENTES` via contrato); demais falhas de leitura e argumentos inválidos são exit 2. `main() -> ExitCode` evita `process::exit` e pânico. Rollback documentado = remover o arquivo novo e os artefatos do ciclo — nunca executar.

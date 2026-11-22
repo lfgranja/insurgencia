@@ -1,0 +1,12 @@
+# Implementation Plan — 033-manifesto-compatibilidade-rust
+
+1. Confirmar R1 `go` no veredito de `.specify/assessments/manifesto-compatibilidade-rust/decision.md` (scorecard 6/6 strong, ÂNCORA em 011/`manifesto.json`/GDScript).
+2. Materializar os 13 artefatos da Fronteira A na fronteira exata: assess (intake/research/problem/concept/decision) → spec → plan → tasks → checklist → analyze (READ-ONLY) → converge (append-only, primeira entrada datada `2026-11-21`) → validate (R4) → release (R7).
+3. Registrar a âncora: `manifesto.json` com os 6 campos e valores literais; `specs/011` FR-001..FR-006 como fonte de ordem e códigos; `manifesto.gd` e `tests/test_manifesto.gd` como implementação de referência (GDD §1/§14.2).
+4. Registrar o estado Rust: `crates/contratos/src/lib.rs` já expõe `REJEICAO_MANIFESTO`, `REJEICAO_VERSAO`, `REJEICAO_MODULO`, `REJEICAO_HASH`, `MODULO_ID` e `PROTOCOL_VERSION`, mas não tem validador de manifesto nem `REGRAS_AUSENTES` — a lacuna a portar.
+5. Definir a tradução de contrato para a Fronteira B (sem escrevê-la aqui): 6 campos nomeados como no JSON, `protocol_version: u8`, `ErroCompatibilidade` com 5 variantes e `codigo()`, `validar_formato` (sem checar tamanho do hash) e `conferir` na ordem 011 com `hash_regras: Option<&str>` — sem I/O e sem pânico.
+6. Mapear as 7 verificações GDScript para os 7 testes Rust, com `serde_json::json!` e os valores de `manifesto.json`; nenhuma dependência nova e nenhum teste adicional definido além da equivalência.
+7. Registrar as evidências de ambiente: 5 gates determinísticos PASS em `2026-11-21T21:24:08Z` (`sdd-completeness`, `work-order-dag`, `task-id-uniqueness`, `converge-append-only`, `hub-docs-gate`); `./verify.sh` em execução por contenção de `cargo` → saída **[NV]**; factory `b1deab1` apenas fonte.
+8. Preservar o SDD ordenado (R1 → R4 → R7), `converge.md` append-only, `analyze.md` READ-ONLY e checklist `[x]` = revisão de requisitos; manter a Fronteira B restrita a `manifesto.rs`, `lib.rs` e `tests/manifesto.rs`.
+9. Validar (R4 aprovado) em `.specify/validations/manifesto-compatibilidade-rust/validate.md` e emitir release (R7) em `.specify/releases/manifesto-compatibilidade-rust/release.md`: `1.0.0`, changelog FR-001..FR-006 + T-IDs, rollback documentado (remover os 2 arquivos novos, a linha `pub mod manifesto;` e os 13 artefatos — nunca executar).
+10. Encerrar sem build/gate/commit/PR e sem tocar factory, `docs/GDD*`, baselines, gates, CI, 194 paths untracked alheios, janelas ou credenciais.

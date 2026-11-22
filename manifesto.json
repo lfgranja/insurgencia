@@ -1,0 +1,8 @@
+{
+	"manifest_version": "1.0.0",
+	"protocol_version": 1,
+	"module_id": "insurgencia.exemplo",
+	"content_hash": "b2c11e6d84ac9db0ff4698343a3d47132e34f5e54d2f5b7f54c0d6374d4cd746",
+	"checked_at": "2026-11-19T00:00:00Z",
+	"tool_version": "4.7.2.stable.official"
+}

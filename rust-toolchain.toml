@@ -1,0 +1,4 @@
+# Toolchain fixada conforme ADR-004 (crate publicado bevy 0.20.1 exige 1.97.1).
+[toolchain]
+channel = "1.99.1"
+components = ["rustfmt", "clippy"]
