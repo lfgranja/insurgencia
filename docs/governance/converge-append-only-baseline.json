@@ -91,8 +91,8 @@
       "sha256": "02f3838c7d0e6cb47c5e797ccc2e6408f9a4bcb6012f0379306eddd5574b6f21"
     },
     "specs/040-barricada-deterministica/converge.md": {
-      "bytes": 6826,
-      "sha256": "739c1d04667d8ff3b86e59f3561c6c151e802558e44a8bcd2b19744c39fb1030"
+      "bytes": 7646,
+      "sha256": "45ba61ceb77fe81f51fa06f2d98a5efcadfb05df741af5724b0e7dbe59fd0640"
     }
   },
   "_provenance": {

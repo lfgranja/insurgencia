@@ -27,3 +27,7 @@ Implementação em `crates/sim/src/lib.rs`, `crates/sim/tests/simulacao.rs` e `c
 ## Execução pelo orquestrador — 2026-11-23T03:30Z
 
 A condição de R4 foi cumprida: roteiro **10/10 PASS**, `./verify.sh` **ALL STAGES OK** com **58/58 testes**, gates locais PASS e evidência versionada em `.specify/validations/barricada-deterministica/evidence.md`. A implementação de `lib.rs`, `simulacao.rs` e `main.rs`, o tick do cliente a 30 Hz e o baseline de converge passam a fazer parte do escopo entregue pelo orquestrador. Rollback permanece **documentado e não executado**; promoção de `1.0.0-local` e merge em `main` dependem do SWE.
+
+## Correção de ACR — 2026-11-23T03:39Z
+
+O blocker P1 da revisão independente foi corrigido na fonte: a canalização passa a avançar automaticamente um tick por tick após um único comando válido, preservando a regra canônica de permanência e evitando dupla contagem. Dano não positivo virou no-op e o rastreio do roteiro foi realinhado. Gate final: `verify.sh` **ALL STAGES OK** com **59/59 testes**; roteiro reexecutado 10/10. Rollback segue documentado e não executado.

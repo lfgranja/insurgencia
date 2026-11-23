@@ -177,6 +177,9 @@ impl Mundo {
     /// Retorna `true` quando a barricada foi removida e `false` quando o `id`
     /// não existe ou a barricada permanece viva.
     pub fn aplicar_dano_a_barreira(&mut self, id: u64, dano: i64) -> bool {
+        if dano <= 0 {
+            return false;
+        }
         let mut destruida = false;
         if let Some(barreira) = self.barreiras.get_mut(&id) {
             barreira.pv = barreira.pv.saturating_sub(dano);
@@ -210,6 +213,7 @@ impl Mundo {
     fn fase_skills(&mut self) {
         let mut coleta_avancada: BTreeSet<u64> = BTreeSet::new();
         let mut construcao_avancada: BTreeSet<u64> = BTreeSet::new();
+        self.avancar_construcoes_automaticas(&mut construcao_avancada);
         let comandos = std::mem::take(&mut self.comandos_do_tick);
 
         for comando in &comandos {
@@ -265,48 +269,72 @@ impl Mundo {
 
     /// Aplica um comando de construção com guarda de saldo e débito atômico.
     fn aplicar_construcao(&mut self, comando: &Comando, avancada: &mut BTreeSet<u64>) {
+        if avancada.contains(&comando.peer_id) {
+            return;
+        }
         let Some(ponto) = comando.destino else {
             return;
         };
-        let concluiu = {
-            let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) else {
-                return;
-            };
-            // Comando forjado com saldo insuficiente: não inicia nem avança a
-            // canalização. O tick de conclusão segue na revalidação abaixo, que
-            // limpa o acúmulo sem debitar nem criar a barricada.
-            let em_conclusao = jogador.construcao_ticks == TICKS_CONSTRUCAO_BARREIRA - 1
-                && matches!(
-                    jogador.construcao_ponto,
-                    Some(anterior) if ponto_igual(anterior, ponto)
-                );
-            if jogador.materiais < CUSTO_BARREIRA_MATERIAIS && !em_conclusao {
-                avancada.insert(comando.peer_id);
-                return;
-            }
-            if !ponto_igual(ponto, jogador.posicao) || avancada.contains(&comando.peer_id) {
-                return;
-            }
-            jogador.construcao_ticks = match jogador.construcao_ponto {
-                Some(anterior) if ponto_igual(anterior, ponto) => jogador.construcao_ticks,
-                _ => 0,
-            };
-            jogador.construcao_ponto = Some(ponto);
-            jogador.construcao_ticks += 1;
-            avancada.insert(comando.peer_id);
-            if jogador.construcao_ticks != TICKS_CONSTRUCAO_BARREIRA {
-                return;
-            }
-            let com_saldo = jogador.materiais >= CUSTO_BARREIRA_MATERIAIS;
-            if com_saldo {
-                jogador.materiais -= CUSTO_BARREIRA_MATERIAIS;
-            }
-            jogador.construcao_ticks = 0;
-            jogador.construcao_ponto = None;
-            com_saldo
+        let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) else {
+            return;
         };
-        if concluiu {
-            self.criar_barreira(comando.peer_id, ponto);
+        // Comando forjado com saldo insuficiente: não inicia a canalização.
+        if jogador.materiais < CUSTO_BARREIRA_MATERIAIS {
+            avancada.insert(comando.peer_id);
+            return;
+        }
+        if !ponto_igual(ponto, jogador.posicao) {
+            return;
+        }
+        jogador.construcao_ticks = match jogador.construcao_ponto {
+            Some(anterior) if ponto_igual(anterior, ponto) => jogador.construcao_ticks,
+            _ => 0,
+        };
+        jogador.construcao_ponto = Some(ponto);
+        jogador.construcao_ticks += 1;
+        avancada.insert(comando.peer_id);
+        if jogador.construcao_ticks == TICKS_CONSTRUCAO_BARREIRA {
+            self.concluir_construcao(comando.peer_id, ponto);
+        }
+    }
+
+    /// Avança um tick as canalizações em curso, sem depender de comandos.
+    fn avancar_construcoes_automaticas(&mut self, avancada: &mut BTreeSet<u64>) {
+        let mut concluidas: Vec<(u64, (f64, f64))> = Vec::new();
+        for (&peer_id, jogador) in &mut self.jogadores {
+            let Some(ponto) = jogador.construcao_ponto else {
+                continue;
+            };
+            if jogador.materiais < CUSTO_BARREIRA_MATERIAIS || !ponto_igual(ponto, jogador.posicao)
+            {
+                jogador.construcao_ticks = 0;
+                jogador.construcao_ponto = None;
+                continue;
+            }
+            jogador.construcao_ticks += 1;
+            avancada.insert(peer_id);
+            if jogador.construcao_ticks == TICKS_CONSTRUCAO_BARREIRA {
+                concluidas.push((peer_id, ponto));
+            }
+        }
+        for (peer_id, ponto) in concluidas {
+            self.concluir_construcao(peer_id, ponto);
+        }
+    }
+
+    /// Débito atômico, criação da barreira e limpeza da canalização.
+    fn concluir_construcao(&mut self, peer_id: u64, ponto: (f64, f64)) {
+        let Some(jogador) = self.jogadores.get_mut(&peer_id) else {
+            return;
+        };
+        let com_saldo = jogador.materiais >= CUSTO_BARREIRA_MATERIAIS;
+        if com_saldo {
+            jogador.materiais -= CUSTO_BARREIRA_MATERIAIS;
+        }
+        jogador.construcao_ticks = 0;
+        jogador.construcao_ponto = None;
+        if com_saldo {
+            self.criar_barreira(peer_id, ponto);
         }
     }
 

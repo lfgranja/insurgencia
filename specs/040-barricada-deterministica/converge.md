@@ -26,3 +26,9 @@ FR-001..FR-006 e SC-001..SC-006 registrados na spec, com rastreabilidade até `.
 - **Cliente funcional**: `avancar_simulacao` consome `comandos_pendentes` a 30 Hz (teto 4 ticks/frame); sem isso a tecla `B` e o HUD seriam inertes. FR-006 passa a ter efeito observável; acionamento visual da tecla permanece **[NV]**.
 - **Gates locais (03:30Z)**: SDD `40/0`, DAG `420 tarefas/117 arestas/0 ciclos`, task-id `0 duplicatas`, hub-docs `0 erros`; converge baselinado por bootstrap após esta entrada.
 - **Fronteira**: `crates/contratos`, `PROTOCOL_VERSION` e `Cargo.toml` intactos; `STATE.md`/ledger preservados. `[NV]`: CI/merge do ciclo 040 e decisão do SWE sobre PR #48.
+
+### Correção de blocker da ACR e revalidação — 2026-11-23T03:39Z
+
+- **P1 (comentário `7090866575`)**: comando único da tecla `B` não sustentava a canalização de 45 ticks. Correção: `avancar_construcoes_automaticas` no início de `fase_skills`, avançando 1 tick por jogador por tick enquanto o ponto e o saldo permanecem válidos, sem dupla contagem com comandos no mesmo tick. `concluir_construcao` centraliza débito/criação/expulsão.
+- **P3**: `aplicar_dano_a_barreira` com dano não positivo virou no-op. **P2 documental**: rastreabilidade do roteiro realinhada com a spec.
+- **Verificação**: `verify.sh` `ALL STAGES OK`, **59/59 testes**; roteiro reexecutado com 11 testes nomeados e 10/10 PASS; gates locais PASS. `[NV]`: CI/merge no novo head, ACR de 2ª rodada e decisão do SWE sobre PR #48.

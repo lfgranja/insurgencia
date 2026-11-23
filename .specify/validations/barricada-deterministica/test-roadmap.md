@@ -6,12 +6,13 @@
 
 | Item | Cobertura |
 |---|---|
-| FR-001 | passos 2–6 — regra canônica do GDD §9.3:475,483 e §10.3:574,577-579: 20 Materiais, 45 ticks, 200 PV, 360 ticks, máx. 2, 3.ª remove a mais antiga, recusa sem saldo sem consumo parcial |
-| FR-002 | passos 2, 4–6, 9 — constantes públicas, campos em `Jogador`/`Mundo`, struct `Barreira`, `CodigoRecusa::SaldoInsuficiente`, `Comando.destino`; nenhuma mudança em `crates/contratos`/`PROTOCOL_VERSION`/`Cargo.toml` |
-| FR-003 | passos 2, 3, 8 — validação `ponto_igual` e saldo, débito atômico, limitação a um avanço por jogador por tick, `mover` zera canalização, remoção da mais antiga |
-| FR-004 | passo 7 — `hash_estado` inclui `construcao_ticks`/`construcao_ponto` e todas as barreiras em ordem de `BTreeMap` |
-| FR-005 | passo 9 — tecla `B` em *just pressed*, `seq`/`request_id` monotônicos, HUD Materiais/Barreiras/Construindo |
-| FR-006 | passos 1, 9, 10 — 14 artefatos na fronteira exata, v1.2.2, `tasks` antes de `analyze`, R4 antes de R7 `1.0.0-local`, `converge` append-only, **R6 N/A** com dívida de automação, rollback |
+| FR-001 | passos 2–6, 9 — API Rust: constantes públicas `CUSTO_BARREIRA_MATERIAIS = 20`, `TICKS_CONSTRUCAO_BARREIRA = 45`, `PV_BARREIRA = 200`, `TICKS_DURACAO_BARREIRA = 360`, `MAX_BARREIRAS_POR_JOGADOR = 2`; campos `construcao_ticks`/`construcao_ponto` em `Jogador`, `barreiras`/`proxima_barreira_id` em `Mundo`, struct `Barreira`, `CodigoRecusa::SaldoInsuficiente`, `Comando.destino`; nenhuma mudança em `crates/contratos`/`PROTOCOL_VERSION`/`Cargo.toml` |
+| FR-002 | passos 2, 3 — `construir_barreira` exige `destino == posicao` (via `ponto_igual`) e `materiais >= 20`; recusa com `CodigoRecusa::SaldoInsuficiente` sem consumo parcial e sem iniciar canalização |
+| FR-003 | passos 2, 3, 8 — `fase_skills` revalida o saldo ao completar, avança no máx. 1 canalização por jogador por tick (`BTreeSet<u64>` local), zera `construcao_ticks`/`construcao_ponto` se `mover` mudou a posição, debita 20 Materiais atomicamente na conclusão e insere a `Barreira` |
+| FR-004 | passos 4–6 — limite de 2 barricadas por jogador; a 3.ª remove a mais antiga (menor `id`); `Barreira` nasce com `pv = 200` e `ticks_restantes = 360` e é removida por PV zero ou duração |
+| FR-005 | passo 7 — `hash_estado` inclui `construcao_ticks`/`construcao_ponto` de cada jogador e todas as barreiras em ordem de `BTreeMap` |
+| FR-006 | passo 9 — tecla `B` em *just pressed* agenda `construir_barreira` com `destino` = posição atual e `seq`/`request_id` monotônicos; HUD Materiais/Barreiras/Construindo; `forbid(unsafe_code)`, `deny(clippy::pedantic)`, sem `unwrap`/`expect`/`#[allow]`, `max_width = 100`, commits PT-BR |
+| Governança (fora dos FR) | passos 1, 10 — 14 artefatos na fronteira exata, constituição v1.2.2, `tasks` antes de `analyze` (READ-ONLY), R4 antes de R7 `1.0.0-local`, `converge` append-only, **R6 N/A** com dívida de automação, rollback e rótulo **[NV]** |
 | SC-001..SC-006 | passos 1–10 |
 
 T-IDs relacionados: T001–T013 (SDD, com `tasks` em T012 e `analyze` READ-ONLY em T013) e T014 (`test-roadmap`, `converge`, R4 e R7). A implementação em `crates/sim/src/lib.rs`, `crates/sim/tests/simulacao.rs` e `crates/cliente/src/main.rs` é handoff ao SWE/orquestrador, fora da fronteira SDD deste ciclo e **[NV]** até execução.

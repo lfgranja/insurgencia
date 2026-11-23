@@ -535,6 +535,46 @@ fn barricada_apos_45_ticks_debita_20() {
 }
 
 #[test]
+fn construcao_continua_apos_um_unico_comando() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.25, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    // Uma única tecla B inicia a canalização; os 44 ticks seguintes são
+    // automáticos, sem qualquer comando adicional na fila.
+    agendar_barreira(&mut mundo, 1, 2, 2, ponto);
+    for tick in 0..TICKS_CONSTRUCAO_BARREIRA {
+        mundo.avancar_tick();
+        assert!(mundo.comandos_pendentes.is_empty());
+        assert!(mundo.comandos_do_tick.is_empty());
+        assert_eq!(mundo.jogadores[&1].seq, 2, "tick {tick}");
+        if tick < TICKS_CONSTRUCAO_BARREIRA - 1 {
+            assert_eq!(
+                mundo.jogadores[&1].construcao_ticks,
+                tick + 1,
+                "tick {tick}"
+            );
+            assert_eq!(mundo.jogadores[&1].construcao_ponto, Some(ponto));
+            assert_eq!(mundo.jogadores[&1].materiais, 100);
+            assert!(mundo.barreiras.is_empty(), "tick {tick}");
+        }
+    }
+
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.materiais, 100 - CUSTO_BARREIRA_MATERIAIS);
+    assert_eq!(jogador.construcao_ticks, 0);
+    assert_eq!(jogador.construcao_ponto, None);
+    assert_eq!(mundo.barreiras.len(), 1);
+    assert_eq!(mundo.barreiras[&1].dono, 1);
+    assert_eq!(mundo.barreiras[&1].posicao, ponto);
+    assert_eq!(mundo.barreiras[&1].pv, PV_BARREIRA);
+    assert_eq!(mundo.barreiras[&1].ticks_restantes, TICKS_DURACAO_BARREIRA);
+}
+
+#[test]
 fn saldo_insuficiente_recusa_sem_debito() {
     let mut mundo = Mundo::new();
     mundo.adicionar_jogador(1);
@@ -624,6 +664,8 @@ fn barricada_200_pv_destruida_ao_200_dano() {
     mundo.avancar_tick();
     concluir_barreira(&mut mundo, 1, 2, ponto);
 
+    assert_eq!(mundo.barreiras[&1].pv, PV_BARREIRA);
+    assert!(!mundo.aplicar_dano_a_barreira(1, -1));
     assert_eq!(mundo.barreiras[&1].pv, PV_BARREIRA);
     assert!(!mundo.aplicar_dano_a_barreira(1, PV_BARREIRA - 1));
     assert_eq!(mundo.barreiras[&1].pv, 1);
