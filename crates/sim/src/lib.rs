@@ -14,6 +14,9 @@ use thiserror::Error;
 /// Passo fixo da simulação, em segundos (`1 / 30`).
 pub const PASSO_SEGUNDOS: f64 = 1.0 / 30.0;
 
+/// Ticks necessários para concluir uma coleta de materiais (6 s a 30 Hz).
+pub const TICKS_COLETA: i64 = 180;
+
 /// Distância máxima de um comando `mover`, em metros.
 const LIMITE_MOVIMENTO_M: f64 = 1.0;
 
@@ -27,6 +30,11 @@ const ACOES_PERMITIDAS: &[&str] = &[
     "atacar_forte",
 ];
 
+/// Compara dois pontos sem depender de tolerância de arredondamento.
+fn ponto_igual(a: (f64, f64), b: (f64, f64)) -> bool {
+    a.0.total_cmp(&b.0).is_eq() && a.1.total_cmp(&b.1).is_eq()
+}
+
 /// Estado de um jogador na simulação.
 #[derive(Clone, Copy, Debug)]
 pub struct Jogador {
@@ -38,6 +46,14 @@ pub struct Jogador {
     pub seq: i64,
     /// Último identificador de requisição aceito.
     pub request_id: i64,
+    /// Materiais acumulados.
+    pub materiais: i64,
+    /// Suprimentos acumulados.
+    pub suprimentos: i64,
+    /// Ticks de coleta acumulados no ponto corrente.
+    pub coleta_ticks: i64,
+    /// Ponto fixado pela coleta corrente.
+    pub coleta_ponto: Option<(f64, f64)>,
 }
 
 /// Comando enfileirado por um par para o próximo tick.
@@ -101,6 +117,10 @@ impl Mundo {
                 vida: 100,
                 seq: 0,
                 request_id: 0,
+                materiais: 0,
+                suprimentos: 0,
+                coleta_ticks: 0,
+                coleta_ponto: None,
             },
         );
     }
@@ -134,7 +154,29 @@ impl Mundo {
             if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
                 if comando.acao == "mover" {
                     if let Some(destino) = comando.destino {
-                        jogador.posicao = destino;
+                        if !ponto_igual(destino, jogador.posicao) {
+                            jogador.coleta_ticks = 0;
+                            jogador.coleta_ponto = None;
+                            jogador.posicao = destino;
+                        }
+                    }
+                } else if comando.acao == "coletar_materiais" {
+                    if let Some(ponto) = comando.destino {
+                        if ponto_igual(ponto, jogador.posicao) {
+                            jogador.coleta_ticks = match jogador.coleta_ponto {
+                                Some(anterior) if ponto_igual(anterior, ponto) => {
+                                    jogador.coleta_ticks
+                                }
+                                _ => 0,
+                            };
+                            jogador.coleta_ponto = Some(ponto);
+                            jogador.coleta_ticks += 1;
+                            if jogador.coleta_ticks == TICKS_COLETA {
+                                jogador.suprimentos += 3;
+                                jogador.materiais += 2;
+                                jogador.coleta_ticks = 0;
+                            }
+                        }
                     }
                 }
                 jogador.seq = comando.seq;
@@ -157,10 +199,14 @@ impl Mundo {
             .map(|(&peer_id, jogador)| {
                 let (x, y) = jogador.posicao;
                 format!(
-                    "{peer_id}:{x}:{y}:{vida}:{seq}:{request_id}",
+                    "{peer_id}:{x}:{y}:{vida}:{seq}:{request_id}:{materiais}:{suprimentos}:{coleta_ticks}:{coleta_ponto:?}",
                     vida = jogador.vida,
                     seq = jogador.seq,
                     request_id = jogador.request_id,
+                    materiais = jogador.materiais,
+                    suprimentos = jogador.suprimentos,
+                    coleta_ticks = jogador.coleta_ticks,
+                    coleta_ponto = jogador.coleta_ponto,
                 )
             })
             .collect::<Vec<_>>()
@@ -206,7 +252,7 @@ impl ValidacaoComandos {
     /// # Errors
     ///
     /// Retorna o primeiro [`CodigoRecusa`] aplicável, na ordem do contrato:
-    /// par, replay, ação e, para `mover`, destino e limite de distância.
+    /// par, replay, ação e destino (incluindo o limite de distância de `mover`).
     pub fn validar(
         mundo: &Mundo,
         peer_id: u64,
@@ -233,6 +279,13 @@ impl ValidacaoComandos {
             let (origem_x, origem_y) = jogador.posicao;
             if (x - origem_x).hypot(y - origem_y) > LIMITE_MOVIMENTO_M {
                 return Err(CodigoRecusa::MovimentoForaDoLimite);
+            }
+        }
+
+        if acao == "coletar_materiais" {
+            let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
+            if !ponto_igual(ponto, jogador.posicao) {
+                return Err(CodigoRecusa::DestinoInvalido);
             }
         }
 

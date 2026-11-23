@@ -85,6 +85,10 @@
     "specs/038-estado-pos-v122/converge.md": {
       "bytes": 4294,
       "sha256": "b148559292a3cb0bb6da02a95d5d008db606a1ffb904e1d397f0e3832de050bd"
+    },
+    "specs/039-coleta-materiais-deterministica/converge.md": {
+      "bytes": 4433,
+      "sha256": "107e991d20d10e4a1cb203a248786b9f304c49a3151654a773fecedcdaf1017c"
     }
   },
   "_provenance": {
