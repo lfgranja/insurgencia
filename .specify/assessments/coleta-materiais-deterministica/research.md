@@ -1,0 +1,24 @@
+# Research — Coleta determinística de materiais
+
+**Data**: 2026-11-23T01:54Z · Fonte primária lida nesta sessão; contrato técnico auditado pelo orquestrador. Nada reexecutado.
+
+## Evidência primária
+- [source: git/worktree, 01:53Z] Worktree `.specify/queue/worktrees/coleta-materiais-039/`, branch `039-coleta-materiais-deterministica`, base `990ab06`. Há uma alteração preexistente em `.specify/feature.json` (`feature_directory`), preservada; `specs/039-coleta-materiais-deterministica/spec.md` é stub a substituir.
+- [source: `docs/GDD - Insurgência.md` §7.1, lido] Pulso de autogestão a cada 30 s; **Fase 1 Coletar**: "Camponês em ponto neutro", decisão "ficar e arriscar emboscada ou recuar", recompensa "3 Suprimentos + 2 Materiais", tempo alvo "6 s". Critério de aceitação canônico: "Um Camponês que permanece 6 s em ponto neutro recebe exatamente 3 Suprimentos e 2 Materiais no pulso; sair antes zera o acúmulo parcial." Pilar: Ação Coletiva e Materialismo Histórico — nenhuma recompensa por abate isolado.
+- [source: `crates/sim/src/lib.rs`, lido] `PASSO_SEGUNDOS=1.0/30.0`; `LIMITE_MOVIMENTO_M=1.0`; `ACOES_PERMITIDAS` já inclui `"coletar_materiais"` (logo não há nova ação de protocolo); `Jogador { posicao, vida, seq, request_id }`; `Comando { peer_id, acao, seq, request_id, destino: Option<(f64,f64)> }`; `Mundo::avancar_tick` executa `fase_prepare → fase_skills → fase_finish` e incrementa `tick`; `fase_skills` hoje só trata `mover` e atualiza `seq`/`request_id`; `hash_estado` usa `format!("{peer_id}:{x}:{y}:{vida}:{seq}:{request_id}")` agregado por `;` e o prefixo `tick|epoch|match_id|`; `ValidacaoComandos::validar` checa par, replay, ação e — somente para `mover` — destino e distância, com `CodigoRecusa::DestinoInvalido`.
+- [source: contrato técnico auditado pelo orquestrador] `TICKS_COLETA=180`; novos campos em `Jogador`: `materiais`, `suprimentos`, `coleta_ticks`, `coleta_ponto`; validação recusa `DestinoInvalido` para `coletar_materiais` sem destino ou com destino ≠ posição do jogador; `fase_skills` acumula tick a tick e **credita atomicamente** ao completar 180; `hash_estado` passa a incluir os quatro campos. Ponto neutro não existe no sim: **`Comando.destino` é o ID do ponto**, sem nova mensagem, sem alterar `crates/contratos` nem `PROTOCOL_VERSION`/`Cargo.toml`.
+- [source: `.specify/memory/constitution.md`, lido] v1.2.2 ratificada: `tasks` antes de `analyze` (READ-ONLY), `converge` append-only, R1 `go`, R4 antes de R7 `1.0.0`; R6 ratificada como intenção mas **fora da sequência executável** até `resolve-tasks.sh`/adaptador existirem — PARE se invocada, nunca simular issue.
+
+## Interpretação
+O incremento é pequeno, mas toca o estado autoritativo e seu hash: a regra canônica do GDD já existe em documento e a ação `"coletar_materiais"` já existe no contrato, faltando apenas o acúmulo, a validação de destino e a refletividade do hash no sim. O risco não é de protocolo (nenhum campo novo de rede), e sim de **semântica**: creditar antes de 180 ticks, aceitar destino ausente/divergente, não incluir os campos novos no hash (quebrando determinismo entre pares) ou estender o escopo para dano, barricada, GUI, GDScript e rede. A fila documental está esgotada após o ciclo 038; este é o menor incremento de produto com valor canônico (180/625). Este agente apenas documenta: código, gates e roteiro executado ficam **[NV]**.
+
+## Alternativas rejeitadas
+1. Documentar estado/deriva outra vez — rejeitada: fila documental esgotada no ciclo 038 (375/625, mas sem valor de produto novo).
+2. Implementar coleta em GDScript/GUI/rede ou criar entidade "ponto neutro" no contrato — rejeitada: fora da fronteira e exigiria mudança de protocolo; o contrato já tem a ação e `destino` serve como ID do ponto.
+3. Creditar recursivamente a cada tick ou creditar ao sair — rejeitada: contraria "sair antes zera o acúmulo parcial" e o requisito de crédito atômico em `fase_skills`.
+4. Aceitar `coletar_materiais` sem destino ou com destino diferente da posição — rejeitada: a validação deve recusar com `DestinoInvalido`; sem isso o acúmulo poderia ocorrer fora do ponto neutro.
+5. Omitir os novos campos de `hash_estado` — rejeitada: dois estados com estoques/acúmulo distintos teriam o mesmo resumo, quebrando determinismo e rastreabilidade.
+6. Adicionar dano/emboscada, barricada, redução de defesa ou R6 neste ciclo — rejeitada: fora de escopo; R6 suspensa por decisão ratificada, PARE se invocada.
+
+## Rastreabilidade
+Fonte primária: GDD §7.1 e `crates/sim/src/lib.rs`, lidos nesta sessão; contrato técnico auditado pelo orquestrador; constituição v1.2.2 lida. Nenhum gate, build, teste, commit, push, PR, merge, deploy ou emissão de issue foi executado por este agente. Execução do roteiro, alteração de código em `lib.rs`, CI e verificação determinística permanecem **[NV]**. `.specify/memory/STATE.md` e a alteração preexistente em `.specify/feature.json` não foram tocados.

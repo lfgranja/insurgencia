@@ -1,0 +1,13 @@
+# Checklist de Requisitos — 039-coleta-materiais-deterministica
+
+- [x] FR-001 regra canônica registrada: 6 s = 180 ticks a 1/30 s em ponto neutro → +3 Suprimentos e +2 Materiais; sair antes zera o acúmulo parcial (GDD §7.1)
+- [x] FR-002 contrato técnico auditado registrado: `TICKS_COLETA=180`, campos `materiais`/`suprimentos`/`coleta_ticks`/`coleta_ponto` em `Jogador`, `DestinoInvalido` para coleta sem destino ou destino ≠ posição, crédito atômico em `fase_skills`, `hash_estado` refletivo, `Comando.destino` como ID do ponto sem nova mensagem
+- [x] FR-003 fronteira de implementação futura restrita a `crates/sim/src/lib.rs`; nenhuma alteração em `crates/contratos`, `PROTOCOL_VERSION`, `Cargo.toml`, GDScript, GUI, rede, dano, barricada ou R6; sem entidade de protocolo para ponto neutro
+- [x] FR-004 constituição v1.2.2 aplicada: ordem `... 09 checklist → revisão → 10 tasks → 11 analyze → 12 implement → 13 converge → 27 validate → 26 release`, `analyze` READ-ONLY depois de `tasks`, R1 `go`, R4 antes de R7 `1.0.0`, `converge` append-only, R6 suspensa por decisão ratificada (PARE se invocada, nenhuma issue simulada)
+- [x] FR-005 80/20 documentado: coleta de materiais 5×4×3×3 = 180/625 escolhida por fila documental esgotada e menor incremento com valor canônico; documentação pós-v1.2.2 (375/625) já executada no ciclo 038
+- [x] FR-006 exatamente 14 artefatos na fronteira, stub de `spec.md` substituído; `.specify/memory/STATE.md`, `converge.md` alheio e alteração preexistente em `.specify/feature.json` preservados
+- [x] FR-007 `test-roadmap.md` antes do PR: 10 passos, superfície documental/CLI, capturas de terminal, `automatizável?`, rollback e os casos 180 ticks, saída antes, recusa sem destino, hash divergente, ausência de consumo parcial e determinismo
+- [x] FR-008 nenhum build/gate/formatador/teste/commit/push/PR/merge/deploy; nenhum verde afirmado sem comando; pendências **[NV]**; código e verificação ao SWE/orquestrador
+
+## Revisão
+Requisitos verificáveis por inspeção das fontes lidas (GDD §7.1, `crates/sim/src/lib.rs`, constituição v1.2.2) e do contrato técnico auditado pelo orquestrador. Checklist `[x]` = revisão de requisitos, **não** execução de build/gate/teste nem implementação em `lib.rs`. R3 = 0: nenhum marcador `[NEEDS CLARIFICATION]` em aberto; as sete clarificações da spec cobrem ponto neutro via `destino`, acúmulo zerado, recusa sem destino, hash divergente, não-execução, R6 suspensa e manifesto documental. A ordem executada é a da constituição do alvo, com `tasks` antes de `analyze` (READ-ONLY) e R4 antes de R7. R6 não é tratada como dívida nem regra ativa: ratificada como intenção, mas suspensa até a ferramenta existir. Aprovado para `tasks`. Tudo o que depende de execução externa permanece **[NV]**.
