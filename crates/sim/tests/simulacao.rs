@@ -215,12 +215,12 @@ fn coleta_apos_180_ticks() {
     {
         let jogador = &mundo.jogadores[&1];
         assert_eq!(jogador.coleta_ticks, 0);
-        assert_eq!(jogador.coleta_ponto, Some(ponto));
+        assert_eq!(jogador.coleta_ponto, None);
         assert_eq!(jogador.materiais, 2);
         assert_eq!(jogador.suprimentos, 3);
     }
 
-    // O ponto permanece fixado, permitindo renda contínua a cada 180 ticks.
+    // A conclusão libera o ponto; um novo comando reinicia o ciclo de 180 ticks.
     let proximo_seq = 2 + TICKS_COLETA;
     for seq in proximo_seq..(proximo_seq + TICKS_COLETA) {
         agendar_coleta(&mut mundo, 1, seq, seq, ponto);
@@ -228,7 +228,7 @@ fn coleta_apos_180_ticks() {
     }
     let jogador = &mundo.jogadores[&1];
     assert_eq!(jogador.coleta_ticks, 0);
-    assert_eq!(jogador.coleta_ponto, Some(ponto));
+    assert_eq!(jogador.coleta_ponto, None);
     assert_eq!(jogador.materiais, 4);
     assert_eq!(jogador.suprimentos, 6);
 }
@@ -261,7 +261,7 @@ fn dupla_coleta_no_mesmo_tick_nao_acelera_credito() {
     mundo.avancar_tick();
     let jogador = &mundo.jogadores[&1];
     assert_eq!(jogador.coleta_ticks, 0);
-    assert_eq!(jogador.coleta_ponto, Some(ponto));
+    assert_eq!(jogador.coleta_ponto, None);
     assert_eq!(jogador.materiais, 2);
     assert_eq!(jogador.suprimentos, 3);
     assert_eq!(jogador.seq, seq);
@@ -307,9 +307,42 @@ fn saida_antes_zera() {
     }
     let jogador = &mundo.jogadores[&1];
     assert_eq!(jogador.coleta_ticks, 0);
-    assert_eq!(jogador.coleta_ponto, Some(origem));
+    assert_eq!(jogador.coleta_ponto, None);
     assert_eq!(jogador.materiais, 2);
     assert_eq!(jogador.suprimentos, 3);
+}
+
+#[test]
+fn saida_no_tick_179_nao_credita() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let origem = (0.5, 0.25);
+    let fora = (0.25, 0.5);
+    agendar_mover(&mut mundo, 1, 1, 1, origem);
+    mundo.avancar_tick();
+
+    // Comandos sustentam a canalização até restar um tick para o crédito.
+    for seq in 2..TICKS_COLETA {
+        agendar_coleta(&mut mundo, 1, seq, seq, origem);
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].coleta_ticks, TICKS_COLETA - 2);
+
+    // Sem comando, o auto-avanço sustenta o tick 179 (TICKS_COLETA - 1).
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].coleta_ticks, TICKS_COLETA - 1);
+    assert_eq!(mundo.jogadores[&1].materiais, 0);
+    assert_eq!(mundo.jogadores[&1].suprimentos, 0);
+
+    // A saída no tick 179 é aplicada antes do crédito automático.
+    agendar_mover(&mut mundo, 1, TICKS_COLETA, TICKS_COLETA, fora);
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.posicao, fora);
+    assert_eq!(jogador.coleta_ticks, 0);
+    assert_eq!(jogador.coleta_ponto, None);
+    assert_eq!(jogador.materiais, 0);
+    assert_eq!(jogador.suprimentos, 0);
 }
 
 #[test]
@@ -434,6 +467,37 @@ fn determinismo_coleta() {
         assert_eq!(jogador.suprimentos, 3);
         assert_eq!(jogador.coleta_ticks, 0);
     }
+}
+
+#[test]
+fn coleta_continua_apos_um_unico_comando() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let ponto = (0.5, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    // Um único comando válido inicia a coleta; os demais ticks não enviam comandos.
+    agendar_coleta(&mut mundo, 1, 2, 2, ponto);
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].coleta_ticks, 1);
+    assert_eq!(mundo.jogadores[&1].coleta_ponto, Some(ponto));
+
+    for ticks in 2..TICKS_COLETA {
+        mundo.avancar_tick();
+        let jogador = &mundo.jogadores[&1];
+        assert_eq!(jogador.coleta_ticks, ticks, "progresso em {ticks} ticks");
+        assert_eq!(jogador.coleta_ponto, Some(ponto));
+        assert_eq!(jogador.materiais, 0);
+        assert_eq!(jogador.suprimentos, 0);
+    }
+
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.coleta_ticks, 0);
+    assert_eq!(jogador.coleta_ponto, None);
+    assert_eq!(jogador.materiais, 2);
+    assert_eq!(jogador.suprimentos, 3);
 }
 
 /// Monta um comando `construir_barreira` com os monotônicos já preenchidos.

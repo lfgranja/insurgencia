@@ -1,0 +1,34 @@
+# Release (R7) — 041-coleta-jogavel
+
+**Data**: 2026-11-23T03:54Z · **Versão**: `1.0.0-local` (SemVer, pré-release local) · **R4**: aprovado em `.specify/validations/coleta-jogavel/validate.md` **(condicionado à execução do roteiro)**, antes desta release
+
+## Changelog
+### [1.0.0-local] — 2026-11-23
+### Added
+- FR-001 / T001 — regra canônica do GDD §7.1:303,310 registrada: **6 s = 180 ticks** a 1/30 s em ponto neutro rendem exatamente **+3 Suprimentos e +2 Materiais**; sair antes **zera o acúmulo parcial**. Nenhuma recompensa aproximada ou alternativa introduzida.
+- FR-002 / T002 — contrato técnico auditado registrado: `TICKS_COLETA = 180`, campos `coleta_ticks`/`coleta_ponto` em `Jogador`, `Comando.destino` como ponto de coleta e doc comment corrigido para citar `mover`, `coletar_materiais` e `construir_barreira`. Nenhuma mensagem nova e nenhuma alteração em `crates/contratos`, `PROTOCOL_VERSION` ou `Cargo.toml`.
+- FR-003 / T003, T004 — auto-avanço determinístico registrado: após um comando válido `coletar_materiais`, a coleta avança **1 tick por jogador por tick** enquanto o jogador permanece no mesmo ponto; `mover` para posição diferente cancela; `BTreeSet<u64>` local ao tick, compartilhado entre comando e auto-avanço, impede dupla contagem no mesmo tick (padrão do ciclo 040).
+- FR-004 / T005 — crédito **atômico** registrado: +3 Suprimentos e +2 Materiais somente ao completar o 180.º tick, com zeração imediata de `coleta_ticks`/`coleta_ponto`; nenhum crédito parcial, nenhum crédito no tick 179 e nenhum reembolso.
+- FR-005 / T006 — `hash_estado` inclui `coleta_ticks`/`coleta_ponto` de cada jogador, preservando resumos divergentes para progressos distintos e replay determinístico tick a tick.
+- FR-006 / T007 — cliente registrado: tecla `C` em *just pressed* agenda `coletar_materiais` com `destino` = posição atual e `seq`/`request_id` monotônicos via recurso local; HUD passa a mostrar `Suprimentos` e progresso de `Coleta`, além de Materiais/Barreiras/Construindo.
+- FR-006 / T008, T009, T010, T011, T012 — constituição **v1.2.2** aplicada: `... 09 checklist → revisão → 10 tasks → 11 analyze (READ-ONLY) → 12 implement → 13 converge → 27 validate → 26 release`, R1 `go`, R4 antes de R7 `1.0.0-local`, `converge` append-only; **R6 N/A** — fora da sequência executável até existir `resolve-tasks.sh`/adaptador, PARE se invocada, nenhuma issue simulada, nenhum `gh` improvisado, dívida de automação registrada; decisão 80/20 do ciclo 041 e R1 `go` registrados nos artefatos de avaliação.
+- FR-006 / T012 — 5 artefatos na fronteira exata, com `tasks` antes de `analyze` READ-ONLY; `.specify/memory/STATE.md`, `concurrency.jsonl`, paths alheios e `converge.md` existentes preservados.
+- FR-006 / T012 — `test-roadmap.md` escrito antes do PR com **exatamente 10 passos**, superfície documental/CLI, capturas planejadas, `automatizável?`, rollback e os casos: 180 ticks, +3/+2 no tick 180, saída antes com zeração do parcial, dupla coleta no mesmo tick, um comando único, hash e determinismo, tecla `C`/HUD e doc comment, fronteira de contrato/Cargo e governança/R6 N/A.
+- FR-006 / T012 — não-execução: nenhum build/gate/formatador/teste/commit/push/PR/merge/deploy; nenhum verde afirmado sem comando; pendências **[NV]**; código, gates e verificação ao SWE/orquestrador.
+
+## Rastreabilidade
+FR-001..FR-006 · SC-001..SC-006 · T001..T012 (SDD, com `tasks` antes de `analyze` READ-ONLY e artefatos de validação/release no mesmo intervalo) · R1 `go` (`.specify/assessments/coleta-jogavel/decision.md`, decisão 80/20 do ciclo 041) · R4 (`.specify/validations/coleta-jogavel/validate.md`, aprovado condicionado à execução do roteiro) · roteiro (`.specify/validations/coleta-jogavel/test-roadmap.md`, passos 2–7 para os casos de regra/auto-avanço/hash, passos 8–10 para cliente/fronteira/governança e rollback). Âncoras: GDD §7.1:303,310, `crates/sim/src/lib.rs`, `crates/cliente/src/main.rs`, contrato técnico auditado pelo orquestrador, constituição v1.2.2, branch `041-coleta-jogavel` (base `bf05cfa`), sessão `20261123T035400Z-coleta-jogavel`. A versão `1.0.0-local` é pré-release local: promoção a `1.0.0`, merge e deploy dependem de decisão do SWE e permanecem **[NV]**.
+
+## Rollback
+Para reverter o ciclo 041: excluir os 5 artefatos escritos neste ciclo — `specs/041-coleta-jogavel/analyze.md`, `specs/041-coleta-jogavel/converge.md`, `.specify/validations/coleta-jogavel/test-roadmap.md`, `.specify/validations/coleta-jogavel/validate.md` e `.specify/releases/coleta-jogavel/release.md` — preservando ou restaurando `specs/041-coleta-jogavel/spec.md`, `plan.md`, `tasks.md` e `checklists/` conforme o estado de chegada definido pelo SDD. Se o baseline append-only tiver sido atualizado, remover a entrada 041. **Nunca executar neste ciclo — apenas documentar.** Não reverter o histórico de ciclos anteriores (inclusive PR #48 e PR #52), `docs/GDD*`, baselines, ledger, CI, `.specify/memory/STATE.md`, `concurrency.jsonl`, `.specify/feature.json`, paths untracked alheios, `converge.md` alheio nem a alteração preexistente em `.specify/feature.json`; não executar `git clean`, `git reset`, force-push, remoção de artefatos do ciclo, merge/PR/deploy nem reexecução de gates — decisão do SWE/orquestrador. A implementação em `lib.rs`, `simulacao.rs` e `main.rs`, se já aplicada pelo SWE, é revertida pelo próprio SWE conforme seu controle de versão; nenhum código foi escrito por este agente.
+
+## Não incluído
+Implementação em `crates/sim/src/lib.rs`, `crates/sim/tests/simulacao.rs` e `crates/cliente/src/main.rs` por este agente; alterações em `crates/contratos`, `PROTOCOL_VERSION`, `Cargo.toml`; mensagens ou entidades novas no protocolo; execução de `./verify.sh`, gates, roteiro ou capturas; adoção de R6 como regra ativa, `taskstoissues`/`resolve-tasks.sh` ou simulação de issues e `gh` improvisado; edição de `converge.md` existente, `.specify/memory/STATE.md`, `concurrency.jsonl` ou da alteração preexistente em `.specify/feature.json`; janelas, credenciais, deploy, assinatura GPG, commits/push/PRs deste agente — todos **[NV]** até o orquestrador/SWE.
+
+## Execução pelo orquestrador — 2026-11-23T04:04Z
+
+R4 foi cumprido: roteiro **10/10 PASS**, `./verify.sh` **ALL STAGES OK** com **60/60 testes**, evidência em `.specify/validations/coleta-jogavel/evidence.md`. Auto-avanço de coleta, tecla `C`, HUD e doc comment passam a fazer parte do escopo entregue. Rollback segue documentado e não executado; promoção e merge em `main` dependem do SWE.
+
+## Correção de ACR — 2026-11-23T04:12Z
+
+O edge case P2 da revisão independente foi corrigido na fonte: sair do ponto no tick 179 não credita mais. Auto-avanço passa a ocorrer após o processamento de comandos, com `BTreeSet<u64>` compartilhado. Documentação alinhada. Gate final: `verify.sh` **ALL STAGES OK** com **61/61 testes**; roteiro 10/10 preservado. Rollback segue documentado e não executado.

@@ -22,7 +22,7 @@ use insurgencia_cliente::{
     deslocar, estado_inicial, ilha_em, EstadoJogador, Geometria3d, Ilha, ILHAS, LIMITE_X, LIMITE_Y,
     VELOCIDADE,
 };
-use insurgencia_sim::{Comando, Mundo, PASSO_SEGUNDOS, TICKS_CONSTRUCAO_BARREIRA};
+use insurgencia_sim::{Comando, Mundo, PASSO_SEGUNDOS, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA};
 
 /// Identificador do jogador local no espelho da simulação.
 const PEER_ID: u64 = 1;
@@ -89,6 +89,7 @@ fn main() {
                 mover_jogador,
                 sincronizar_avatar,
                 solicitar_barreira,
+                solicitar_coleta,
                 sincronizar_sim,
                 avancar_simulacao,
                 atualizar_texto,
@@ -595,6 +596,33 @@ fn solicitar_barreira(
     });
 }
 
+/// Agenda a coleta de materiais no ponto atual ao pressionar `C`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_coleta(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyC) {
+        return;
+    }
+
+    local.seq += 1;
+    local.request_id += 1;
+    let (x, y) = jogador.0.posicao;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "coletar_materiais".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some((f64::from(x), f64::from(y))),
+    });
+}
+
 /// Copia a posição do estado para a transformação 3D do avatar no plano do mapa.
 #[expect(
     clippy::needless_pass_by_value,
@@ -643,7 +671,7 @@ fn avancar_simulacao(
     }
 }
 
-/// Atualiza o painel com posição, materiais, barreiras e progresso de construção.
+/// Atualiza o painel com recursos, barreiras e progresso de construção e coleta.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
@@ -661,6 +689,7 @@ fn atualizar_texto(
     };
     let remoto = simulacao.0.jogadores.get(&PEER_ID);
     let materiais = remoto.map_or(0, |j| j.materiais);
+    let suprimentos = remoto.map_or(0, |j| j.suprimentos);
     let barreiras = simulacao
         .0
         .barreiras
@@ -673,8 +702,14 @@ fn atualizar_texto(
         }
         _ => "nao".to_owned(),
     };
+    let coletando = match remoto {
+        Some(j) if j.coleta_ponto.is_some() => {
+            format!("{}/{}", j.coleta_ticks, TICKS_COLETA)
+        }
+        _ => "nao".to_owned(),
+    };
     let conteudo = format!(
-        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nMateriais: {materiais}\nBarreiras: {barreiras}\nConstruindo: {construindo}\nWASD ou setas para mover · B para construir barreira"
+        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nSuprimentos: {suprimentos}\nMateriais: {materiais}\nBarreiras: {barreiras}\nConstruindo: {construindo}\nColeta: {coletando}\nWASD ou setas para mover · B para construir barreira · C para coletar materiais"
     );
 
     for mut texto in &mut textos {

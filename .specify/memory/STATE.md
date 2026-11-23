@@ -274,3 +274,16 @@
 | Servidor + Lightyear (dep ausente, docs.rs 0.31 falha) | 5 | 2 | 1 | 1 | 10/625 |
 
 **Escolha**: `construir_barreira`. É o primeiro destino canônico dos Materiais introduzidos no ciclo 039, tem valores tabelados no GDD (§9.3, §10.3), não exige protocolo/Cargo novo e produz efeito verificável no core determinístico e no HUD. Netcode fica habilitado, mas não é o nº 1. R6 permanece **N/A** por constituição v1.2.2 (dívida de automação registrada).
+
+## 2026-11-23T03:54Z — decisão 80/20 do ciclo 041 (antes da implementação)
+
+**Sessão**: `20261123T035400Z-coleta-jogavel` · **Título**: `insurgencia - coleta jogavel no cliente`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Coleta jogável no cliente (tecla C + auto-avanço) | 5 | 5 | 5 | 4 | **500/625** |
+| Corrigir comentário de `Comando.destino` | 2 | 5 | 5 | 5 | 250/625 |
+| Ponte provisória | 3 | 3 | 3 | 4 | 108/625 |
+| Servidor + Lightyear | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `coleta-jogavel`. O ciclo 040 entregou barricada e HUD, mas o espelho local começa com 0 Materiais e não tem como coletar: a cadeia jogável está incompleta. A correção do comentário de `destino` entra no mesmo ciclo por ser trivial e adjacente. R6 continua **N/A** por constituição v1.2.2.
