@@ -5,7 +5,8 @@ use insurgencia_sim::{
     Barreira, CodigoRecusa, Comando, Mundo, Ponte, ValidacaoComandos, CUSTO_BARREIRA_MATERIAIS,
     CUSTO_PONTE_MATERIAIS, MAX_BARREIRAS_POR_JOGADOR, PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA,
     PV_PONTE, TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA,
-    TICKS_CONSTRUCAO_PONTE, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_PONTE,
+    TICKS_CONSTRUCAO_PONTE, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_PONTE, TICKS_PROPAGANDA,
+    TICKS_REVERSAO_SUDITO,
 };
 
 /// Monta um comando `mover` com os monotônicos já preenchidos.
@@ -1498,4 +1499,289 @@ fn dupla_construcao_ponte_no_mesmo_tick_nao_acelera() {
     }
     assert_eq!(mundo.pontes.len(), 1);
     assert_eq!(mundo.jogadores[&1].materiais, 100 - CUSTO_PONTE_MATERIAIS);
+}
+
+/// Monta um comando `propaganda` com os monotônicos já preenchidos.
+#[must_use]
+fn comando_propaganda(peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) -> Comando {
+    Comando {
+        peer_id,
+        acao: "propaganda".to_string(),
+        seq,
+        request_id,
+        destino: Some(ponto),
+    }
+}
+
+/// Agenda uma propaganda somente após validá-la contra o estado corrente.
+fn agendar_propaganda(
+    mundo: &mut Mundo,
+    peer_id: u64,
+    seq: i64,
+    request_id: i64,
+    ponto: (f64, f64),
+) {
+    assert!(
+        ValidacaoComandos::validar(mundo, peer_id, "propaganda", seq, request_id, Some(ponto),)
+            .is_ok()
+    );
+    mundo.agendar_comando(comando_propaganda(peer_id, seq, request_id, ponto));
+}
+
+/// Converte um Súdito com uma sequência ininterrupta de comandos válidos.
+fn converter_sudito(mundo: &mut Mundo, peer_id: u64, id: u64, seq_base: i64, ponto: (f64, f64)) {
+    for offset in 0..TICKS_PROPAGANDA {
+        let seq = seq_base + offset;
+        agendar_propaganda(mundo, peer_id, seq, seq, ponto);
+        mundo.avancar_tick();
+    }
+    assert!(mundo.suditos[&id].convertido);
+}
+
+#[test]
+fn propaganda_converte_apos_120_ticks() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let ponto = (0.25, 0.0);
+    mundo.adicionar_sudito(7, ponto);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    for offset in 0..(TICKS_PROPAGANDA - 1) {
+        let seq = 2 + offset;
+        agendar_propaganda(&mut mundo, 1, seq, seq, ponto);
+        mundo.avancar_tick();
+        let sudito = &mundo.suditos[&7];
+        assert_eq!(sudito.propaganda_ticks, 1 + offset, "tick {offset}");
+        assert!(!sudito.convertido, "tick {offset}");
+    }
+
+    let seq = 1 + TICKS_PROPAGANDA;
+    agendar_propaganda(&mut mundo, 1, seq, seq, ponto);
+    mundo.avancar_tick();
+    let sudito = &mundo.suditos[&7];
+    assert_eq!(sudito.propaganda_ticks, TICKS_PROPAGANDA);
+    assert!(sudito.convertido);
+    assert_eq!(sudito.reversao_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].propaganda_alvo, Some(7));
+}
+
+#[test]
+fn dano_reverte_em_90_ticks() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let ponto = (0.25, 0.0);
+    mundo.adicionar_sudito(7, ponto);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+    converter_sudito(&mut mundo, 1, 7, 2, ponto);
+
+    mundo.aplicar_dano_a_sudito(7, 1);
+    assert_eq!(mundo.suditos[&7].reversao_ticks, TICKS_REVERSAO_SUDITO);
+    for offset in 0..(TICKS_REVERSAO_SUDITO - 1) {
+        mundo.avancar_tick();
+        let sudito = &mundo.suditos[&7];
+        assert!(sudito.convertido, "tick {offset}");
+        assert_eq!(sudito.reversao_ticks, TICKS_REVERSAO_SUDITO - 1 - offset);
+        assert_eq!(sudito.propaganda_ticks, TICKS_PROPAGANDA);
+    }
+
+    mundo.avancar_tick();
+    let sudito = &mundo.suditos[&7];
+    assert!(!sudito.convertido);
+    assert_eq!(sudito.reversao_ticks, 0);
+    assert_eq!(sudito.propaganda_ticks, 0);
+
+    // Dano não positivo e ID inexistente não alteram o estado.
+    mundo.aplicar_dano_a_sudito(7, 0);
+    mundo.aplicar_dano_a_sudito(99, 10);
+    assert_eq!(mundo.suditos[&7].reversao_ticks, 0);
+    assert!(!mundo.suditos[&7].convertido);
+
+    // Dano antes da conversão registra a reversão sem apagar a exposição.
+    let mut outro = Mundo::new();
+    outro.adicionar_sudito(9, (0.25, 0.0));
+    outro.aplicar_dano_a_sudito(9, 1);
+    assert_eq!(outro.suditos[&9].reversao_ticks, TICKS_REVERSAO_SUDITO);
+    assert!(!outro.suditos[&9].convertido);
+    assert_eq!(outro.suditos[&9].propaganda_ticks, 0);
+}
+
+#[test]
+fn propaganda_apos_um_unico_comando() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let ponto = (0.25, 0.0);
+    mundo.adicionar_sudito(7, ponto);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    // Uma única tecla G inicia a exposição; os ticks seguintes são automáticos.
+    agendar_propaganda(&mut mundo, 1, 2, 2, ponto);
+    for tick in 0..TICKS_PROPAGANDA {
+        mundo.avancar_tick();
+        assert!(mundo.comandos_pendentes.is_empty());
+        assert!(mundo.comandos_do_tick.is_empty());
+        assert_eq!(mundo.jogadores[&1].seq, 2, "tick {tick}");
+        let sudito = &mundo.suditos[&7];
+        if tick < TICKS_PROPAGANDA - 1 {
+            assert_eq!(sudito.propaganda_ticks, tick + 1, "tick {tick}");
+            assert!(!sudito.convertido, "tick {tick}");
+        }
+    }
+
+    let sudito = &mundo.suditos[&7];
+    assert_eq!(sudito.propaganda_ticks, TICKS_PROPAGANDA);
+    assert!(sudito.convertido);
+    assert_eq!(mundo.jogadores[&1].propaganda_alvo, Some(7));
+}
+
+#[test]
+fn dupla_propaganda_no_mesmo_tick_nao_acelera() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let ponto = (0.25, 0.0);
+    mundo.adicionar_sudito(7, ponto);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    let mut seq = 2_i64;
+    // Dois comandos válidos por tick não podem valer dois ticks de exposição.
+    for tick in 0..(TICKS_PROPAGANDA - 1) {
+        mundo.agendar_comando(comando_propaganda(1, seq, seq, ponto));
+        seq += 1;
+        mundo.agendar_comando(comando_propaganda(1, seq, seq, ponto));
+        seq += 1;
+        mundo.avancar_tick();
+        assert_eq!(mundo.suditos[&7].propaganda_ticks, 1 + tick, "tick {tick}");
+        assert!(!mundo.suditos[&7].convertido, "tick {tick}");
+    }
+
+    mundo.agendar_comando(comando_propaganda(1, seq, seq, ponto));
+    seq += 1;
+    mundo.agendar_comando(comando_propaganda(1, seq, seq, ponto));
+    mundo.avancar_tick();
+
+    let sudito = &mundo.suditos[&7];
+    assert_eq!(sudito.propaganda_ticks, TICKS_PROPAGANDA);
+    assert!(sudito.convertido);
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.seq, seq);
+    assert_eq!(jogador.request_id, seq);
+}
+
+#[test]
+fn hash_reflete_suditos() {
+    let mut primeira = Mundo::new();
+    let mut segunda = Mundo::new();
+    for mundo in [&mut primeira, &mut segunda] {
+        mundo.adicionar_jogador(1);
+    }
+    let sem_suditos = primeira.hash_estado();
+    primeira.adicionar_sudito(7, (0.5, 0.0));
+    primeira.adicionar_sudito(2, (-0.5, 0.0));
+    // Ordem de inserção distinta: a iteração do BTreeMap é canônica.
+    segunda.adicionar_sudito(2, (-0.5, 0.0));
+    segunda.adicionar_sudito(7, (0.5, 0.0));
+    assert_ne!(primeira.hash_estado(), sem_suditos);
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    if let Some(sudito) = primeira.suditos.get_mut(&2) {
+        sudito.convertido = true;
+        sudito.propaganda_ticks = TICKS_PROPAGANDA;
+        sudito.reversao_ticks = TICKS_REVERSAO_SUDITO;
+    }
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+    if let Some(sudito) = segunda.suditos.get_mut(&2) {
+        sudito.convertido = true;
+        sudito.propaganda_ticks = TICKS_PROPAGANDA;
+        sudito.reversao_ticks = TICKS_REVERSAO_SUDITO;
+    }
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    if let Some(sudito) = primeira.suditos.get_mut(&7) {
+        sudito.posicao = (0.75, 0.0);
+    }
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+
+    let mut com_alvo = Mundo::new();
+    com_alvo.adicionar_jogador(1);
+    let hash_sem_alvo = com_alvo.hash_estado();
+    if let Some(jogador) = com_alvo.jogadores.get_mut(&1) {
+        jogador.propaganda_alvo = Some(7);
+    }
+    assert_ne!(com_alvo.hash_estado(), hash_sem_alvo);
+}
+
+#[test]
+fn movimento_cancela_propaganda() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let ponto = (0.25, 0.0);
+    let fora = (0.25, 0.5);
+    mundo.adicionar_sudito(7, ponto);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+    agendar_propaganda(&mut mundo, 1, 2, 2, ponto);
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].propaganda_alvo, Some(7));
+    assert_eq!(mundo.suditos[&7].propaganda_ticks, 1);
+
+    agendar_mover(&mut mundo, 1, 3, 3, fora);
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.posicao, fora);
+    assert_eq!(jogador.propaganda_alvo, None);
+    // O auto-avanço ocorre antes do `mover`, mas a saída zera o acúmulo do alvo.
+    assert_eq!(mundo.suditos[&7].propaganda_ticks, 0);
+
+    for _ in 0..TICKS_PROPAGANDA {
+        mundo.avancar_tick();
+    }
+    assert!(!mundo.suditos[&7].convertido);
+    assert_eq!(mundo.suditos[&7].propaganda_ticks, 0);
+
+    // Um `mover` para o mesmo ponto não cancela o alvo recém-fixado.
+    mundo.adicionar_sudito(8, fora);
+    let seq = 4 + TICKS_PROPAGANDA;
+    agendar_propaganda(&mut mundo, 1, seq, seq, fora);
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].propaganda_alvo, Some(8));
+    let seq = seq + 1;
+    agendar_mover(&mut mundo, 1, seq, seq, fora);
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.propaganda_alvo, Some(8));
+    assert_eq!(mundo.suditos[&8].propaganda_ticks, 2);
+}
+
+#[test]
+fn dois_jogadores_nao_aceleram_propaganda() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    let ponto = (0.25, 0.0);
+    mundo.adicionar_sudito(7, ponto);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    agendar_mover(&mut mundo, 2, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    // Comandos de dois pares no mesmo ponto, somados ao auto-avanço, valem 1 tick.
+    for tick in 0..TICKS_PROPAGANDA {
+        let seq = 2 + tick;
+        agendar_propaganda(&mut mundo, 1, seq, seq, ponto);
+        agendar_propaganda(&mut mundo, 2, seq, seq, ponto);
+        mundo.avancar_tick();
+        let sudito = &mundo.suditos[&7];
+        if tick < TICKS_PROPAGANDA - 1 {
+            assert_eq!(sudito.propaganda_ticks, tick + 1, "tick {tick}");
+            assert!(!sudito.convertido, "tick {tick}");
+        }
+    }
+
+    let sudito = &mundo.suditos[&7];
+    assert_eq!(sudito.propaganda_ticks, TICKS_PROPAGANDA);
+    assert!(sudito.convertido);
+    assert_eq!(mundo.jogadores[&1].propaganda_alvo, Some(7));
+    assert_eq!(mundo.jogadores[&2].propaganda_alvo, Some(7));
 }

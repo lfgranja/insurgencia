@@ -91,6 +91,7 @@ fn main() {
                 solicitar_barreira,
                 solicitar_coleta,
                 solicitar_ponte,
+                solicitar_propaganda,
                 sincronizar_sim,
                 avancar_simulacao,
                 atualizar_texto,
@@ -651,6 +652,33 @@ fn solicitar_ponte(
     });
 }
 
+/// Agenda a propaganda no súdito no ponto atual ao pressionar `G`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_propaganda(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyG) {
+        return;
+    }
+
+    local.seq += 1;
+    local.request_id += 1;
+    let (x, y) = jogador.0.posicao;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "propaganda".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some((f64::from(x), f64::from(y))),
+    });
+}
+
 /// Copia a posição do estado para a transformação 3D do avatar no plano do mapa.
 #[expect(
     clippy::needless_pass_by_value,
@@ -731,6 +759,12 @@ fn atualizar_texto(
         .values()
         .filter(|ponte| ponte.dono == PEER_ID)
         .count();
+    let suditos = simulacao
+        .0
+        .suditos
+        .values()
+        .filter(|sudito| sudito.convertido)
+        .count();
     let construindo = match remoto {
         Some(j) if j.construcao_ponto.is_some() => {
             format!("{}/{}", j.construcao_ticks, TICKS_CONSTRUCAO_BARREIRA)
@@ -744,7 +778,7 @@ fn atualizar_texto(
         _ => "nao".to_owned(),
     };
     let conteudo = format!(
-        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nSuprimentos: {suprimentos}\nMateriais: {materiais}\nAutogestão: {autogestao}\nBarreiras: {barreiras}\nPontes: {pontes}\nConstruindo: {construindo}\nColeta: {coletando}\nWASD ou setas para mover · B para construir barreira · P para construir ponte · C para coletar materiais"
+        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nSuprimentos: {suprimentos}\nMateriais: {materiais}\nAutogestão: {autogestao}\nBarreiras: {barreiras}\nPontes: {pontes}\nSúditos: {suditos}\nConstruindo: {construindo}\nColeta: {coletando}\nWASD ou setas para mover · B para construir barreira · P para construir ponte · C para coletar materiais · G para propaganda"
     );
 
     for mut texto in &mut textos {
