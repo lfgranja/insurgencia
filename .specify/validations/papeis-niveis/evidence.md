@@ -20,3 +20,8 @@
 **Gate agregado (15:17Z)**: `./verify.sh` **ALL STAGES OK**, **122 testes run: 122 passed** (117 anteriores + 5 novos), `VERIFY_EXIT=0`. Um RED de `clippy::match_same_arms` foi corrigido na fonte antes do verde.
 
 **Limitações**: papéis/níveis/Q1-W2-E3-R6 são `[HIPÓTESE]`/protótipo; novas habilidades W/E/R e níveis acima do desbloqueio de ações existentes ficam para ciclos posteriores; captura visual real permanece **[NV]**.
+
+### Revalidação pós-ACR — 2026-11-23T15:34Z
+
+- Blocker da ACR (`7105536867`) corrigido: `nivel_minimo_para_acao` é compartilhado por validador e `fase_skills`; comando abaixo do nível não executa, não debita e não atualiza `seq`/`request_id`, com recusa observável em `Mundo.ultima_recusa` (incluído no hash). Novo teste `acao_bloqueada_nao_executa_no_core`; três testes preexistentes elevaram o nível mínimo. Documentação alinhada a `nivel_ticks` por jogador.
+- `./verify.sh` reexecutado: **ALL STAGES OK**, **123 testes run: 123 passed** (122 anteriores + 1 novo), cinco gates locais PASS. O verde anterior de 122 foi descartado; a decisão usa o head corrigido.

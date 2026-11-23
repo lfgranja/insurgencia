@@ -1531,6 +1531,7 @@ fn movimento_cancela_ponte() {
 fn dupla_construcao_ponte_no_mesmo_tick_nao_acelera() {
     let mut mundo = Mundo::new();
     mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 2);
     definir_materiais(&mut mundo, 1, 100);
     let ponto = (0.25, 0.0);
     agendar_mover(&mut mundo, 1, 1, 1, ponto);
@@ -1690,6 +1691,7 @@ fn dupla_propaganda_no_mesmo_tick_nao_acelera() {
     mundo.adicionar_jogador(1);
     let ponto = (0.25, 0.0);
     mundo.adicionar_sudito(7, ponto);
+    garantir_nivel(&mut mundo, 1, 3);
     agendar_mover(&mut mundo, 1, 1, 1, ponto);
     mundo.avancar_tick();
 
@@ -2997,6 +2999,64 @@ fn desbloqueio_q_w_e_r() {
         let liberado = ValidacaoComandos::validar(&mundo, 1, acao, 1, 1, Some(ponto));
         assert!(liberado.is_ok(), "{acao} no nivel {nivel}");
     }
+}
+
+/// O gate de nível do núcleo recusa comandos enfileirados diretamente: o
+/// comando recusado não executa, não atualiza os monotônicos e é observável.
+#[test]
+fn acao_bloqueada_nao_executa_no_core() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let ponto = (0.25, 0.0);
+    definir_materiais(&mut mundo, 1, CUSTO_BARREIRA_MATERIAIS);
+    assert_eq!(mundo.jogadores[&1].nivel, 1);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.posicao = ponto;
+    }
+
+    // Um chamador pode enfileirar sem passar pelo validador isolado.
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "construir_barreira", 1, 1, Some(ponto)),
+        Err(CodigoRecusa::AcaoBloqueada)
+    );
+    mundo.agendar_comando(comando_barreira(1, 1, 1, ponto));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.ultima_recusa, Some(CodigoRecusa::AcaoBloqueada));
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.seq, 0);
+    assert_eq!(jogador.request_id, 0);
+    assert_eq!(jogador.construcao_ticks, 0);
+    assert_eq!(jogador.construcao_ponto, None);
+    assert_eq!(jogador.materiais, CUSTO_BARREIRA_MATERIAIS);
+    assert!(mundo.barreiras.is_empty());
+
+    // A recusa observável entra no hash determinístico do estado.
+    let com_recusa = mundo.hash_estado();
+    mundo.ultima_recusa = None;
+    assert_ne!(mundo.hash_estado(), com_recusa);
+
+    // No nível 2 o mesmo comando inicia a canalização e avança os monotônicos.
+    garantir_nivel(&mut mundo, 1, 2);
+    mundo.agendar_comando(comando_barreira(1, 2, 2, ponto));
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.seq, 2);
+    assert_eq!(jogador.request_id, 2);
+    assert_eq!(jogador.construcao_ticks, 1);
+    assert_eq!(jogador.construcao_ponto, Some(ponto));
+    assert_eq!(jogador.materiais, CUSTO_BARREIRA_MATERIAIS);
+    assert!(mundo.barreiras.is_empty());
+
+    // A canalização restante é automática e conclui com débito atômico.
+    for _ in 1..TICKS_CONSTRUCAO_BARREIRA {
+        mundo.avancar_tick();
+    }
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.construcao_ticks, 0);
+    assert_eq!(jogador.construcao_ponto, None);
+    assert_eq!(jogador.materiais, 0);
+    assert_eq!(mundo.barreiras.len(), 1);
 }
 
 /// Papel, nível e acumulador entram no hash em ordem estável.

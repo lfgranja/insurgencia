@@ -152,6 +152,18 @@ fn ponto_igual(a: (f64, f64), b: (f64, f64)) -> bool {
     a.0.total_cmp(&b.0).is_eq() && a.1.total_cmp(&b.1).is_eq()
 }
 
+/// Nível mínimo exigido por cada ação (`[HIPÓTESE]`/protótipo, não cânone).
+///
+/// Mapa Q1/W2/E3/R6: ações sem slot permanecem livres (nível 1).
+fn nivel_minimo_para_acao(acao: &str) -> u8 {
+    match acao {
+        "construir_barreira" | "construir_ponte" => 2,
+        "propaganda" | "propaganda_no" => 3,
+        "atacar_no" => 6,
+        _ => 1,
+    }
+}
+
 /// Origem do alvo de Nó fixado no jogador.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum AcaoNo {
@@ -389,6 +401,9 @@ pub struct Mundo {
     /// Fila de sinais pendentes em ordem FIFO; não é um histórico completo
     /// dos sinais emitidos.
     pub sinais: VecDeque<String>,
+    /// Última recusa aplicada pelo gate de nível no núcleo; não é limpa por
+    /// comandos aceitos (`[HIPÓTESE]`/protótipo, não cânone).
+    pub ultima_recusa: Option<CodigoRecusa>,
 }
 
 impl Default for Mundo {
@@ -416,6 +431,7 @@ impl Mundo {
             ilhas: BTreeMap::new(),
             ilhas_reconquistadas: BTreeSet::new(),
             sinais: VecDeque::new(),
+            ultima_recusa: None,
             nos: BTreeMap::new(),
             resistencia_ideologica: RESISTENCIA_INICIAL,
             resultado: None,
@@ -616,6 +632,17 @@ impl Mundo {
         let mut ataques_realizados: BTreeSet<u64> = BTreeSet::new();
 
         for comando in &comandos {
+            // O gate de nível também vale no núcleo: a validação isolada não
+            // impede um chamador de enfileirar diretamente um comando acima do
+            // nível do jogador. O comando recusado não executa e não atualiza
+            // `seq`/`request_id`, portanto não é considerado aceito.
+            let Some(jogador) = self.jogadores.get(&comando.peer_id) else {
+                continue;
+            };
+            if jogador.nivel < nivel_minimo_para_acao(&comando.acao) {
+                self.ultima_recusa = Some(CodigoRecusa::AcaoBloqueada);
+                continue;
+            }
             if comando.acao == "mover" {
                 if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
                     if let Some(destino) = comando.destino {
@@ -1481,10 +1508,14 @@ impl Mundo {
             None => "nenhum",
         };
 
+        let ultima_recusa = match self.ultima_recusa {
+            Some(codigo) => codigo.to_string(),
+            None => "nenhuma".to_owned(),
+        };
         let entrada = format!(
             concat!(
                 "{tick}|{epoch}|{match_id}|{jogadores}|{estruturas}|",
-                "{nos}|{resistencia}|{resultado}",
+                "{nos}|{resistencia}|{resultado}|{ultima_recusa}",
             ),
             tick = self.tick,
             epoch = self.epoch,
@@ -1494,6 +1525,7 @@ impl Mundo {
             nos = nos,
             resistencia = self.resistencia_ideologica,
             resultado = resultado,
+            ultima_recusa = ultima_recusa,
         );
         let resumo = Sha256::digest(entrada.as_bytes());
         format!("{resumo:x}")
@@ -1570,15 +1602,8 @@ impl ValidacaoComandos {
             return Err(CodigoRecusa::AcaoDesconhecida);
         }
 
-        // Mapa Q1/W2/E3/R6 (`[HIPÓTESE]`/protótipo, não cânone): as ações sem
-        // slot permanecem livres, e as demais exigem o nível mínimo correspondente.
-        let nivel_minimo = match acao {
-            "construir_barreira" | "construir_ponte" => 2,
-            "propaganda" | "propaganda_no" => 3,
-            "atacar_no" => 6,
-            _ => 1,
-        };
-        if jogador.nivel < nivel_minimo {
+        // Mesmo mapa Q1/W2/E3/R6 usado pelo gate de `fase_skills`.
+        if jogador.nivel < nivel_minimo_para_acao(acao) {
             return Err(CodigoRecusa::AcaoBloqueada);
         }
 
