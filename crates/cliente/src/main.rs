@@ -23,7 +23,8 @@ use insurgencia_cliente::{
     VELOCIDADE,
 };
 use insurgencia_sim::{
-    Comando, Mundo, ResultadoPartida, PASSO_SEGUNDOS, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA,
+    Comando, Mundo, ResultadoPartida, MAX_RECONQUISTAS, PASSO_SEGUNDOS, TICKS_COLETA,
+    TICKS_CONSTRUCAO_BARREIRA,
 };
 
 /// Identificador do jogador local no espelho da simulação.
@@ -883,6 +884,19 @@ fn avancar_simulacao(
     }
 }
 
+/// Descreve o desfecho da partida para o painel da HUD.
+#[must_use]
+fn texto_resultado(simulacao: &Simulacao) -> String {
+    match simulacao.0.resultado {
+        Some(ResultadoPartida::Vitoria) => "Autogestão estabelecida".to_owned(),
+        Some(ResultadoPartida::DerrotaPorTempo) => "Comuna dissolvida — tempo esgotado".to_owned(),
+        Some(ResultadoPartida::DerrotaPorReconquista) => {
+            format!("Comuna dissolvida — {MAX_RECONQUISTAS} reconquistas")
+        }
+        None => "em curso".to_owned(),
+    }
+}
+
 /// Monta o texto do painel a partir do estado local e do espelho da simulação.
 #[must_use]
 fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
@@ -930,11 +944,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
     let sinais = simulacao.0.sinais.len();
     let nos_convertidos = simulacao.0.nos.values().filter(|no| no.convertido).count();
     let resistencia = simulacao.0.resistencia_ideologica;
-    let resultado = if matches!(simulacao.0.resultado, Some(ResultadoPartida::Vitoria)) {
-        "Autogestão estabelecida"
-    } else {
-        "em curso"
-    };
+    let resultado = texto_resultado(simulacao);
     let construindo = match remoto {
         Some(j) if j.construcao_ponto.is_some() => {
             format!("{}/{}", j.construcao_ticks, TICKS_CONSTRUCAO_BARREIRA)

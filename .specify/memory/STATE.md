@@ -387,3 +387,16 @@
 | Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
 
 **Escolha**: `nos-vitoria`. É a condição de vitória do GDD, agora factível após controle de ilha e Súditos. Todos os números (3 Nós, 100 Resistência, −30/Nó, pulso final −10, dano cap −20, 20 s por Nó) são `[HIPÓTESE]` no GDD e devem ser rotulados como protótipo. R6 permanece **N/A**.
+
+## 2026-11-23T14:25Z — decisão 80/20 do ciclo 051 (antes da implementação)
+
+**Sessão**: `20261123T142500Z-derrota` · **Título**: `insurgencia - derrota por timeout e reconquista`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Derrota por timeout/reconquista | 4 | 3 | 4 | 4 | **192/625** |
+| Papéis W/E/R + níveis | 4 | 2 | 2 | 3 | 48/625 |
+| PVE/PNJs | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `derrota`. GDD §6.2:277 define derrota por relógio de 20 min ou 3 reconquistas; §9.4:489,501 já fornece perda de ilha e sinal `ilha_perdida`. A implementação reusa esses sinais e o contador de ilhas, sem mapa/rede. Números permanecem `[HIPÓTESE]`/protótipo. R6 permanece **N/A**.
