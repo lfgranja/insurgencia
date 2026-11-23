@@ -412,3 +412,19 @@
 | Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
 
 **Escolha**: `papeis-niveis`. GDD §10.1 fixa papéis materiais, nível 1–12 e desbloqueio Q no 1, W no 2, E no 3, R no 6 — todos rotulados `[HIPÓTESE]`. Implementação mínima: campo `funcao`, nível por pulso, desbloqueio de ações existentes por nível e HUD; novas habilidades W/E/R ficam para ciclo posterior. R6 permanece **N/A**.
+
+## 2026-11-23T15:53Z — decisão 80/20 do ciclo 053 (antes da implementação)
+
+**Sessão**: `20261123T155300Z-pnj-defensores` · **Título**: `insurgencia - pnjs defensores`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| PNJs defensores (PV + dano determinístico) | 4 | 2 | 2 | 3 | **48/625** |
+| Novas habilidades W/E/R | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `pnj-defensores`. GDD §8.4/§8.5 descreve guardas/patrulhas com dano e PV como `[HIPÓTESE]`; o ciclo implementa entidades determinísticas com PV, ataque em alcance e reação a dano do jogador, sem mapa/rede. Novas habilidades W/E/R ficam para o próximo ciclo. R6 permanece **N/A**.
+
+## 2026-11-23T16:11Z — fechamento do ciclo 053
+
+**Sessão**: `20261123T155300Z-pnj-defensores` · **Título**: `insurgencia - pnjs defensores`. Roteiro **10/10 PASS** (`.specify/validations/pnj-defensores/evidence.md`); `./verify.sh` **ALL STAGES OK**, **128 testes run: 128 passed, 0 skipped**, `VERIFY_EXIT=0`; cinco gates locais PASS após bootstrap do baseline de `specs/053-pnj-defensores/converge.md` (`files=35 baselined=35`). Implementação: `Pnj`/`Mundo.pnjs`/`adicionar_pnj`/`aplicar_dano_a_pnj` com piso zero/`atacar_pnj` nível 1/`fase_ataque_pnjs` 8 dmg a cada 90 ticks em 2 m/hash/HUD `PNJs: N`/tecla `T`. Três RED corrigidos na fonte (não em expectativa): `texto_hud` <100 linhas, piso zero do dano e asserção da transição letal. R4 PASS, R7 `1.0.0-local` pronto, R6 N/A. CI/merge/promoção pendentes nesta entrada; captura visual real **[NV]**.
