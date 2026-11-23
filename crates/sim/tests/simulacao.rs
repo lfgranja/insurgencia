@@ -2,9 +2,10 @@
 #![deny(clippy::pedantic)]
 
 use insurgencia_sim::{
-    Barreira, CodigoRecusa, Comando, Mundo, ValidacaoComandos, CUSTO_BARREIRA_MATERIAIS,
-    MAX_BARREIRAS_POR_JOGADOR, PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA,
-    TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA, TICKS_DURACAO_BARREIRA,
+    Barreira, CodigoRecusa, Comando, Mundo, Ponte, ValidacaoComandos, CUSTO_BARREIRA_MATERIAIS,
+    CUSTO_PONTE_MATERIAIS, MAX_BARREIRAS_POR_JOGADOR, PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA,
+    PV_PONTE, TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA,
+    TICKS_CONSTRUCAO_PONTE, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_PONTE,
 };
 
 /// Monta um comando `mover` com os monotônicos já preenchidos.
@@ -558,6 +559,53 @@ fn barreira_teste(
         pv,
         ticks_restantes,
         defesa_ticks: 0,
+    }
+}
+
+/// Monta um comando `construir_ponte` com os monotônicos já preenchidos.
+#[must_use]
+fn comando_ponte(peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) -> Comando {
+    Comando {
+        peer_id,
+        acao: "construir_ponte".to_string(),
+        seq,
+        request_id,
+        destino: Some(ponto),
+    }
+}
+
+/// Agenda uma construção de ponte somente após validá-la contra o estado corrente.
+fn agendar_ponte(mundo: &mut Mundo, peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) {
+    assert!(ValidacaoComandos::validar(
+        mundo,
+        peer_id,
+        "construir_ponte",
+        seq,
+        request_id,
+        Some(ponto),
+    )
+    .is_ok());
+    mundo.agendar_comando(comando_ponte(peer_id, seq, request_id, ponto));
+}
+
+/// Conclui uma ponte em `ponto`, começando em `seq_base`.
+fn concluir_ponte(mundo: &mut Mundo, peer_id: u64, seq_base: i64, ponto: (f64, f64)) {
+    for offset in 0..TICKS_CONSTRUCAO_PONTE {
+        let seq = seq_base + offset;
+        agendar_ponte(mundo, peer_id, seq, seq, ponto);
+        mundo.avancar_tick();
+    }
+}
+
+/// Monta uma ponte direta para verificações de hash.
+#[must_use]
+fn ponte_teste(id: u64, dono: u64, posicao: (f64, f64), pv: i64, ticks_restantes: i64) -> Ponte {
+    Ponte {
+        id,
+        dono,
+        posicao,
+        pv,
+        ticks_restantes,
     }
 }
 
@@ -1175,4 +1223,279 @@ fn hash_reflete_autogestao() {
         barreira.defesa_ticks = 7;
     }
     assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+}
+
+#[test]
+fn ponte_apos_45_ticks_debita_15() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.25, 0.5);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    for offset in 0..(TICKS_CONSTRUCAO_PONTE - 1) {
+        let seq = 2 + offset;
+        agendar_ponte(&mut mundo, 1, seq, seq, ponto);
+        mundo.avancar_tick();
+        let jogador = &mundo.jogadores[&1];
+        assert_eq!(jogador.ponte_ticks, 1 + offset, "tick {offset}");
+        assert_eq!(jogador.ponte_ponto, Some(ponto));
+        assert_eq!(jogador.materiais, 100);
+        assert!(mundo.pontes.is_empty());
+    }
+
+    let seq = 1 + TICKS_CONSTRUCAO_PONTE;
+    agendar_ponte(&mut mundo, 1, seq, seq, ponto);
+    mundo.avancar_tick();
+
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.materiais, 100 - CUSTO_PONTE_MATERIAIS);
+    assert_eq!(jogador.ponte_ticks, 0);
+    assert_eq!(jogador.ponte_ponto, None);
+    assert_eq!(mundo.pontes.len(), 1);
+    let ponte_construida = &mundo.pontes[&1];
+    assert_eq!(ponte_construida.id, 1);
+    assert_eq!(ponte_construida.dono, 1);
+    assert_eq!(ponte_construida.posicao, ponto);
+    assert_eq!(ponte_construida.pv, PV_PONTE);
+    assert_eq!(ponte_construida.ticks_restantes, TICKS_DURACAO_PONTE);
+    assert_eq!(mundo.proxima_ponte_id, 2);
+}
+
+#[test]
+fn saldo_14_nao_construi_ponte() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let insuficiente = CUSTO_PONTE_MATERIAIS - 1;
+    definir_materiais(&mut mundo, 1, insuficiente);
+    let ponto = (0.25, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    let recusado = ValidacaoComandos::validar(&mundo, 1, "construir_ponte", 2, 2, Some(ponto));
+    assert_eq!(recusado, Err(CodigoRecusa::SaldoInsuficiente));
+    assert_eq!(mundo.jogadores[&1].materiais, insuficiente);
+
+    // Um comando forjado não inicia canalização nem debita.
+    mundo.agendar_comando(comando_ponte(1, 2, 2, ponto));
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.ponte_ticks, 0);
+    assert_eq!(jogador.ponte_ponto, None);
+    assert_eq!(jogador.materiais, insuficiente);
+    assert!(mundo.pontes.is_empty());
+
+    // O saldo é revalidado no tick de conclusão: sem débito e sem ponte.
+    definir_materiais(&mut mundo, 1, CUSTO_PONTE_MATERIAIS);
+    for offset in 0..(TICKS_CONSTRUCAO_PONTE - 1) {
+        let seq = 3 + offset;
+        agendar_ponte(&mut mundo, 1, seq, seq, ponto);
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].ponte_ticks, TICKS_CONSTRUCAO_PONTE - 1);
+    definir_materiais(&mut mundo, 1, insuficiente);
+    let seq = 3 + TICKS_CONSTRUCAO_PONTE;
+    mundo.agendar_comando(comando_ponte(1, seq, seq, ponto));
+    mundo.avancar_tick();
+
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.materiais, insuficiente);
+    assert_eq!(jogador.ponte_ticks, 0);
+    assert_eq!(jogador.ponte_ponto, None);
+    assert!(mundo.pontes.is_empty());
+}
+
+#[test]
+fn ponte_60_pv_destruida() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.5, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+    concluir_ponte(&mut mundo, 1, 2, ponto);
+
+    assert_eq!(mundo.pontes[&1].pv, PV_PONTE);
+    assert!(!mundo.aplicar_dano_a_ponte(1, -1));
+    assert_eq!(mundo.pontes[&1].pv, PV_PONTE);
+    assert!(!mundo.aplicar_dano_a_ponte(1, PV_PONTE - 1));
+    assert_eq!(mundo.pontes[&1].pv, 1);
+    assert!(!mundo.aplicar_dano_a_ponte(1, 0));
+    assert!(!mundo.aplicar_dano_a_ponte(99, PV_PONTE));
+    assert!(mundo.aplicar_dano_a_ponte(1, 1));
+    assert!(mundo.pontes.is_empty());
+    assert!(!mundo.aplicar_dano_a_ponte(1, 1));
+}
+
+#[test]
+fn ponte_expira_apos_1350_ticks() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.5, 0.25);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+    concluir_ponte(&mut mundo, 1, 2, ponto);
+    assert_eq!(mundo.pontes[&1].ticks_restantes, TICKS_DURACAO_PONTE);
+
+    for _ in 0..(TICKS_DURACAO_PONTE - 1) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.pontes[&1].ticks_restantes, 1);
+    mundo.avancar_tick();
+    assert!(mundo.pontes.is_empty());
+    assert_eq!(mundo.proxima_ponte_id, 2);
+}
+
+#[test]
+fn ponte_apos_um_unico_comando() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.25, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    // Uma única tecla P inicia a canalização; os 44 ticks seguintes são
+    // automáticos, sem qualquer comando adicional na fila.
+    agendar_ponte(&mut mundo, 1, 2, 2, ponto);
+    for tick in 0..TICKS_CONSTRUCAO_PONTE {
+        mundo.avancar_tick();
+        assert!(mundo.comandos_pendentes.is_empty());
+        assert!(mundo.comandos_do_tick.is_empty());
+        assert_eq!(mundo.jogadores[&1].seq, 2, "tick {tick}");
+        if tick < TICKS_CONSTRUCAO_PONTE - 1 {
+            assert_eq!(mundo.jogadores[&1].ponte_ticks, tick + 1, "tick {tick}");
+            assert_eq!(mundo.jogadores[&1].ponte_ponto, Some(ponto));
+            assert_eq!(mundo.jogadores[&1].materiais, 100);
+            assert!(mundo.pontes.is_empty(), "tick {tick}");
+        }
+    }
+
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.materiais, 100 - CUSTO_PONTE_MATERIAIS);
+    assert_eq!(jogador.ponte_ticks, 0);
+    assert_eq!(jogador.ponte_ponto, None);
+    assert_eq!(mundo.pontes.len(), 1);
+    assert_eq!(mundo.pontes[&1].dono, 1);
+    assert_eq!(mundo.pontes[&1].posicao, ponto);
+    assert_eq!(mundo.pontes[&1].pv, PV_PONTE);
+    assert_eq!(mundo.pontes[&1].ticks_restantes, TICKS_DURACAO_PONTE);
+}
+
+#[test]
+fn hash_reflete_pontes() {
+    let mut primeira = Mundo::new();
+    let mut segunda = Mundo::new();
+    for mundo in [&mut primeira, &mut segunda] {
+        mundo.adicionar_jogador(1);
+    }
+    let sem_pontes = primeira.hash_estado();
+    primeira
+        .pontes
+        .insert(1, ponte_teste(1, 1, (0.5, 0.0), PV_PONTE, 10));
+    primeira
+        .pontes
+        .insert(2, ponte_teste(2, 1, (-0.5, 0.0), 30, 20));
+    // Ordem de inserção distinta: a iteração do BTreeMap é canônica.
+    segunda
+        .pontes
+        .insert(2, ponte_teste(2, 1, (-0.5, 0.0), 30, 20));
+    segunda
+        .pontes
+        .insert(1, ponte_teste(1, 1, (0.5, 0.0), PV_PONTE, 10));
+    assert_ne!(primeira.hash_estado(), sem_pontes);
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    if let Some(ponte) = primeira.pontes.get_mut(&2) {
+        ponte.pv -= 1;
+    }
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+    if let Some(ponte) = primeira.pontes.get_mut(&2) {
+        ponte.pv += 1;
+        ponte.ticks_restantes -= 1;
+    }
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+
+    let mut com_canalizacao = Mundo::new();
+    com_canalizacao.adicionar_jogador(1);
+    let hash_sem_canalizacao = com_canalizacao.hash_estado();
+    if let Some(jogador) = com_canalizacao.jogadores.get_mut(&1) {
+        jogador.ponte_ticks = 3;
+        jogador.ponte_ponto = Some((0.25, 0.0));
+    }
+    assert_ne!(com_canalizacao.hash_estado(), hash_sem_canalizacao);
+}
+
+#[test]
+fn ponte_fora_do_ponto_recusada() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.25, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    let aceita = ValidacaoComandos::validar(&mundo, 1, "construir_ponte", 2, 2, Some(ponto));
+    assert!(aceita.is_ok());
+    let fora = ValidacaoComandos::validar(&mundo, 1, "construir_ponte", 2, 2, Some((0.75, 0.0)));
+    assert_eq!(fora, Err(CodigoRecusa::DestinoInvalido));
+    let sem_destino = ValidacaoComandos::validar(&mundo, 1, "construir_ponte", 2, 2, None);
+    assert_eq!(sem_destino, Err(CodigoRecusa::DestinoInvalido));
+
+    mundo.agendar_comando(comando_ponte(1, 2, 2, (0.75, 0.0)));
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.ponte_ticks, 0);
+    assert_eq!(jogador.ponte_ponto, None);
+    assert_eq!(jogador.materiais, 100);
+    assert!(mundo.pontes.is_empty());
+}
+
+#[test]
+fn movimento_cancela_ponte() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.25, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+    agendar_ponte(&mut mundo, 1, 2, 2, ponto);
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].ponte_ticks, 1);
+
+    agendar_mover(&mut mundo, 1, 3, 3, (0.5, 0.0));
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.ponte_ticks, 0);
+    assert_eq!(jogador.ponte_ponto, None);
+    assert_eq!(jogador.materiais, 100);
+
+    for _ in 0..TICKS_CONSTRUCAO_PONTE {
+        mundo.avancar_tick();
+    }
+    assert!(mundo.pontes.is_empty());
+    assert_eq!(mundo.jogadores[&1].materiais, 100);
+}
+
+#[test]
+fn dupla_construcao_ponte_no_mesmo_tick_nao_acelera() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.25, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    mundo.agendar_comando(comando_ponte(1, 2, 2, ponto));
+    mundo.agendar_comando(comando_ponte(1, 3, 3, ponto));
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].ponte_ticks, 1);
+
+    for _ in 0..(TICKS_CONSTRUCAO_PONTE - 1) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.pontes.len(), 1);
+    assert_eq!(mundo.jogadores[&1].materiais, 100 - CUSTO_PONTE_MATERIAIS);
 }
