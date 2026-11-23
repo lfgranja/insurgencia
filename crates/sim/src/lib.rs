@@ -60,6 +60,30 @@ pub const TICKS_REVERSAO_SUDITO: i64 = 90;
 /// (10 s a 30 Hz; derivação de protótipo, não número canônico).
 pub const TICKS_CONTROLE_ILHA: i64 = 300;
 
+/// Número de Nós de Controle do protótipo (`[HIPÓTESE]` da GDD §6.2, nunca cânone).
+pub const TOTAL_NOS: usize = 3;
+
+/// Resistência Ideológica inicial (`[HIPÓTESE]`/derivação de protótipo, não cânone).
+pub const RESISTENCIA_INICIAL: i64 = 100;
+
+/// Resistência removida por cada Nó convertido (`[HIPÓTESE]`/protótipo, não cânone).
+pub const CONTRIBUICAO_NO: i64 = 30;
+
+/// Teto de dano por Nó (`[HIPÓTESE]`/protótipo, não cânone).
+pub const DANO_MAXIMO_NOS: i64 = 20;
+
+/// Piso da Resistência enquanto restar Nó não convertido (`[HIPÓTESE]`, não cânone).
+pub const PISO_DANO_COM_NOS: i64 = 10;
+
+/// Ticks de Propaganda para converter um Nó (20 s × 30 Hz; protótipo, não cânone).
+pub const TICKS_PROPAGANDA_NO: i64 = 600;
+
+/// Ticks de inatividade de um Nó após dano (20 s × 30 Hz; protótipo, não cânone).
+pub const TICKS_INATIVIDADE_NO: i64 = 600;
+
+/// Pulso final que encerra a Resistência (`[HIPÓTESE]`/protótipo, não cânone).
+pub const PULSO_FINAL: i64 = 10;
+
 /// Fôlego máximo por jogador: `[HIPÓTESE]` da GDD §10.1, escolha de protótipo, não cânone.
 pub const FOLEGO_MAXIMO: i64 = 100;
 
@@ -106,11 +130,22 @@ const ACOES_PERMITIDAS: &[&str] = &[
     "atacar_forte",
     "construir_ponte",
     "propaganda",
+    "propaganda_no",
+    "atacar_no",
 ];
 
 /// Compara dois pontos sem depender de tolerância de arredondamento.
 fn ponto_igual(a: (f64, f64), b: (f64, f64)) -> bool {
     a.0.total_cmp(&b.0).is_eq() && a.1.total_cmp(&b.1).is_eq()
+}
+
+/// Origem do alvo de Nó fixado no jogador.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum AcaoNo {
+    /// Propaganda em curso; também o padrão quando o alvo é injetado diretamente.
+    Propaganda,
+    /// Dano aplicado; sozinho, não inicia Propaganda em um Nó intacto.
+    Ataque,
 }
 
 /// Estado de um jogador na simulação.
@@ -144,6 +179,9 @@ pub struct Jogador {
     pub ponte_ponto: Option<(f64, f64)>,
     /// Súdito alvejado pela Propaganda em curso.
     pub propaganda_alvo: Option<u64>,
+    /// Nó de Controle alvejado por `propaganda_no` ou `atacar_no`.
+    pub no_alvo: Option<u64>,
+    no_acao_no: AcaoNo,
     /// Fôlego corrente, limitado a `FOLEGO_MAXIMO` (`[HIPÓTESE]`/protótipo).
     pub folego: i64,
     /// Ticks acumulados para a próxima regeneração de Fôlego (`[HIPÓTESE]`/protótipo).
@@ -212,6 +250,30 @@ pub struct Ilha {
     pub controle_ticks: i64,
 }
 
+/// Nó de Controle cuja conversão depende de Propaganda canalizada.
+///
+/// Todos os números e a posição fixa são derivações de protótipo (`[HIPÓTESE]`), não cânone.
+#[derive(Clone, Copy, Debug)]
+pub struct NoControle {
+    /// Identificador determinístico do Nó.
+    pub id: u64,
+    /// Posição fixa no plano `(x, y)`; simplificação de mapa do protótipo.
+    pub posicao: (f64, f64),
+    /// `true` ao completar `TICKS_PROPAGANDA_NO` ticks de Propaganda.
+    pub convertido: bool,
+    /// Ticks de Propaganda acumulados, saturando em `TICKS_PROPAGANDA_NO`.
+    pub propaganda_ticks: i64,
+    /// Ticks restantes de inatividade após dano (`[HIPÓTESE]`/protótipo).
+    pub inativo_ticks: i64,
+}
+
+/// Desfecho observável da partida; o protótipo implementa apenas a vitória.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ResultadoPartida {
+    /// Autogestão estabelecida pela conversão dos Nós e pelo pulso final.
+    Vitoria,
+}
+
 /// Comando enfileirado por um par para o próximo tick.
 #[derive(Clone, Debug)]
 pub struct Comando {
@@ -255,6 +317,12 @@ pub struct Mundo {
     pub suditos: BTreeMap<u64, Sudito>,
     /// Ilhas indexadas por `id`, em ordem determinística.
     pub ilhas: BTreeMap<u64, Ilha>,
+    /// Nós de Controle indexados por `id`, em ordem determinística.
+    pub nos: BTreeMap<u64, NoControle>,
+    /// Resistência Ideológica corrente (`[HIPÓTESE]`/protótipo, não cânone).
+    pub resistencia_ideologica: i64,
+    /// Desfecho da partida; `None` até o pulso final de vitória.
+    pub resultado: Option<ResultadoPartida>,
     /// Fila de sinais pendentes em ordem FIFO; não é um histórico completo
     /// dos sinais emitidos.
     pub sinais: VecDeque<String>,
@@ -284,6 +352,9 @@ impl Mundo {
             suditos: BTreeMap::new(),
             ilhas: BTreeMap::new(),
             sinais: VecDeque::new(),
+            nos: BTreeMap::new(),
+            resistencia_ideologica: RESISTENCIA_INICIAL,
+            resultado: None,
         }
     }
 
@@ -309,6 +380,8 @@ impl Mundo {
                 ponte_ticks: 0,
                 ponte_ponto: None,
                 propaganda_alvo: None,
+                no_alvo: None,
+                no_acao_no: AcaoNo::Propaganda,
             },
         );
     }
@@ -340,6 +413,20 @@ impl Mundo {
                 id,
                 controlada: false,
                 controle_ticks: 0,
+            },
+        );
+    }
+
+    /// Insere (ou reinicia) um Nó com progresso zerado na posição fixa informada.
+    pub fn adicionar_no(&mut self, id: u64, posicao: (f64, f64)) {
+        self.nos.insert(
+            id,
+            NoControle {
+                id,
+                posicao,
+                convertido: false,
+                propaganda_ticks: 0,
+                inativo_ticks: 0,
             },
         );
     }
@@ -426,12 +513,15 @@ impl Mundo {
         self.comandos_pendentes.push_back(comando);
     }
 
-    /// Avança um tick nas fases `prepare`, `skills`, `defesa`, `controle_ilhas` e `finish`.
+    /// Avança um tick nas fases `prepare`, `skills`, `defesa`, `controle_ilhas`,
+    /// `vitoria` e `finish`.
     pub fn avancar_tick(&mut self) {
+        let convertidos_no_inicio = self.nos.values().filter(|no| no.convertido).count();
         self.fase_prepare();
         self.fase_skills();
         self.fase_defesa();
         self.fase_controle_ilhas();
+        self.fase_vitoria(convertidos_no_inicio);
         self.fase_finish();
         self.avancar_reversoes();
         self.tick += 1;
@@ -451,6 +541,9 @@ impl Mundo {
         self.avancar_construcoes_ponte_automaticas(&mut construcao_ponte_avancada);
         let mut propaganda_avancada: BTreeSet<u64> = BTreeSet::new();
         self.avancar_propagandas_automaticas(&mut propaganda_avancada);
+        let mut propaganda_no_avancada: BTreeSet<u64> = BTreeSet::new();
+        self.avancar_propagandas_no_automaticas(&mut propaganda_no_avancada);
+        let mut ataque_no_avancado: BTreeSet<u64> = BTreeSet::new();
         let comandos = std::mem::take(&mut self.comandos_do_tick);
         let mut ataques_realizados: BTreeSet<u64> = BTreeSet::new();
 
@@ -470,6 +563,7 @@ impl Mundo {
                                     sudito.propaganda_ticks = 0;
                                 }
                             }
+                            jogador.no_alvo = None;
                             jogador.posicao = destino;
                         }
                     }
@@ -484,6 +578,10 @@ impl Mundo {
                 self.aplicar_construcao_ponte(comando, &mut construcao_ponte_avancada);
             } else if comando.acao == "propaganda" {
                 self.aplicar_propaganda(comando, &mut propaganda_avancada);
+            } else if comando.acao == "propaganda_no" {
+                self.aplicar_propaganda_no(comando, &mut propaganda_no_avancada);
+            } else if comando.acao == "atacar_no" {
+                self.aplicar_atacar_no(comando, &mut ataque_no_avancado);
             }
             if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
                 jogador.seq = comando.seq;
@@ -928,6 +1026,160 @@ impl Mundo {
         }
     }
 
+    /// Encontra o Nó em `ponto`, preferindo o menor `id` em caso de empate.
+    fn no_id_em_ponto(&self, ponto: (f64, f64)) -> Option<u64> {
+        self.nos
+            .iter()
+            .find(|(_, no)| ponto_igual(no.posicao, ponto))
+            .map(|(&id, _)| id)
+    }
+
+    /// Fixa o alvo e avança a Propaganda em um tick, no máximo uma vez por Nó.
+    fn aplicar_propaganda_no(&mut self, comando: &Comando, avancada: &mut BTreeSet<u64>) {
+        let Some(ponto) = comando.destino else {
+            return;
+        };
+        let Some(id) = self.no_id_em_ponto(ponto) else {
+            return;
+        };
+        let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) else {
+            return;
+        };
+        if !ponto_igual(ponto, jogador.posicao) {
+            return;
+        }
+        jogador.no_alvo = Some(id);
+        jogador.no_acao_no = AcaoNo::Propaganda;
+        if avancada.contains(&id) {
+            return;
+        }
+        avancada.insert(id);
+        self.avancar_propaganda_no(id);
+    }
+
+    /// Avança a Propaganda automática enquanto o jogador permanece no ponto do Nó.
+    fn avancar_propagandas_no_automaticas(&mut self, avancada: &mut BTreeSet<u64>) {
+        let alvos: Vec<(u64, u64, (f64, f64), AcaoNo)> = self
+            .jogadores
+            .iter()
+            .filter_map(|(&peer_id, jogador)| {
+                jogador
+                    .no_alvo
+                    .map(|id| (peer_id, id, jogador.posicao, jogador.no_acao_no))
+            })
+            .collect();
+        for (peer_id, id, posicao, acao) in alvos {
+            let Some(no) = self.nos.get(&id) else {
+                continue;
+            };
+            if !ponto_igual(no.posicao, posicao) {
+                if let Some(jogador) = self.jogadores.get_mut(&peer_id) {
+                    jogador.no_alvo = None;
+                }
+                continue;
+            }
+            let sem_propaganda_previa = acao == AcaoNo::Ataque && no.propaganda_ticks == 0;
+            if no.convertido
+                || no.inativo_ticks > 0
+                || avancada.contains(&id)
+                || sem_propaganda_previa
+            {
+                continue;
+            }
+            avancada.insert(id);
+            self.avancar_propaganda_no(id);
+        }
+    }
+
+    /// Avança a exposição e converte o Nó ao atingir o limiar de protótipo.
+    fn avancar_propaganda_no(&mut self, id: u64) {
+        let convertido_agora = {
+            let Some(no) = self.nos.get_mut(&id) else {
+                return;
+            };
+            if no.convertido || no.inativo_ticks > 0 {
+                return;
+            }
+            no.propaganda_ticks = (no.propaganda_ticks + 1).min(TICKS_PROPAGANDA_NO);
+            no.convertido = no.propaganda_ticks == TICKS_PROPAGANDA_NO;
+            no.convertido
+        };
+        if convertido_agora {
+            self.resistencia_ideologica =
+                self.resistencia_ideologica.saturating_sub(CONTRIBUICAO_NO);
+        }
+    }
+
+    /// Fixa o alvo e aplica dano limitado, sem converter o Nó nem apagar Propaganda.
+    fn aplicar_atacar_no(&mut self, comando: &Comando, avancada: &mut BTreeSet<u64>) {
+        let Some(ponto) = comando.destino else {
+            return;
+        };
+        let Some(id) = self.no_id_em_ponto(ponto) else {
+            return;
+        };
+        let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) else {
+            return;
+        };
+        if !ponto_igual(ponto, jogador.posicao) {
+            return;
+        }
+        jogador.no_alvo = Some(id);
+        jogador.no_acao_no = AcaoNo::Ataque;
+        if avancada.contains(&id) || self.resultado.is_some() {
+            return;
+        }
+        avancada.insert(id);
+        if self.nos.values().filter(|no| no.convertido).count() >= TOTAL_NOS {
+            return;
+        }
+        let Some(no) = self.nos.get(&id) else {
+            return;
+        };
+        if no.convertido || no.inativo_ticks > 0 {
+            return;
+        }
+        let mut piso = RESISTENCIA_INICIAL - DANO_MAXIMO_NOS;
+        for _ in self.nos.values().filter(|no| no.convertido) {
+            piso -= CONTRIBUICAO_NO;
+        }
+        let piso = piso.max(PISO_DANO_COM_NOS);
+        let dano = self
+            .resistencia_ideologica
+            .saturating_sub(piso)
+            .min(DANO_MAXIMO_NOS);
+        self.resistencia_ideologica = self.resistencia_ideologica.saturating_sub(dano);
+        if let Some(no) = self.nos.get_mut(&id) {
+            // A unidade extra é consumida por `fase_vitoria` no próprio tick do dano.
+            no.inativo_ticks = TICKS_INATIVIDADE_NO + 1;
+        }
+    }
+
+    /// Decrementa a inatividade dos Nós e aplica o pulso final de vitória.
+    ///
+    /// A contagem de convertidos no início do tick garante que a terceira conversão
+    /// gere o pulso apenas no tick seguinte (`[HIPÓTESE]`/protótipo, não cânone).
+    fn fase_vitoria(&mut self, convertidos_no_inicio: usize) {
+        for no in self.nos.values_mut() {
+            no.inativo_ticks = no.inativo_ticks.saturating_sub(1);
+        }
+        if self.resultado.is_some()
+            || self.nos.len() != TOTAL_NOS
+            || convertidos_no_inicio != TOTAL_NOS
+        {
+            return;
+        }
+        let mut resistencia_esperada = RESISTENCIA_INICIAL;
+        for _ in 0..TOTAL_NOS {
+            resistencia_esperada -= CONTRIBUICAO_NO;
+        }
+        if self.resistencia_ideologica != resistencia_esperada {
+            return;
+        }
+        self.resistencia_ideologica = self.resistencia_ideologica.saturating_sub(PULSO_FINAL);
+        self.resultado = Some(ResultadoPartida::Vitoria);
+    }
+
     /// Descarta comandos, regenera Fôlego e expira barricadas e pontes vencidas.
     fn fase_finish(&mut self) {
         self.comandos_do_tick.clear();
@@ -977,7 +1229,7 @@ impl Mundo {
                 format!(
                     concat!(
                         "{0}:{1}:{2}:{3}:{4}:{5}:{6}:{7}:{8}:{9:?}:{10}:{11:?}:",
-                        "{12}:{13}:{14:?}:{15:?}:{16}:{17}:{18}"
+                        "{12}:{13}:{14:?}:{15:?}:{16}:{17}:{18}:{19:?}"
                     ),
                     peer_id,
                     x,
@@ -998,6 +1250,7 @@ impl Mundo {
                     jogador.folego,
                     jogador.folego_ticks,
                     jogador.combate_ticks,
+                    jogador.no_alvo,
                 )
             })
             .collect::<Vec<_>>()
@@ -1065,8 +1318,26 @@ impl Mundo {
             .collect::<Vec<_>>()
             .join(";");
 
+        let nos: String = self
+            .nos
+            .values()
+            .map(|no| {
+                let (x, y) = no.posicao;
+                let id = no.id;
+                let convertido = no.convertido;
+                let propaganda = no.propaganda_ticks;
+                let inatividade = no.inativo_ticks;
+                format!("{id}:{x}:{y}:{convertido}:{propaganda}:{inatividade}")
+            })
+            .collect::<Vec<_>>()
+            .join(";");
+        let resultado = match self.resultado {
+            Some(ResultadoPartida::Vitoria) => "vitoria",
+            None => "nenhum",
+        };
+
         let entrada = format!(
-            "{0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}",
+            "{0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}|{9}|{10}|{11}",
             self.tick,
             self.epoch,
             self.match_id,
@@ -1076,6 +1347,9 @@ impl Mundo {
             suditos,
             ilhas,
             sinais,
+            nos,
+            self.resistencia_ideologica,
+            resultado,
         );
         let resumo = Sha256::digest(entrada.as_bytes());
         format!("{resumo:x}")
@@ -1101,7 +1375,8 @@ pub enum CodigoRecusa {
     #[error("folego insuficiente")]
     FolegoInsuficiente,
     /// Destino ausente ou fora do ponto para `mover`, `coletar_materiais`,
-    /// `construir_barreira`, `construir_ponte` ou sem Súdito para `propaganda`.
+    /// `construir_barreira`, `construir_ponte`, `propaganda`, `propaganda_no` ou
+    /// `atacar_no`; Nó inativo também recusa `atacar_no`.
     #[error("destino ausente ou fora do ponto")]
     DestinoInvalido,
     /// Deslocamento acima de `LIMITE_MOVIMENTO_M`.
@@ -1125,6 +1400,7 @@ impl ValidacaoComandos {
     /// par, replay, ação, destino (incluindo o limite de distância de `mover`),
     /// alvo/alcance e Fôlego para `atacar_forte`, saldo para `construir_barreira`
     /// e `construir_ponte`; `propaganda` exige Súdito no ponto do jogador.
+    /// `propaganda_no`/`atacar_no` exigem Nó no ponto do jogador e não exigem saldo ou Fôlego.
     pub fn validar(
         mundo: &Mundo,
         peer_id: u64,
@@ -1203,6 +1479,19 @@ impl ValidacaoComandos {
             let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
             let no_ponto = mundo.sudito_id_em_ponto(ponto).is_some();
             if !ponto_igual(ponto, jogador.posicao) || !no_ponto {
+                return Err(CodigoRecusa::DestinoInvalido);
+            }
+        }
+
+        if acao == "propaganda_no" || acao == "atacar_no" {
+            let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
+            if !ponto_igual(ponto, jogador.posicao) {
+                return Err(CodigoRecusa::DestinoInvalido);
+            }
+            let Some(id) = mundo.no_id_em_ponto(ponto) else {
+                return Err(CodigoRecusa::DestinoInvalido);
+            };
+            if acao == "atacar_no" && mundo.nos[&id].inativo_ticks > 0 {
                 return Err(CodigoRecusa::DestinoInvalido);
             }
         }

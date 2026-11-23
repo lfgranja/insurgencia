@@ -125,6 +125,10 @@
     "specs/049-ilhas-vitoria/converge.md": {
       "bytes": 8187,
       "sha256": "e6e4f86aeca066a3d1e767a6a255d87ff8a039cf717a512b5ab0898bd3b50337"
+    },
+    "specs/050-nos-vitoria/converge.md": {
+      "bytes": 9086,
+      "sha256": "59408e00f1542d7e902d0d08421ffe79f1804eb2d97a3d66132f5a2fdc13d264"
     }
   },
   "_provenance": {
