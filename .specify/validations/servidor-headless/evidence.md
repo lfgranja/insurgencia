@@ -26,5 +26,5 @@
 ### Reexecução final — 2026-11-23T04:45Z
 
 - Roteiro reexecutado após a correção do snapshot: CLI aceita `1`/`3` e rejeita `0`/`-1`/`abc`/ausência com exit 2; 6+5 testes do crate PASS; stdin com dois comandos gera 2 ticks; `--ticks 3` emite exatamente 3 linhas com ticks `0,1,2`; `cmp_exit=0`; 5 casos malformados rejeitados com exit 2; nenhuma dependência/`allow`/`unwrap`/`expect`/async/socket; 5 gates locais PASS. Capturas: `/tmp/tmp.9zdb7J9z25/saidas/`.
-- **Linha 0 corrigida**: `c4d3c5cf874bd14bd4da189756830e80cb6000ac8b6e3f53dcfa93d599ba8747` = `Mundo::new().hash_estado()` (estado inicial), seguida por `95746704…` e `162de773…` nos ticks 1 e 2. O teste de integração `primeira_linha_com_stdin_vazia_e_o_estado_inicial` cobre esse contrato.
+- **Linha 0 corrigida**: `c4d3c5cf874bd14bd4da189756830e80cb6000ac8b6e3f53dcfa93d599ba8747` = estado **após registrar o `peer_id=1` e agendar seus comandos, antes do primeiro tick**. Para stdin vazia, o teste `primeira_linha_com_stdin_vazia_e_o_estado_inicial` compara a linha `0` ao hash de `Mundo::new()`; as linhas seguintes da captura são `95746704…` e `162de773…` nos ticks 1 e 2.
 - **Gate final (04:44:39Z)**: `verify.sh` **ALL STAGES OK**, **72 testes run: 72 passed** (71 anteriores + 1 novo teste de integração). O verde anterior de 71 testes foi descartado; a decisão usa o head corrigido.
