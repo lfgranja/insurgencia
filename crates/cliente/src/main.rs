@@ -92,6 +92,7 @@ fn main() {
                 solicitar_coleta,
                 solicitar_ponte,
                 solicitar_propaganda,
+                solicitar_ataque,
                 sincronizar_sim,
                 avancar_simulacao,
                 atualizar_texto,
@@ -679,6 +680,36 @@ fn solicitar_propaganda(
     });
 }
 
+/// Agenda um ataque forte ao pressionar `Q`, usando a própria posição como alvo aproximado.
+///
+/// Protótipo sem mira: o `destino` é a posição atual do jogador local; a simulação
+/// valida a distância e escolhe o alvo no alcance de contato.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_ataque(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyQ) {
+        return;
+    }
+
+    local.seq += 1;
+    local.request_id += 1;
+    let (x, y) = jogador.0.posicao;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "atacar_forte".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some((f64::from(x), f64::from(y))),
+    });
+}
+
 /// Copia a posição do estado para a transformação 3D do avatar no plano do mapa.
 #[expect(
     clippy::needless_pass_by_value,
@@ -727,7 +758,8 @@ fn avancar_simulacao(
     }
 }
 
-/// Atualiza o painel com recursos, barreiras, pontes e progresso de construção e coleta.
+/// Atualiza o painel com recursos, Fôlego, Vida, barreiras, pontes e progresso de
+/// construção e coleta.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
@@ -747,6 +779,8 @@ fn atualizar_texto(
     let materiais = remoto.map_or(0, |j| j.materiais);
     let suprimentos = remoto.map_or(0, |j| j.suprimentos);
     let autogestao = remoto.map_or(0, |j| j.pontos_autogestao);
+    let folego = remoto.map_or(0, |j| j.folego);
+    let vida = remoto.map_or(0, |j| j.vida);
     let barreiras = simulacao
         .0
         .barreiras
@@ -778,7 +812,32 @@ fn atualizar_texto(
         _ => "nao".to_owned(),
     };
     let conteudo = format!(
-        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nSuprimentos: {suprimentos}\nMateriais: {materiais}\nAutogestão: {autogestao}\nBarreiras: {barreiras}\nPontes: {pontes}\nSúditos: {suditos}\nConstruindo: {construindo}\nColeta: {coletando}\nWASD ou setas para mover · B para construir barreira · P para construir ponte · C para coletar materiais · G para propaganda"
+        concat!(
+            "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\n",
+            "Limites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\n",
+            "Suprimentos: {suprimentos}\nMateriais: {materiais}\n",
+            "Fôlego: {folego}\nVida: {vida}\n",
+            "Autogestão: {autogestao}\nBarreiras: {barreiras}\n",
+            "Pontes: {pontes}\nSúditos: {suditos}\n",
+            "Construindo: {construindo}\nColeta: {coletando}\n",
+            "WASD ou setas para mover · B para construir barreira · P para construir ponte · ",
+            "C para coletar materiais · G para propaganda · Q para atacar"
+        ),
+        x = x,
+        y = y,
+        ilha = ilha,
+        LIMITE_X = LIMITE_X,
+        LIMITE_Y = LIMITE_Y,
+        suprimentos = suprimentos,
+        materiais = materiais,
+        folego = folego,
+        vida = vida,
+        autogestao = autogestao,
+        barreiras = barreiras,
+        pontes = pontes,
+        suditos = suditos,
+        construindo = construindo,
+        coletando = coletando,
     );
 
     for mut texto in &mut textos {

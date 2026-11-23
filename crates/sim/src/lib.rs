@@ -56,6 +56,39 @@ pub const TICKS_PROPAGANDA: i64 = 120;
 /// Ticks de reversão da conversão de um Súdito após dano de jogador (3 s a 30 Hz).
 pub const TICKS_REVERSAO_SUDITO: i64 = 90;
 
+/// Fôlego máximo por jogador: `[HIPÓTESE]` da GDD §10.1, escolha de protótipo, não cânone.
+pub const FOLEGO_MAXIMO: i64 = 100;
+
+/// Ticks por +1 Fôlego fora de combate (10/s a 30 Hz): `[HIPÓTESE]`/protótipo, não cânone.
+pub const TICKS_REGENERACAO_FORA_COMBATE: i64 = 3;
+
+/// Ticks por +1 Fôlego em combate (5/s a 30 Hz): `[HIPÓTESE]`/protótipo, não cânone.
+pub const TICKS_REGENERACAO_COMBATE: i64 = 6;
+
+/// Custo de Fôlego de `atacar_forte`: `[HIPÓTESE]` de protótipo, não cânone.
+pub const CUSTO_ATAQUE_FOLEGO: i64 = 30;
+
+/// Dano de `atacar_forte`: `[HIPÓTESE]` de protótipo, não cânone.
+pub const DANO_ATAQUE: i64 = 10;
+
+/// Alcance de contato do ataque, em metros: `[HIPÓTESE]`/protótipo, não cânone.
+pub const ALCANCE_CONTATO_M: f64 = 2.0;
+
+/// Duração do estado de combate em ticks (3 s a 30 Hz): `[HIPÓTESE]`/protótipo, não cânone.
+pub const TICKS_COMBATE: i64 = 90;
+
+/// Nome alternativo do custo na spec 047 (`[HIPÓTESE]`/protótipo, não cânone).
+pub const CUSTO_ATAQUE_FORTE: i64 = CUSTO_ATAQUE_FOLEGO;
+
+/// Nome alternativo do dano na spec 047 (`[HIPÓTESE]`/protótipo, não cânone).
+pub const DANO_ATAQUE_FORTE: i64 = DANO_ATAQUE;
+
+/// Nome alternativo da regeneração fora de combate na spec 047 (`[HIPÓTESE]`, não cânone).
+pub const FOLEGO_REGENERACAO_FORA: i64 = 10;
+
+/// Nome alternativo da regeneração em combate na spec 047 (`[HIPÓTESE]`, não cânone).
+pub const FOLEGO_REGENERACAO_COMBATE: i64 = 5;
+
 /// Distância máxima de um comando `mover`, em metros.
 const LIMITE_MOVIMENTO_M: f64 = 1.0;
 
@@ -107,6 +140,12 @@ pub struct Jogador {
     pub ponte_ponto: Option<(f64, f64)>,
     /// Súdito alvejado pela Propaganda em curso.
     pub propaganda_alvo: Option<u64>,
+    /// Fôlego corrente, limitado a `FOLEGO_MAXIMO` (`[HIPÓTESE]`/protótipo).
+    pub folego: i64,
+    /// Ticks acumulados para a próxima regeneração de Fôlego (`[HIPÓTESE]`/protótipo).
+    pub folego_ticks: i64,
+    /// Ticks restantes de combate; a taxa de regeneração muda enquanto for positivo.
+    pub combate_ticks: i64,
 }
 
 /// Barricada ativa no mundo, identificada por `id`.
@@ -231,6 +270,9 @@ impl Mundo {
             Jogador {
                 posicao: (0.0, 0.0),
                 vida: 100,
+                folego: FOLEGO_MAXIMO,
+                folego_ticks: 0,
+                combate_ticks: 0,
                 seq: 0,
                 request_id: 0,
                 materiais: 0,
@@ -373,6 +415,7 @@ impl Mundo {
         let mut propaganda_avancada: BTreeSet<u64> = BTreeSet::new();
         self.avancar_propagandas_automaticas(&mut propaganda_avancada);
         let comandos = std::mem::take(&mut self.comandos_do_tick);
+        let mut ataques_realizados: BTreeSet<u64> = BTreeSet::new();
 
         for comando in &comandos {
             if comando.acao == "mover" {
@@ -394,6 +437,8 @@ impl Mundo {
                         }
                     }
                 }
+            } else if comando.acao == "atacar_forte" {
+                self.aplicar_ataque(comando, &mut ataques_realizados);
             } else if comando.acao == "coletar_materiais" {
                 self.aplicar_coleta(comando, &mut coleta_avancada);
             } else if comando.acao == "construir_barreira" {
@@ -410,6 +455,49 @@ impl Mundo {
         }
         self.avancar_coletas_automaticas(&mut coleta_avancada);
         self.comandos_do_tick = comandos;
+    }
+
+    /// Aplica no máximo um `atacar_forte` por atacante a cada tick.
+    fn aplicar_ataque(&mut self, comando: &Comando, ataques: &mut BTreeSet<u64>) {
+        if !ataques.insert(comando.peer_id) {
+            return;
+        }
+        let Some(destino) = comando.destino else {
+            return;
+        };
+        let Some((origem, folego)) = self
+            .jogadores
+            .get(&comando.peer_id)
+            .map(|jogador| (jogador.posicao, jogador.folego))
+        else {
+            return;
+        };
+        let alvo = self
+            .jogadores
+            .iter()
+            .find(|(&peer_id, jogador)| {
+                peer_id != comando.peer_id && ponto_igual(jogador.posicao, destino)
+            })
+            .map(|(&peer_id, _)| peer_id);
+        let Some(alvo) = alvo else {
+            return;
+        };
+        if (destino.0 - origem.0).hypot(destino.1 - origem.1) > ALCANCE_CONTATO_M {
+            return;
+        }
+        if folego < CUSTO_ATAQUE_FOLEGO {
+            return;
+        }
+        if let Some(atacante) = self.jogadores.get_mut(&comando.peer_id) {
+            atacante.folego = atacante.folego.saturating_sub(CUSTO_ATAQUE_FOLEGO);
+            // A unidade extra é consumida por `fase_finish` no próprio tick do ataque.
+            atacante.combate_ticks = TICKS_COMBATE + 1;
+        }
+        if let Some(vitima) = self.jogadores.get_mut(&alvo) {
+            // FR-001/SC-001 da spec 047: vida nunca negativa, mesmo partindo de valor < 0.
+            vitima.vida = vitima.vida.saturating_sub(DANO_ATAQUE).max(0);
+            vitima.combate_ticks = TICKS_COMBATE + 1;
+        }
     }
 
     /// Avança a defesa das barricadas intactas, creditando autogestão a cada 300 ticks.
@@ -774,9 +862,10 @@ impl Mundo {
         }
     }
 
-    /// Descarta os comandos já aplicados e expira barricadas e pontes vencidas.
+    /// Descarta comandos, regenera Fôlego e expira barricadas e pontes vencidas.
     fn fase_finish(&mut self) {
         self.comandos_do_tick.clear();
+        self.regenerar_folego();
         self.barreiras.retain(|_, barreira| {
             // A unidade extra da criação é consumida no próprio tick de criação;
             // o último tick decrementa de 1 para 0 e remove a barricada.
@@ -793,6 +882,26 @@ impl Mundo {
         });
     }
 
+    /// Regenera o Fôlego com acumulador próprio, em ordem estável de `peer_id`.
+    ///
+    /// Em combate a taxa é +1 a cada 6 ticks; fora de combate, +1 a cada 3 ticks
+    /// (`[HIPÓTESE]`/protótipo, não cânone). `combate_ticks` decresce um por tick.
+    fn regenerar_folego(&mut self) {
+        for jogador in self.jogadores.values_mut() {
+            jogador.folego_ticks += 1;
+            let periodo = if jogador.combate_ticks > 0 {
+                jogador.combate_ticks -= 1;
+                TICKS_REGENERACAO_COMBATE
+            } else {
+                TICKS_REGENERACAO_FORA_COMBATE
+            };
+            if jogador.folego_ticks >= periodo {
+                jogador.folego_ticks = 0;
+                jogador.folego = (jogador.folego + 1).min(FOLEGO_MAXIMO);
+            }
+        }
+    }
+
     /// Calcula o hash SHA-256 canônico do estado corrente.
     #[must_use]
     pub fn hash_estado(&self) -> String {
@@ -804,7 +913,7 @@ impl Mundo {
                 format!(
                     concat!(
                         "{0}:{1}:{2}:{3}:{4}:{5}:{6}:{7}:{8}:{9:?}:{10}:{11:?}:",
-                        "{12}:{13}:{14:?}:{15:?}"
+                        "{12}:{13}:{14:?}:{15:?}:{16}:{17}:{18}"
                     ),
                     peer_id,
                     x,
@@ -822,6 +931,9 @@ impl Mundo {
                     jogador.ponte_ticks,
                     jogador.ponte_ponto,
                     jogador.propaganda_alvo,
+                    jogador.folego,
+                    jogador.folego_ticks,
+                    jogador.combate_ticks,
                 )
             })
             .collect::<Vec<_>>()
@@ -893,6 +1005,12 @@ pub enum CodigoRecusa {
     /// A ação não pertence ao contrato.
     #[error("acao desconhecida")]
     AcaoDesconhecida,
+    /// `atacar_forte` sem alvo no destino ou além do alcance de contato.
+    #[error("alvo invalido")]
+    AlvoInvalido,
+    /// Fôlego abaixo do custo de `atacar_forte`.
+    #[error("folego insuficiente")]
+    FolegoInsuficiente,
     /// Destino ausente ou fora do ponto para `mover`, `coletar_materiais`,
     /// `construir_barreira`, `construir_ponte` ou sem Súdito para `propaganda`.
     #[error("destino ausente ou fora do ponto")]
@@ -915,9 +1033,9 @@ impl ValidacaoComandos {
     /// # Errors
     ///
     /// Retorna o primeiro [`CodigoRecusa`] aplicável, na ordem do contrato:
-    /// par, replay, ação, destino (incluindo o limite de distância de `mover`)
-    /// e saldo para `construir_barreira` e `construir_ponte`; `propaganda` exige
-    /// Súdito no ponto do jogador.
+    /// par, replay, ação, destino (incluindo o limite de distância de `mover`),
+    /// alvo/alcance e Fôlego para `atacar_forte`, saldo para `construir_barreira`
+    /// e `construir_ponte`; `propaganda` exige Súdito no ponto do jogador.
     pub fn validar(
         mundo: &Mundo,
         peer_id: u64,
@@ -944,6 +1062,24 @@ impl ValidacaoComandos {
             let (origem_x, origem_y) = jogador.posicao;
             if (x - origem_x).hypot(y - origem_y) > LIMITE_MOVIMENTO_M {
                 return Err(CodigoRecusa::MovimentoForaDoLimite);
+            }
+        }
+
+        if acao == "atacar_forte" {
+            let ponto = destino.ok_or(CodigoRecusa::AlvoInvalido)?;
+            let alvo_no_ponto = mundo
+                .jogadores
+                .iter()
+                .any(|(&peer, alvo)| peer != peer_id && ponto_igual(alvo.posicao, ponto));
+            if !alvo_no_ponto {
+                return Err(CodigoRecusa::AlvoInvalido);
+            }
+            let (origem_x, origem_y) = jogador.posicao;
+            if (ponto.0 - origem_x).hypot(ponto.1 - origem_y) > ALCANCE_CONTATO_M {
+                return Err(CodigoRecusa::AlvoInvalido);
+            }
+            if jogador.folego < CUSTO_ATAQUE_FOLEGO {
+                return Err(CodigoRecusa::FolegoInsuficiente);
             }
         }
 
