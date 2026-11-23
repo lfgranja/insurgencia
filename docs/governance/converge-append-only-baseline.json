@@ -93,6 +93,10 @@
     "specs/040-barricada-deterministica/converge.md": {
       "bytes": 7646,
       "sha256": "45ba61ceb77fe81f51fa06f2d98a5efcadfb05df741af5724b0e7dbe59fd0640"
+    },
+    "specs/041-coleta-jogavel/converge.md": {
+      "bytes": 6303,
+      "sha256": "2f31c7baa96b3901a0cce7bb3c011283f5baecfef1b6ecc20b4e4809e4536d46"
     }
   },
   "_provenance": {

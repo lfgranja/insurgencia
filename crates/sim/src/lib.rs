@@ -101,7 +101,7 @@ pub struct Comando {
     pub seq: i64,
     /// Identificador de requisição monotônico do comando.
     pub request_id: i64,
-    /// Destino opcional, usado por `mover`.
+    /// Destino opcional, usado por `mover`, `coletar_materiais` e `construir_barreira`.
     pub destino: Option<(f64, f64)>,
 }
 
@@ -213,6 +213,7 @@ impl Mundo {
     fn fase_skills(&mut self) {
         let mut coleta_avancada: BTreeSet<u64> = BTreeSet::new();
         let mut construcao_avancada: BTreeSet<u64> = BTreeSet::new();
+        self.avancar_coletas_automaticas(&mut coleta_avancada);
         self.avancar_construcoes_automaticas(&mut construcao_avancada);
         let comandos = std::mem::take(&mut self.comandos_do_tick);
 
@@ -244,13 +245,16 @@ impl Mundo {
 
     /// Aplica um comando de coleta, no máximo uma vez por jogador a cada tick.
     fn aplicar_coleta(&mut self, comando: &Comando, avancada: &mut BTreeSet<u64>) {
+        if avancada.contains(&comando.peer_id) {
+            return;
+        }
         let Some(ponto) = comando.destino else {
             return;
         };
         let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) else {
             return;
         };
-        if !ponto_igual(ponto, jogador.posicao) || avancada.contains(&comando.peer_id) {
+        if !ponto_igual(ponto, jogador.posicao) {
             return;
         }
         jogador.coleta_ticks = match jogador.coleta_ponto {
@@ -261,10 +265,42 @@ impl Mundo {
         jogador.coleta_ticks += 1;
         avancada.insert(comando.peer_id);
         if jogador.coleta_ticks == TICKS_COLETA {
-            jogador.suprimentos += 3;
-            jogador.materiais += 2;
-            jogador.coleta_ticks = 0;
+            self.concluir_coleta(comando.peer_id);
         }
+    }
+
+    /// Avança um tick as coletas em curso, sem depender de comandos.
+    fn avancar_coletas_automaticas(&mut self, avancada: &mut BTreeSet<u64>) {
+        let mut concluidas: Vec<u64> = Vec::new();
+        for (&peer_id, jogador) in &mut self.jogadores {
+            let Some(ponto) = jogador.coleta_ponto else {
+                continue;
+            };
+            if !ponto_igual(ponto, jogador.posicao) {
+                jogador.coleta_ticks = 0;
+                jogador.coleta_ponto = None;
+                continue;
+            }
+            jogador.coleta_ticks += 1;
+            avancada.insert(peer_id);
+            if jogador.coleta_ticks == TICKS_COLETA {
+                concluidas.push(peer_id);
+            }
+        }
+        for peer_id in concluidas {
+            self.concluir_coleta(peer_id);
+        }
+    }
+
+    /// Crédito atômico e limpeza da canalização de coleta concluída.
+    fn concluir_coleta(&mut self, peer_id: u64) {
+        let Some(jogador) = self.jogadores.get_mut(&peer_id) else {
+            return;
+        };
+        jogador.suprimentos += 3;
+        jogador.materiais += 2;
+        jogador.coleta_ticks = 0;
+        jogador.coleta_ponto = None;
     }
 
     /// Aplica um comando de construção com guarda de saldo e débito atômico.
