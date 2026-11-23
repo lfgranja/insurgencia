@@ -1105,12 +1105,20 @@ impl Mundo {
             no.convertido
         };
         if convertido_agora {
-            self.resistencia_ideologica =
-                self.resistencia_ideologica.saturating_sub(CONTRIBUICAO_NO);
+            if self.nos.len() == TOTAL_NOS && self.nos.values().all(|no| no.convertido) {
+                // O último Nó deixa a barra em 10 para o pulso final do tick seguinte.
+                self.resistencia_ideologica = Self::resistencia_pre_pulso();
+            } else {
+                self.resistencia_ideologica = self
+                    .resistencia_ideologica
+                    .saturating_sub(CONTRIBUICAO_NO)
+                    .max(PISO_DANO_COM_NOS);
+            }
         }
     }
 
     /// Fixa o alvo e aplica dano limitado, sem converter o Nó nem apagar Propaganda.
+    /// Dano nulo não inicia inatividade.
     fn aplicar_atacar_no(&mut self, comando: &Comando, avancada: &mut BTreeSet<u64>) {
         let Some(ponto) = comando.destino else {
             return;
@@ -1148,11 +1156,23 @@ impl Mundo {
             .resistencia_ideologica
             .saturating_sub(piso)
             .min(DANO_MAXIMO_NOS);
+        if dano == 0 {
+            return;
+        }
         self.resistencia_ideologica = self.resistencia_ideologica.saturating_sub(dano);
         if let Some(no) = self.nos.get_mut(&id) {
             // A unidade extra é consumida por `fase_vitoria` no próprio tick do dano.
             no.inativo_ticks = TICKS_INATIVIDADE_NO + 1;
         }
+    }
+
+    /// Resistência deixada pelas três conversões antes do pulso final (`[HIPÓTESE]`).
+    fn resistencia_pre_pulso() -> i64 {
+        let mut resistencia = RESISTENCIA_INICIAL;
+        for _ in 0..TOTAL_NOS {
+            resistencia -= CONTRIBUICAO_NO;
+        }
+        resistencia
     }
 
     /// Decrementa a inatividade dos Nós e aplica o pulso final de vitória.
@@ -1161,7 +1181,7 @@ impl Mundo {
     /// gere o pulso apenas no tick seguinte (`[HIPÓTESE]`/protótipo, não cânone).
     fn fase_vitoria(&mut self, convertidos_no_inicio: usize) {
         for no in self.nos.values_mut() {
-            no.inativo_ticks = no.inativo_ticks.saturating_sub(1);
+            no.inativo_ticks = no.inativo_ticks.saturating_sub(1).max(0);
         }
         if self.resultado.is_some()
             || self.nos.len() != TOTAL_NOS
@@ -1169,11 +1189,7 @@ impl Mundo {
         {
             return;
         }
-        let mut resistencia_esperada = RESISTENCIA_INICIAL;
-        for _ in 0..TOTAL_NOS {
-            resistencia_esperada -= CONTRIBUICAO_NO;
-        }
-        if self.resistencia_ideologica != resistencia_esperada {
+        if self.resistencia_ideologica != Self::resistencia_pre_pulso() {
             return;
         }
         self.resistencia_ideologica = self.resistencia_ideologica.saturating_sub(PULSO_FINAL);
@@ -1229,7 +1245,7 @@ impl Mundo {
                 format!(
                     concat!(
                         "{0}:{1}:{2}:{3}:{4}:{5}:{6}:{7}:{8}:{9:?}:{10}:{11:?}:",
-                        "{12}:{13}:{14:?}:{15:?}:{16}:{17}:{18}:{19:?}"
+                        "{12}:{13}:{14:?}:{15:?}:{16}:{17}:{18}:{19:?}:{20:?}"
                     ),
                     peer_id,
                     x,
@@ -1251,6 +1267,7 @@ impl Mundo {
                     jogador.folego_ticks,
                     jogador.combate_ticks,
                     jogador.no_alvo,
+                    jogador.no_acao_no,
                 )
             })
             .collect::<Vec<_>>()

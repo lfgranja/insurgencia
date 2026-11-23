@@ -20,3 +20,8 @@
 **Gate agregado (13:04Z)**: `./verify.sh` **ALL STAGES OK**, **110 testes run: 110 passed** (105 anteriores + 5 novos), `VERIFY_EXIT=0`. Um RED de `clippy::too_many_lines` em `atualizar_texto` foi corrigido via helper puro `texto_hud`, preservando o HUD.
 
 **Limitações**: todos os valores numéricos são `[HIPÓTESE]`/protótipo conforme GDD §6.2/§8.5; derrota por timeout/reconquista e variante duas Comunas ficam fora de escopo; captura visual real permanece **[NV]**.
+
+### Revalidação pós-ACR — 2026-11-23T14:08Z
+
+- Blocker determinístico da ACR (`7102167832`) corrigido: conversões não descem abaixo do piso 10; o último Nó deixa a barra em 10 para o pulso final, preservando vitória mesmo com dano prévio. Hash passou a incluir `no_acao_no`; dano zero não inicia inatividade. Documentação alinhada.
+- `./verify.sh` reexecutado: **ALL STAGES OK**, **112 testes run: 112 passed** (110 anteriores + 2 novos: `dano_nao_bloqueia_vitoria`, `hash_inclui_acao_no`). Cinco gates locais PASS. O verde anterior de 110 foi descartado; a decisão usa o head corrigido.

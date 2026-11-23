@@ -2406,9 +2406,8 @@ fn dano_nao_converte_no_e_respeita_teto() {
     for (id, posicao) in posicoes_nos() {
         posicionar_jogador(&mut mundo, id, 1, posicao);
     }
-    if let Some(no) = mundo.nos.get_mut(&1) {
-        no.propaganda_ticks = 300;
-    }
+    // Sem progresso prévio de Propaganda, nenhum auto-avanço converte um Nó antes
+    // dos ataques. O teto de 20 é global: só o primeiro Nó atacado sofre dano.
 
     for (id, posicao) in posicoes_nos() {
         agendar_no(&mut mundo, id, "atacar_no", 10, 10, posicao);
@@ -2419,11 +2418,19 @@ fn dano_nao_converte_no_e_respeita_teto() {
         mundo.resistencia_ideologica,
         RESISTENCIA_INICIAL - DANO_MAXIMO_NOS
     );
+    // O primeiro Nó atacado (menor id) recebe o dano e 600 ticks de inatividade;
+    // os demais encontram a Resistência no piso e não entram em inatividade.
+    let primeiro_id = posicoes_nos()[0].0;
     for (id, _) in posicoes_nos() {
         assert!(!mundo.nos[&id].convertido);
-        assert_eq!(mundo.nos[&id].inativo_ticks, TICKS_INATIVIDADE_NO);
+        assert_eq!(mundo.nos[&id].propaganda_ticks, 0);
+        let inatividade = if id == primeiro_id {
+            TICKS_INATIVIDADE_NO
+        } else {
+            0
+        };
+        assert_eq!(mundo.nos[&id].inativo_ticks, inatividade);
     }
-    assert_eq!(mundo.nos[&1].propaganda_ticks, 300);
 
     for _ in 0..TICKS_INATIVIDADE_NO {
         mundo.avancar_tick();
@@ -2431,9 +2438,11 @@ fn dano_nao_converte_no_e_respeita_teto() {
     for (id, _) in posicoes_nos() {
         assert_eq!(mundo.nos[&id].inativo_ticks, 0);
     }
-    assert_eq!(mundo.nos[&1].propaganda_ticks, 300);
+    assert_eq!(mundo.nos[&1].propaganda_ticks, 0);
     assert!(mundo.resultado.is_none());
 
+    // Com a Resistência no piso derivado, o ataque tem dano zero: não converte
+    // Nó nem reinicia a inatividade.
     for (id, posicao) in posicoes_nos() {
         agendar_no(&mut mundo, id, "atacar_no", 11, 11, posicao);
     }
@@ -2444,6 +2453,7 @@ fn dano_nao_converte_no_e_respeita_teto() {
     );
     for (id, _) in posicoes_nos() {
         assert!(!mundo.nos[&id].convertido);
+        assert_eq!(mundo.nos[&id].inativo_ticks, 0);
     }
 }
 
@@ -2482,6 +2492,82 @@ fn tres_nos_geram_vitoria() {
     }
     assert_eq!(mundo.resistencia_ideologica, 0);
     assert_eq!(mundo.resultado, Some(ResultadoPartida::Vitoria));
+}
+
+#[test]
+fn dano_nao_bloqueia_vitoria() {
+    let mut mundo = Mundo::new();
+    for (id, _) in posicoes_nos() {
+        mundo.adicionar_jogador(id);
+    }
+    for (id, posicao) in posicoes_nos() {
+        mundo.adicionar_no(id, posicao);
+    }
+    for (id, posicao) in posicoes_nos() {
+        posicionar_jogador(&mut mundo, id, 1, posicao);
+    }
+
+    // Dano prévio em todos os Nós: a Resistência para no teto derivado de 20.
+    for (id, posicao) in posicoes_nos() {
+        agendar_no(&mut mundo, id, "atacar_no", 10, 10, posicao);
+    }
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo.resistencia_ideologica,
+        RESISTENCIA_INICIAL - DANO_MAXIMO_NOS
+    );
+    for _ in 0..TICKS_INATIVIDADE_NO {
+        mundo.avancar_tick();
+    }
+
+    for (id, posicao) in posicoes_nos() {
+        agendar_no(&mut mundo, id, "propaganda_no", 20, 20, posicao);
+    }
+    mundo.avancar_tick();
+    for _ in 1..TICKS_PROPAGANDA_NO {
+        mundo.avancar_tick();
+    }
+    for (id, _) in posicoes_nos() {
+        assert!(mundo.nos[&id].convertido);
+    }
+    // As duas primeiras conversões respeitam o piso; a última deixa a barra em 10.
+    assert_eq!(mundo.resistencia_ideologica, 10);
+    assert!(mundo.resultado.is_none());
+
+    mundo.avancar_tick();
+    assert_eq!(mundo.resistencia_ideologica, 0);
+    assert_eq!(mundo.resultado, Some(ResultadoPartida::Vitoria));
+}
+
+#[test]
+fn hash_inclui_acao_no() {
+    let mut propaganda = Mundo::new();
+    let mut ataque = Mundo::new();
+    for mundo in [&mut propaganda, &mut ataque] {
+        mundo.adicionar_jogador(1);
+        mundo.adicionar_no(1, (0.5, 0.0));
+        if let Some(no) = mundo.nos.get_mut(&1) {
+            no.convertido = true;
+        }
+        posicionar_jogador(mundo, 1, 1, (0.5, 0.0));
+    }
+    assert_eq!(propaganda.hash_estado(), ataque.hash_estado());
+
+    agendar_no(&mut propaganda, 1, "propaganda_no", 10, 10, (0.5, 0.0));
+    propaganda.avancar_tick();
+    agendar_no(&mut ataque, 1, "atacar_no", 10, 10, (0.5, 0.0));
+    ataque.avancar_tick();
+    assert_eq!(
+        propaganda.jogadores[&1].no_alvo,
+        ataque.jogadores[&1].no_alvo
+    );
+    assert_ne!(propaganda.hash_estado(), ataque.hash_estado());
+
+    for mundo in [&mut propaganda, &mut ataque] {
+        agendar_no(mundo, 1, "atacar_no", 11, 11, (0.5, 0.0));
+        mundo.avancar_tick();
+    }
+    assert_eq!(propaganda.hash_estado(), ataque.hash_estado());
 }
 
 #[test]
