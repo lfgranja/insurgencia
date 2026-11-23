@@ -140,3 +140,21 @@ A tabela de 23:01Z acima permanece como histórico. Contagens VERIFICADAS às 23
 
 - O checkout compartilhado apresenta 238 assessments / 13 research porque inclui 173 diretórios untracked históricos (`ast-*`, `cor-*`, `doc-*`, `srv-*`, `ev-*`) e 3 notas untracked em `docs/research/2026-11-20-*`, preservados por decisão registrada; não são versionados. O 36 de specs/validations/releases antecedia o ciclo 037; agora são 37 cada, incluindo o ciclo em curso.
 - Âncora `efb4d4b`/`c126b6e`, PR #45 escalado, 41/41 testes e a decisão de governança/R6 permanecem inalterados. Correção append-only; nenhum gate/build/formatter/commit/push/PR executado; 0 linhas removidas.
+
+## Atualização verificada — 2026-11-23T01:31Z (ciclo 038 — constituição v1.2.2)
+
+A tabela de 23:05Z acima permanece como histórico. A tabela **vigente** abaixo reflete a contagem verificada às 01:31Z neste worktree, a partir da árvore versionada de `origin/dev` (`dev=e0103635`, `main=8b0b044a`); números iguais aos de 23:05Z, agora com âncora/PR/checks atualizados.
+
+| Conjunto | Vigente | Comando (saída) |
+|:--|--:|:--|
+| specs numeradas | 37 | `find specs -maxdepth 1 -type d -name '[0-9][0-9][0-9]-*' \| wc -l` → 38 no disco (37 versionados + `038-estado-pos-v122` untracked); `git ls-files 'specs/*/spec.md'` → 37 |
+| assessments | 65 | `find .specify/assessments -mindepth 1 -maxdepth 1 -type d \| wc -l` → 65 |
+| validations | 37 | `find .specify/validations -mindepth 1 -maxdepth 1 -type d \| wc -l` → 37 |
+| releases | 37 | `find .specify/releases -mindepth 1 -maxdepth 1 -type d \| wc -l` → 37 |
+| bugs | 0 | sem `BUG-*.md` versionados |
+| research (md) | 10 | `find docs/research -maxdepth 1 -type f -name '*.md' \| wc -l` → 10; `find docs/research -type f -name '*.md' \| wc -l` → 10 |
+
+- O 238 assessments / 13 research do checkout compartilhado permanece como histórico: inclui 173 diretórios untracked (`ast-*`, `cor-*`, `doc-*`, `srv-*`, `ev-*`) e 3 notas untracked em `docs/research/2026-11-20-*`, preservados por decisão registrada; neste worktree a árvore versionada dá 65/10.
+- Âncora/PRs: `git rev-parse --short HEAD` = `e010363`, branch `038-estado-pos-v122`; `gh pr view 48` → #48 `dev→main` OPEN/MERGEABLE, `gates`+`rust` SUCCESS (green), fila SWE, sem merge/deploy; #47/#49/#50 mesclados em 23/11. Constituição v1.2.2 (Ratified 2026-11-19, Last Amended 2026-11-23).
+- Checks: `./verify.sh` ALL STAGES OK, 41/41; 5 gates Python PASS (observados pela orquestração, não reexecutados — **[NV]**); `python3 -m pytest -q` → exit 5 (N/A), não RED.
+- Dívidas: deploy/publicação inexistente no workflow (`ci-gates.yml` só `gates`+`rust`); **R6** ratificada em v1.2.0 mas fora da sequência executável até `resolve-tasks.sh`/adaptador de issues (`constitution.md:50`) — PARE e escale ao SWE; `AGENTS.md` ainda afirma "34 tests"/"29 dirs" no corpo, corrigido por nota datada no fim. Factory `b1deab1` é fonte, não autoridade. **[NV]**: reexecução local dos gates, CI/merge posteriores, deploy, confirmação visual da SE, assinatura GPG. Nenhum gate/build/formatter/commit/push/PR executado; correção append-only, 0 linhas removidas.
