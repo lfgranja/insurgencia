@@ -22,7 +22,7 @@ use insurgencia_cliente::{
     deslocar, estado_inicial, ilha_em, EstadoJogador, Geometria3d, Ilha, ILHAS, LIMITE_X, LIMITE_Y,
     VELOCIDADE,
 };
-use insurgencia_sim::Mundo;
+use insurgencia_sim::{Comando, Mundo, PASSO_SEGUNDOS, TICKS_CONSTRUCAO_BARREIRA};
 
 /// Identificador do jogador local no espelho da simulação.
 const PEER_ID: u64 = 1;
@@ -51,6 +51,17 @@ struct JogadorLocal(EstadoJogador);
 #[derive(Resource)]
 struct Simulacao(Mundo);
 
+/// Sequências locais usadas nos comandos enviados à simulação.
+#[derive(Resource)]
+struct ComandoLocal {
+    seq: i64,
+    request_id: i64,
+}
+
+/// Tempo acumulado para avançar a simulação em passos fixos.
+#[derive(Resource)]
+struct AccumuladorTick(f64);
+
 /// Quando verdadeiro, a janela inicia minizada (opção `--minimizado`).
 #[derive(Resource)]
 struct ModoJanela(bool);
@@ -77,7 +88,9 @@ fn main() {
             (
                 mover_jogador,
                 sincronizar_avatar,
+                solicitar_barreira,
                 sincronizar_sim,
+                avancar_simulacao,
                 atualizar_texto,
             )
                 .chain(),
@@ -512,7 +525,12 @@ fn configurar(
     let mut sim = Mundo::new();
     sim.adicionar_jogador(PEER_ID);
     commands.insert_resource(JogadorLocal(jogador));
+    commands.insert_resource(ComandoLocal {
+        seq: 0,
+        request_id: 0,
+    });
     commands.insert_resource(Simulacao(sim));
+    commands.insert_resource(AccumuladorTick(0.0));
 }
 
 /// Lê `WASD` ou as setas e desloca o avatar com passo dependente do tempo.
@@ -550,6 +568,33 @@ fn mover_jogador(
     jogador.0 = deslocar(jogador.0, (passo.x, passo.y));
 }
 
+/// Agenda a construção de uma barreira no ponto atual ao pressionar `B`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_barreira(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyB) {
+        return;
+    }
+
+    local.seq += 1;
+    local.request_id += 1;
+    let (x, y) = jogador.0.posicao;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "construir_barreira".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some((f64::from(x), f64::from(y))),
+    });
+}
+
 /// Copia a posição do estado para a transformação 3D do avatar no plano do mapa.
 #[expect(
     clippy::needless_pass_by_value,
@@ -578,20 +623,58 @@ fn sincronizar_sim(jogador: Res<JogadorLocal>, mut simulacao: ResMut<Simulacao>)
     remoto.posicao = (f64::from(x), f64::from(y));
 }
 
-/// Atualiza o painel com posição, ilha corrente e limites do mapa.
+/// Avança a simulação em passos fixos, com teto de quatro ticks por frame.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
 )]
-fn atualizar_texto(jogador: Res<JogadorLocal>, mut textos: Query<&mut Text, With<TextoEstado>>) {
+fn avancar_simulacao(
+    tempo: Res<Time>,
+    mut simulacao: ResMut<Simulacao>,
+    mut acumulador: ResMut<AccumuladorTick>,
+) {
+    acumulador.0 += f64::from(tempo.delta_secs());
+    for _ in 0..4 {
+        if acumulador.0 < PASSO_SEGUNDOS {
+            break;
+        }
+        simulacao.0.avancar_tick();
+        acumulador.0 -= PASSO_SEGUNDOS;
+    }
+}
+
+/// Atualiza o painel com posição, materiais, barreiras e progresso de construção.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn atualizar_texto(
+    jogador: Res<JogadorLocal>,
+    simulacao: Res<Simulacao>,
+    mut textos: Query<&mut Text, With<TextoEstado>>,
+) {
     let (x, y) = jogador.0.posicao;
     let ilha = if let Some(atual) = ilha_em((x, y)) {
         atual.nome
     } else {
         "nenhuma"
     };
+    let remoto = simulacao.0.jogadores.get(&PEER_ID);
+    let materiais = remoto.map_or(0, |j| j.materiais);
+    let barreiras = simulacao
+        .0
+        .barreiras
+        .values()
+        .filter(|barreira| barreira.dono == PEER_ID)
+        .count();
+    let construindo = match remoto {
+        Some(j) if j.construcao_ponto.is_some() => {
+            format!("{}/{}", j.construcao_ticks, TICKS_CONSTRUCAO_BARREIRA)
+        }
+        _ => "nao".to_owned(),
+    };
     let conteudo = format!(
-        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nWASD ou setas para mover"
+        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nMateriais: {materiais}\nBarreiras: {barreiras}\nConstruindo: {construindo}\nWASD ou setas para mover · B para construir barreira"
     );
 
     for mut texto in &mut textos {

@@ -1,0 +1,13 @@
+# Checklist de Requisitos — 040-barricada-deterministica
+
+- [x] FR-001 API Rust: constantes públicas `CUSTO_BARREIRA_MATERIAIS=20`, `TICKS_CONSTRUCAO_BARREIRA=45`, `PV_BARREIRA=200`, `TICKS_DURACAO_BARREIRA=360`, `MAX_BARREIRAS_POR_JOGADOR=2`; `Jogador.construcao_ticks: i64` e `construcao_ponto: Option<(f64,f64)>`; `Mundo.barreiras: BTreeMap<u64, Barreira>` e `proxima_barreira_id: u64`; struct `Barreira { id, dono, posicao, pv, ticks_restantes }`; `CodigoRecusa::SaldoInsuficiente`; `Comando.destino` como ponto de construção; nenhuma mudança em `crates/contratos`, `PROTOCOL_VERSION` ou `Cargo.toml`
+- [x] FR-002 `construir_barreira` exige `destino == posicao` via `ponto_igual` e `materiais >= 20`; recusa sem consumo parcial e sem iniciar canalização
+- [x] FR-003 `fase_skills` revalida saldo ao completar, avança no máx. 1 canalização por jogador por tick (`BTreeSet<u64>` local), zera canalização se `mover` mudar posição, debita 20 Materiais atomicamente e insere a `Barreira`
+- [x] FR-004 limite de 2 barricadas por jogador; a 3ª remove a mais antiga (menor `id`); `Barreira` nasce com 200 PV e 360 ticks e é removida por PV zero ou duração
+- [x] FR-005 `hash_estado` inclui `construcao_ticks`/`construcao_ponto` de cada jogador e todas as barreiras em ordem de `BTreeMap`
+- [x] FR-006 tecla `B` em *just pressed* agenda `construir_barreira` com `destino` = posição atual e `seq`/`request_id` monotônicos via recurso local; HUD mostra Materiais, Barreiras e Construindo; `forbid(unsafe_code)`, `deny(clippy::pedantic)`, sem `unwrap`/`expect`/`#[allow]`, `max_width = 100`, commits PT-BR com staging explícito
+
+## Revisão
+Requisitos verificáveis por inspeção da spec (6 FR / 6 SC), do plano (passos 00→26, fronteira explícita, roteiro de 10 passos) e dos valores canônicos do GDD §9.3:475,483 e §10.3:574,577-579 / H4. **`[x]` = revisão de requisitos, não implementação**: nenhum build, gate, teste ou formatador foi executado, nenhum código foi editado e nenhum commit/push/PR foi feito; essas atividades pertencem às etapas 12/27/26 e permanecem **[NV]** até execução pelo orquestrador.
+
+R6 é **N/A** por constituição v1.2.2: fora da sequência executável até `resolve-tasks.sh`/adaptador existirem; PARE se invocada, nenhuma issue simulada, nenhum `gh` improvisado — dívida de automação registrada, não executada. O conflito §16.3/H4 fica registrado como risco (hipóteses de escala do MVP vs. valores canônicos da barricada), sem reabertura. Fôlego, alcance, recarga e dimensões são `[HIPÓTESE]` e permanecem fora de escopo. Nenhum marcador `[NEEDS CLARIFICATION]` em aberto (R3 = 0); R1 `go` registrado; R4 antes de R7.

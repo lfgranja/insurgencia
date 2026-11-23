@@ -17,6 +17,21 @@ pub const PASSO_SEGUNDOS: f64 = 1.0 / 30.0;
 /// Ticks necessários para concluir uma coleta de materiais (6 s a 30 Hz).
 pub const TICKS_COLETA: i64 = 180;
 
+/// Custo em materiais para construir uma barricada.
+pub const CUSTO_BARREIRA_MATERIAIS: i64 = 20;
+
+/// Ticks de canalização necessários para concluir uma barricada (1,5 s a 30 Hz).
+pub const TICKS_CONSTRUCAO_BARREIRA: i64 = 45;
+
+/// Pontos de vida de uma barricada recém-construída.
+pub const PV_BARREIRA: i64 = 200;
+
+/// Duração de uma barricada em ticks (12 s a 30 Hz).
+pub const TICKS_DURACAO_BARREIRA: i64 = 360;
+
+/// Número máximo de barricadas ativas por jogador.
+pub const MAX_BARREIRAS_POR_JOGADOR: usize = 2;
+
 /// Distância máxima de um comando `mover`, em metros.
 const LIMITE_MOVIMENTO_M: f64 = 1.0;
 
@@ -54,6 +69,25 @@ pub struct Jogador {
     pub coleta_ticks: i64,
     /// Ponto fixado pela coleta corrente.
     pub coleta_ponto: Option<(f64, f64)>,
+    /// Ticks de construção acumulados no ponto corrente.
+    pub construcao_ticks: i64,
+    /// Ponto fixado pela construção corrente.
+    pub construcao_ponto: Option<(f64, f64)>,
+}
+
+/// Barricada ativa no mundo, identificada por `id`.
+#[derive(Clone, Debug)]
+pub struct Barreira {
+    /// Identificador monotônico da barricada.
+    pub id: u64,
+    /// `peer_id` do jogador que construiu a barricada.
+    pub dono: u64,
+    /// Posição no plano `(x, y)`.
+    pub posicao: (f64, f64),
+    /// Pontos de vida restantes; zero ou menos destrói a barricada.
+    pub pv: i64,
+    /// Ticks restantes de duração; zero expira a barricada.
+    pub ticks_restantes: i64,
 }
 
 /// Comando enfileirado por um par para o próximo tick.
@@ -86,6 +120,10 @@ pub struct Mundo {
     pub comandos_pendentes: VecDeque<Comando>,
     /// Comandos selecionados para o tick corrente.
     pub comandos_do_tick: Vec<Comando>,
+    /// Barricadas ativas indexadas por `id`.
+    pub barreiras: BTreeMap<u64, Barreira>,
+    /// Próximo identificador de barricada, começando em um.
+    pub proxima_barreira_id: u64,
 }
 
 impl Default for Mundo {
@@ -105,6 +143,8 @@ impl Mundo {
             jogadores: BTreeMap::new(),
             comandos_pendentes: VecDeque::new(),
             comandos_do_tick: Vec::new(),
+            barreiras: BTreeMap::new(),
+            proxima_barreira_id: 1,
         }
     }
 
@@ -121,6 +161,8 @@ impl Mundo {
                 suprimentos: 0,
                 coleta_ticks: 0,
                 coleta_ponto: None,
+                construcao_ticks: 0,
+                construcao_ponto: None,
             },
         );
     }
@@ -128,6 +170,25 @@ impl Mundo {
     /// Remove um jogador pelo `peer_id`.
     pub fn remover_jogador(&mut self, peer_id: u64) {
         self.jogadores.remove(&peer_id);
+    }
+
+    /// Aplica dano a uma barricada, removendo-a se os PV chegam a zero ou menos.
+    ///
+    /// Retorna `true` quando a barricada foi removida e `false` quando o `id`
+    /// não existe ou a barricada permanece viva.
+    pub fn aplicar_dano_a_barreira(&mut self, id: u64, dano: i64) -> bool {
+        if dano <= 0 {
+            return false;
+        }
+        let mut destruida = false;
+        if let Some(barreira) = self.barreiras.get_mut(&id) {
+            barreira.pv = barreira.pv.saturating_sub(dano);
+            destruida = barreira.pv <= 0;
+        }
+        if destruida {
+            self.barreiras.remove(&id);
+        }
+        destruida
     }
 
     /// Enfileira um comando para o próximo tick.
@@ -151,48 +212,178 @@ impl Mundo {
     /// Aplica os comandos selecionados ao estado dos jogadores.
     fn fase_skills(&mut self) {
         let mut coleta_avancada: BTreeSet<u64> = BTreeSet::new();
+        let mut construcao_avancada: BTreeSet<u64> = BTreeSet::new();
+        self.avancar_construcoes_automaticas(&mut construcao_avancada);
+        let comandos = std::mem::take(&mut self.comandos_do_tick);
 
-        for comando in &self.comandos_do_tick {
-            if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
-                if comando.acao == "mover" {
+        for comando in &comandos {
+            if comando.acao == "mover" {
+                if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
                     if let Some(destino) = comando.destino {
                         if !ponto_igual(destino, jogador.posicao) {
                             jogador.coleta_ticks = 0;
                             jogador.coleta_ponto = None;
+                            jogador.construcao_ticks = 0;
+                            jogador.construcao_ponto = None;
                             jogador.posicao = destino;
                         }
                     }
-                } else if comando.acao == "coletar_materiais" {
-                    if let Some(ponto) = comando.destino {
-                        if ponto_igual(ponto, jogador.posicao)
-                            && !coleta_avancada.contains(&comando.peer_id)
-                        {
-                            jogador.coleta_ticks = match jogador.coleta_ponto {
-                                Some(anterior) if ponto_igual(anterior, ponto) => {
-                                    jogador.coleta_ticks
-                                }
-                                _ => 0,
-                            };
-                            jogador.coleta_ponto = Some(ponto);
-                            jogador.coleta_ticks += 1;
-                            coleta_avancada.insert(comando.peer_id);
-                            if jogador.coleta_ticks == TICKS_COLETA {
-                                jogador.suprimentos += 3;
-                                jogador.materiais += 2;
-                                jogador.coleta_ticks = 0;
-                            }
-                        }
-                    }
                 }
+            } else if comando.acao == "coletar_materiais" {
+                self.aplicar_coleta(comando, &mut coleta_avancada);
+            } else if comando.acao == "construir_barreira" {
+                self.aplicar_construcao(comando, &mut construcao_avancada);
+            }
+            if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
                 jogador.seq = comando.seq;
                 jogador.request_id = comando.request_id;
             }
         }
+        self.comandos_do_tick = comandos;
     }
 
-    /// Descarta os comandos já aplicados.
+    /// Aplica um comando de coleta, no máximo uma vez por jogador a cada tick.
+    fn aplicar_coleta(&mut self, comando: &Comando, avancada: &mut BTreeSet<u64>) {
+        let Some(ponto) = comando.destino else {
+            return;
+        };
+        let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) else {
+            return;
+        };
+        if !ponto_igual(ponto, jogador.posicao) || avancada.contains(&comando.peer_id) {
+            return;
+        }
+        jogador.coleta_ticks = match jogador.coleta_ponto {
+            Some(anterior) if ponto_igual(anterior, ponto) => jogador.coleta_ticks,
+            _ => 0,
+        };
+        jogador.coleta_ponto = Some(ponto);
+        jogador.coleta_ticks += 1;
+        avancada.insert(comando.peer_id);
+        if jogador.coleta_ticks == TICKS_COLETA {
+            jogador.suprimentos += 3;
+            jogador.materiais += 2;
+            jogador.coleta_ticks = 0;
+        }
+    }
+
+    /// Aplica um comando de construção com guarda de saldo e débito atômico.
+    fn aplicar_construcao(&mut self, comando: &Comando, avancada: &mut BTreeSet<u64>) {
+        if avancada.contains(&comando.peer_id) {
+            return;
+        }
+        let Some(ponto) = comando.destino else {
+            return;
+        };
+        let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) else {
+            return;
+        };
+        // Comando forjado com saldo insuficiente: não inicia a canalização.
+        if jogador.materiais < CUSTO_BARREIRA_MATERIAIS {
+            avancada.insert(comando.peer_id);
+            return;
+        }
+        if !ponto_igual(ponto, jogador.posicao) {
+            return;
+        }
+        jogador.construcao_ticks = match jogador.construcao_ponto {
+            Some(anterior) if ponto_igual(anterior, ponto) => jogador.construcao_ticks,
+            _ => 0,
+        };
+        jogador.construcao_ponto = Some(ponto);
+        jogador.construcao_ticks += 1;
+        avancada.insert(comando.peer_id);
+        if jogador.construcao_ticks == TICKS_CONSTRUCAO_BARREIRA {
+            self.concluir_construcao(comando.peer_id, ponto);
+        }
+    }
+
+    /// Avança um tick as canalizações em curso, sem depender de comandos.
+    fn avancar_construcoes_automaticas(&mut self, avancada: &mut BTreeSet<u64>) {
+        let mut concluidas: Vec<(u64, (f64, f64))> = Vec::new();
+        for (&peer_id, jogador) in &mut self.jogadores {
+            let Some(ponto) = jogador.construcao_ponto else {
+                continue;
+            };
+            if jogador.materiais < CUSTO_BARREIRA_MATERIAIS || !ponto_igual(ponto, jogador.posicao)
+            {
+                jogador.construcao_ticks = 0;
+                jogador.construcao_ponto = None;
+                continue;
+            }
+            jogador.construcao_ticks += 1;
+            avancada.insert(peer_id);
+            if jogador.construcao_ticks == TICKS_CONSTRUCAO_BARREIRA {
+                concluidas.push((peer_id, ponto));
+            }
+        }
+        for (peer_id, ponto) in concluidas {
+            self.concluir_construcao(peer_id, ponto);
+        }
+    }
+
+    /// Débito atômico, criação da barreira e limpeza da canalização.
+    fn concluir_construcao(&mut self, peer_id: u64, ponto: (f64, f64)) {
+        let Some(jogador) = self.jogadores.get_mut(&peer_id) else {
+            return;
+        };
+        let com_saldo = jogador.materiais >= CUSTO_BARREIRA_MATERIAIS;
+        if com_saldo {
+            jogador.materiais -= CUSTO_BARREIRA_MATERIAIS;
+        }
+        jogador.construcao_ticks = 0;
+        jogador.construcao_ponto = None;
+        if com_saldo {
+            self.criar_barreira(peer_id, ponto);
+        }
+    }
+
+    /// Cria a barricada e remove a mais antiga quando o limite é excedido.
+    fn criar_barreira(&mut self, dono: u64, posicao: (f64, f64)) {
+        let id = self.proxima_barreira_id;
+        self.proxima_barreira_id += 1;
+        self.barreiras.insert(
+            id,
+            Barreira {
+                id,
+                dono,
+                posicao,
+                pv: PV_BARREIRA,
+                // O tick de criação consome a unidade extra: o valor
+                // serializado ao fim dele é `TICKS_DURACAO_BARREIRA`.
+                ticks_restantes: TICKS_DURACAO_BARREIRA + 1,
+            },
+        );
+        if self
+            .barreiras
+            .values()
+            .filter(|barreira| barreira.dono == dono)
+            .count()
+            > MAX_BARREIRAS_POR_JOGADOR
+        {
+            let antiga = self
+                .barreiras
+                .values()
+                .filter(|barreira| barreira.dono == dono)
+                .map(|barreira| barreira.id)
+                .min();
+            if let Some(id_antigo) = antiga {
+                self.barreiras.remove(&id_antigo);
+            }
+        }
+    }
+
+    /// Descarta os comandos já aplicados e expira as barricadas vencidas.
     fn fase_finish(&mut self) {
         self.comandos_do_tick.clear();
+        self.barreiras.retain(|_, barreira| {
+            // A unidade extra da criação é consumida no próprio tick de criação;
+            // o último tick decrementa de 1 para 0 e remove a barricada.
+            if barreira.ticks_restantes > 0 {
+                barreira.ticks_restantes -= 1;
+            }
+            barreira.ticks_restantes > 0
+        });
     }
 
     /// Calcula o hash SHA-256 canônico do estado corrente.
@@ -204,20 +395,38 @@ impl Mundo {
             .map(|(&peer_id, jogador)| {
                 let (x, y) = jogador.posicao;
                 format!(
-                    "{peer_id}:{x}:{y}:{vida}:{seq}:{request_id}:{materiais}:{suprimentos}:{coleta_ticks}:{coleta_ponto:?}",
-                    vida = jogador.vida,
-                    seq = jogador.seq,
-                    request_id = jogador.request_id,
-                    materiais = jogador.materiais,
-                    suprimentos = jogador.suprimentos,
-                    coleta_ticks = jogador.coleta_ticks,
-                    coleta_ponto = jogador.coleta_ponto,
+                    "{0}:{1}:{2}:{3}:{4}:{5}:{6}:{7}:{8}:{9:?}:{10}:{11:?}",
+                    peer_id,
+                    x,
+                    y,
+                    jogador.vida,
+                    jogador.seq,
+                    jogador.request_id,
+                    jogador.materiais,
+                    jogador.suprimentos,
+                    jogador.coleta_ticks,
+                    jogador.coleta_ponto,
+                    jogador.construcao_ticks,
+                    jogador.construcao_ponto,
                 )
             })
             .collect::<Vec<_>>()
             .join(";");
+        let barreiras: String = self
+            .barreiras
+            .values()
+            .map(|barreira| {
+                let (x, y) = barreira.posicao;
+                let id = barreira.id;
+                let dono = barreira.dono;
+                let pv = barreira.pv;
+                let ticks = barreira.ticks_restantes;
+                format!("{id}:{dono}:{x}:{y}:{pv}:{ticks}")
+            })
+            .collect::<Vec<_>>()
+            .join(";");
         let entrada = format!(
-            "{tick}|{epoch}|{match_id}|{jogadores}",
+            "{tick}|{epoch}|{match_id}|{jogadores}|{barreiras}",
             tick = self.tick,
             epoch = self.epoch,
             match_id = self.match_id,
@@ -239,12 +448,16 @@ pub enum CodigoRecusa {
     /// A ação não pertence ao contrato.
     #[error("acao desconhecida")]
     AcaoDesconhecida,
-    /// Destino ausente ou fora do ponto para `mover` ou `coletar_materiais`.
+    /// Destino ausente ou fora do ponto para `mover`, `coletar_materiais` ou
+    /// `construir_barreira`.
     #[error("destino ausente ou fora do ponto")]
     DestinoInvalido,
     /// Deslocamento acima de `LIMITE_MOVIMENTO_M`.
     #[error("movimento fora do limite")]
     MovimentoForaDoLimite,
+    /// Materiais abaixo do custo de uma barricada.
+    #[error("materiais insuficientes")]
+    SaldoInsuficiente,
 }
 
 /// Validação isolada de comandos, espelhando `ValidacaoComandos` do contrato.
@@ -257,7 +470,8 @@ impl ValidacaoComandos {
     /// # Errors
     ///
     /// Retorna o primeiro [`CodigoRecusa`] aplicável, na ordem do contrato:
-    /// par, replay, ação e destino (incluindo o limite de distância de `mover`).
+    /// par, replay, ação, destino (incluindo o limite de distância de `mover`)
+    /// e saldo para `construir_barreira`.
     pub fn validar(
         mundo: &Mundo,
         peer_id: u64,
@@ -291,6 +505,16 @@ impl ValidacaoComandos {
             let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
             if !ponto_igual(ponto, jogador.posicao) {
                 return Err(CodigoRecusa::DestinoInvalido);
+            }
+        }
+
+        if acao == "construir_barreira" {
+            let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
+            if !ponto_igual(ponto, jogador.posicao) {
+                return Err(CodigoRecusa::DestinoInvalido);
+            }
+            if jogador.materiais < CUSTO_BARREIRA_MATERIAIS {
+                return Err(CodigoRecusa::SaldoInsuficiente);
             }
         }
 
