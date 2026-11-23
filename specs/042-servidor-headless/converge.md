@@ -30,3 +30,8 @@ FR-001..FR-006 e SC-001..SC-006 registrados na spec, com rastreabilidade até `.
 - **Servidor headless**: `crates/servidor` com binário `insurgencia-servidor`, membro da workspace, sem async/socket/Lightyear/tokio; stdin validada antes do tick 0, comandos agendados em ordem e hash canônico emitido por tick.
 - **Gates locais**: SDD `42/0`, DAG `444 tarefas/139 arestas/0 ciclos`, task-id `0 duplicatas`, hub-docs `0 erros`; converge baselinado por bootstrap após esta entrada.
 - **Fronteira**: `crates/contratos`, `PROTOCOL_VERSION` e demais cycles preservados. `[NV]`: CI/merge do ciclo 042, promoção e decisão do SWE sobre PR #48.
+
+### Correção de blocker da ACR e revalidação — 2026-11-23T04:45Z
+
+- **P1 (comentário `7091811530`)**: hash era emitido após `avancar_tick`, deslocando a linha `0`. Correção: `writeln!` com `hash_estado()` antes de `avancar_tick()`; novo teste `primeira_linha_com_stdin_vazia_e_o_estado_inicial` compara a linha `0` ao hash de `Mundo::new()`.
+- **Verificação**: `verify.sh` **ALL STAGES OK**, **72/72 testes**; roteiro reexecutado 10/10 com 5 gates locais PASS. `[NV]`: CI/merge no novo head, ACR de 2ª rodada e decisão do SWE sobre PR #48.

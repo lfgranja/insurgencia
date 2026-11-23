@@ -99,8 +99,8 @@
       "sha256": "9cda32d77fdac4c410662bace531e096eeb23069952cdcc65dca020ff4b08628"
     },
     "specs/042-servidor-headless/converge.md": {
-      "bytes": 6697,
-      "sha256": "a82884e360ccc510018a478b11307c2aad15f42e7e4e937ea031604bf1eb3a7d"
+      "bytes": 7252,
+      "sha256": "68875506e3506ffcd7142d5edf650f0279c1caa491ada93a553e694df1fcdd2d"
     }
   },
   "_provenance": {

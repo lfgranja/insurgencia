@@ -168,9 +168,9 @@ fn executar() -> Result<(), String> {
     let stdout = io::stdout();
     let mut saida = BufWriter::new(stdout.lock());
     for tick in 0..ticks {
-        mundo.avancar_tick();
         writeln!(saida, "{tick}\t{}", mundo.hash_estado())
             .map_err(|erro| format!("falha ao escrever stdout: {erro}"))?;
+        mundo.avancar_tick();
     }
     saida
         .flush()

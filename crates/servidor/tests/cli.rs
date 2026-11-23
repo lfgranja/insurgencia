@@ -168,3 +168,24 @@ fn argumentos_invalidos_retornam_exit_2_sem_saida() {
         );
     }
 }
+
+#[test]
+fn primeira_linha_com_stdin_vazia_e_o_estado_inicial() {
+    let ticks = TICKS.to_string();
+    let saida = executar_ou_falhar(&["--ticks", ticks.as_str()], "");
+    assert!(
+        saida.status.success(),
+        "execução falhou: {}",
+        texto(&saida.stderr)
+    );
+
+    let stdout = texto(&saida.stdout);
+    let linhas: Vec<&str> = stdout.lines().collect();
+    assert_eq!(linhas.len(), TICKS, "esperadas {TICKS} linhas: {stdout}");
+
+    let esperado = format!("0\t{}", insurgencia_sim::Mundo::new().hash_estado());
+    assert_eq!(
+        linhas[0], esperado,
+        "linha 0 deveria retratar o estado inicial: {stdout}"
+    );
+}
