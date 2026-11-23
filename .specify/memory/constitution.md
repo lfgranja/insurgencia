@@ -45,13 +45,7 @@ código são registradas, nunca escondidas.
 
 - **R1 (`go`)**: nenhum ciclo avança sem decisão `go` explícita e registrada.
 - **R4 antes de R7**: R4 precede R7 na sequência; inversão exige emenda registrada.
-- **R6 (`taskstoissues`) — obrigatório**: entre `11 analyze` e `12 implement`, converta as
-  tarefas em issues no remoto GitHub com `/speckit.github.taskstoissues`, com deduplicação
-  por ID `Tddd` e título canônico `Tddd: <descrição>`. Se o adaptador/script estiver ausente —
-  o alvo não tem `.specify/extensions/github/scripts/bash/resolve-tasks.sh` nem
-  `scripts/runner/sync_tasks_to_forgejo_issues.py` — PARE e escale ao SWE; nunca simule issue
-  criada e nunca siga para `implement` com R6 não executado. A portaria entra em vigor como
-  regra nesta emenda; a execução depende da ferramenta disponível e de remoto GitHub.
+- **R6 (`taskstoissues`) — ratificada, operacionalmente suspensa neste alvo**: a portaria foi ratificada em v1.2.0 e volta a ser executável entre `11 analyze` e `12 implement` quando `.specify/extensions/github/scripts/bash/resolve-tasks.sh` e o adaptador de issues estiverem presentes e validados. Enquanto a ferramenta não existe, registre a suspensão e a ausência no `converge.md` do ciclo e prossiga; nunca simule issue criada, nunca use `gh` improvisado como substituto e nunca alegue R6 executada. Ratificação não implica disponibilidade operacional.
 - **Comunicação externa**: PRs, comentários, escalonamentos e relatórios são didáticos e
   acionáveis. Toda afirmação de estado traz fonte observável; quando houver ação, inclua
   URL explícita. Diferencie caminho versionado no repositório de URL clicável: cite o caminho
@@ -67,11 +61,7 @@ código são registradas, nunca escondidas.
 
 - Commits convencionais em português brasileiro; staging explícito; nunca `git add -A` ou
   `git add .`.
-- **CI/CD e merge**: check obrigatório verde observado no CI/CD é autoridade suficiente para
-  mesclar em `dev`/`main` de forma autônoma via `gh`, sem aprovação humana. Se o CI/CD não
-  inspirar confiança, o próximo 80/20 imediato é reforçá-lo até inspirar confiança para merge
-  autônomo. Auto-merge habilitado no provedor, force-push, reescrita e deleção de branch alheia
-  continuam proibidos.
+- **CI/CD e merge em `dev`**: check obrigatório verde observado no CI/CD é autoridade suficiente para mesclar em `dev` de forma autônoma via `gh`, sem aprovação humana. Se o CI/CD não inspirar confiança, o próximo 80/20 imediato é reforçá-lo até inspirar confiança para merge autônomo em `dev`. Auto-merge habilitado no provedor, force-push, reescrita e deleção de branch alheia continuam proibidos.
 - **Promoção e deploy**: promoção `dev → main` e deploy são competência exclusiva do SWE, mesmo
   com CI green e ACR sem blockers. CI green autoriza merge; não autoriza promoção automática
   nem substitui a decisão do SWE. PRs #13–#22 aprovados retroativamente pela autorização da SE
@@ -82,10 +72,11 @@ código são registradas, nunca escondidas.
 Esta constituição prevalece sobre práticas, prompts e documentos externos. Emenda exige
 registro explícito, rationale e plano de migração quando aplicável. Versionamento segue
 Semantic Versioning: MAJOR para remoção/redefinição de princípio, MINOR para princípio ou seção
-novo(a) ou expansão material, PATCH para esclarecimento e correção não semântica. Esta emenda é
-MINOR (1.0.0 → 1.2.0): ordem SDD v4.6, novo item R6 e normas de comunicação externa e de
-promoção/deploy. Cada PR/revisão verifica conformidade e registra a evidência da verificação
-antes de declarar conformidade. A ratificação original permanece 2026-11-19; data de emenda
-2026-11-23.
+novo(a) ou expansão material, PATCH para esclarecimento e correção não semântica. A emenda
+anterior foi MINOR (1.0.0 → 1.2.0): ordem SDD v4.6, item R6 e normas de comunicação e de
+promoção/deploy. Esta é PATCH (1.2.0 → 1.2.1): esclarece que merge autônomo se limita a `dev`
+e que R6 está ratificada mas operacionalmente suspensa até existir o adaptador. Cada PR/revisão
+verifica conformidade e registra a evidência antes de declarar conformidade. A ratificação
+original permanece 2026-11-19; data desta emenda 2026-11-23.
 
-**Version**: 1.2.0 | **Ratified**: 2026-11-19 | **Last Amended**: 2026-11-23
+**Version**: 1.2.1 | **Ratified**: 2026-11-19 | **Last Amended**: 2026-11-23
