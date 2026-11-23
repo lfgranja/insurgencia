@@ -121,6 +121,10 @@
     "specs/048-alvo-treino/converge.md": {
       "bytes": 8018,
       "sha256": "5bbaf33eb29d16a115b3f11e5a34ccbc94b5dd041abe0c6218998edca91fe920"
+    },
+    "specs/049-ilhas-vitoria/converge.md": {
+      "bytes": 8187,
+      "sha256": "e6e4f86aeca066a3d1e767a6a255d87ff8a039cf717a512b5ab0898bd3b50337"
     }
   },
   "_provenance": {
