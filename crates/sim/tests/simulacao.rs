@@ -1732,14 +1732,14 @@ fn movimento_cancela_propaganda() {
     let jogador = &mundo.jogadores[&1];
     assert_eq!(jogador.posicao, fora);
     assert_eq!(jogador.propaganda_alvo, None);
-    // O auto-avanço deste tick ocorre antes do `mover`: a exposição não retrocede.
-    assert_eq!(mundo.suditos[&7].propaganda_ticks, 2);
+    // O auto-avanço ocorre antes do `mover`, mas a saída zera o acúmulo do alvo.
+    assert_eq!(mundo.suditos[&7].propaganda_ticks, 0);
 
     for _ in 0..TICKS_PROPAGANDA {
         mundo.avancar_tick();
     }
     assert!(!mundo.suditos[&7].convertido);
-    assert_eq!(mundo.suditos[&7].propaganda_ticks, 2);
+    assert_eq!(mundo.suditos[&7].propaganda_ticks, 0);
 
     // Um `mover` para o mesmo ponto não cancela o alvo recém-fixado.
     mundo.adicionar_sudito(8, fora);
@@ -1753,4 +1753,35 @@ fn movimento_cancela_propaganda() {
     let jogador = &mundo.jogadores[&1];
     assert_eq!(jogador.propaganda_alvo, Some(8));
     assert_eq!(mundo.suditos[&8].propaganda_ticks, 2);
+}
+
+#[test]
+fn dois_jogadores_nao_aceleram_propaganda() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    let ponto = (0.25, 0.0);
+    mundo.adicionar_sudito(7, ponto);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    agendar_mover(&mut mundo, 2, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    // Comandos de dois pares no mesmo ponto, somados ao auto-avanço, valem 1 tick.
+    for tick in 0..TICKS_PROPAGANDA {
+        let seq = 2 + tick;
+        agendar_propaganda(&mut mundo, 1, seq, seq, ponto);
+        agendar_propaganda(&mut mundo, 2, seq, seq, ponto);
+        mundo.avancar_tick();
+        let sudito = &mundo.suditos[&7];
+        if tick < TICKS_PROPAGANDA - 1 {
+            assert_eq!(sudito.propaganda_ticks, tick + 1, "tick {tick}");
+            assert!(!sudito.convertido, "tick {tick}");
+        }
+    }
+
+    let sudito = &mundo.suditos[&7];
+    assert_eq!(sudito.propaganda_ticks, TICKS_PROPAGANDA);
+    assert!(sudito.convertido);
+    assert_eq!(mundo.jogadores[&1].propaganda_alvo, Some(7));
+    assert_eq!(mundo.jogadores[&2].propaganda_alvo, Some(7));
 }

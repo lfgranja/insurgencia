@@ -385,7 +385,11 @@ impl Mundo {
                             jogador.construcao_ponto = None;
                             jogador.ponte_ticks = 0;
                             jogador.ponte_ponto = None;
-                            jogador.propaganda_alvo = None;
+                            if let Some(id) = jogador.propaganda_alvo.take() {
+                                if let Some(sudito) = self.suditos.get_mut(&id) {
+                                    sudito.propaganda_ticks = 0;
+                                }
+                            }
                             jogador.posicao = destino;
                         }
                     }
@@ -705,11 +709,8 @@ impl Mundo {
             .map(|(&id, _)| id)
     }
 
-    /// Fixa o alvo e avança a exposição em um tick, no máximo uma vez por jogador.
+    /// Fixa o alvo e avança a exposição em um tick, no máximo uma vez por Súdito.
     fn aplicar_propaganda(&mut self, comando: &Comando, avancada: &mut BTreeSet<u64>) {
-        if avancada.contains(&comando.peer_id) {
-            return;
-        }
         let Some(ponto) = comando.destino else {
             return;
         };
@@ -723,7 +724,10 @@ impl Mundo {
             return;
         }
         jogador.propaganda_alvo = Some(id);
-        avancada.insert(comando.peer_id);
+        if avancada.contains(&id) {
+            return;
+        }
+        avancada.insert(id);
         self.avancar_propaganda_sudito(id);
     }
 
@@ -739,9 +743,6 @@ impl Mundo {
             })
             .collect();
         for (peer_id, id, posicao) in alvos {
-            if avancada.contains(&peer_id) {
-                continue;
-            }
             let Some(sudito) = self.suditos.get(&id) else {
                 continue;
             };
@@ -751,7 +752,10 @@ impl Mundo {
                 }
                 continue;
             }
-            avancada.insert(peer_id);
+            if avancada.contains(&id) {
+                continue;
+            }
+            avancada.insert(id);
             self.avancar_propaganda_sudito(id);
         }
     }

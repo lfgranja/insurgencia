@@ -35,14 +35,14 @@ O `Mundo` passa a manter os Súditos em `BTreeMap<u64, Sudito>`, com struct púb
 
 ### US3 — Auto-avanço determinístico por comando (P1)
 
-A ação `propaganda` avança a exposição de cada Súdito alvejado em **no máximo 1 tick por Súdito por tick**. Um `BTreeSet<u64>` rastreia os IDs já avançados no tick corrente, de modo que comandos duplicados não acumulem exposição extra; a reversão avança no mesmo ritmo, em ordem estável de ID, sem relógio externo, aleatoriedade ou efeito colateral em outras entidades.
+A ação `propaganda` avança a exposição de cada Súdito alvejado em **no máximo 1 tick por Súdito por tick**. Um `BTreeSet<u64>` rastreia os **IDs dos Súditos** já avançados no tick corrente e é compartilhado entre o comando e o auto-avanço, de modo que dois jogadores no mesmo ponto não acumulem exposição extra; `mover` para posição diferente limpa `propaganda_alvo` e zera `propaganda_ticks` do Súdito anterior. A reversão avança no mesmo ritmo, em ordem estável de ID, sem relógio externo, aleatoriedade ou efeito colateral em outras entidades.
 
-**Why this priority**: a disciplina de tick é o que garante que 4 s signifiquem 120 ticks em qualquer execução; deduplicar por `BTreeSet` impede que flood de comandos converta um Súdito antes do tempo canônico (Princípio VI).
+**Why this priority**: a disciplina de tick é o que garante que 4 s signifiquem 120 ticks em qualquer execução; deduplicar por `id` do Súdito impede que flood de comandos — inclusive de jogadores distintos no mesmo ponto — converta um Súdito antes do tempo canônico (Princípio VI).
 
-**Independent Test**: enviar dois comandos `propaganda` para o mesmo Súdito no mesmo tick e conferir `propaganda_ticks == 1`, não `2`; repetir por 120 ticks e confirmar conversão exatamente no 120.º.
+**Independent Test**: enviar dois comandos `propaganda` para o mesmo Súdito no mesmo tick e conferir `propaganda_ticks == 1`, não `2`; repetir com dois jogadores no mesmo ponto e com um único comando seguido de auto-avanço; confirmar conversão exatamente no 120.º e que `mover` para outro ponto zera a contagem do Súdito anterior.
 
 **Acceptance Scenarios**:
-1. **Given** dois comandos `propaganda` para o mesmo ID no mesmo tick, **When** o tick é processado, **Then** `propaganda_ticks` incrementa exatamente **1**.
+1. **Given** dois comandos `propaganda` (de um ou dois jogadores no mesmo ponto) para o mesmo ID de Súdito no mesmo tick, **When** o tick é processado, **Then** `propaganda_ticks` incrementa exatamente **1**.
 2. **Given** Súditos convertidos com `reversao_ticks > 0`, **When** um tick é processado, **Then** cada contagem decrementa exatamente 1, em ordem de `BTreeMap`, sem afetar Súditos não convertidos.
 3. **Given** duas execuções com a mesma sequência de comandos, **When** os ticks são comparados, **Then** exposição, conversão e reversão são idênticas em todos os ticks.
 
@@ -61,15 +61,15 @@ O estado dos Súditos é refletido em `Mundo::hash_estado()` na ordem de `BTreeM
 
 ### US5 — HUD: contagem de convertidos e tecla `G` (P2)
 
-O cliente passa a enviar `propaganda` com a tecla **`G`** (`KeyCode::KeyG` em `just_pressed`) e exibe **Convertidos** com a contagem de Súditos convertidos do estado replicado (filtro por `convertido` em `Mundo::suditos`), ao lado de **Pontes**. Nenhum campo novo entra no protocolo e nenhuma tecla existente é removida.
+O cliente passa a enviar `propaganda` com a tecla **`G`** (`KeyCode::KeyG` em `just_pressed`) e exibe **`Súditos`** com a contagem de Súditos convertidos do estado replicado (filtro por `convertido` em `Mundo::suditos`), ao lado de **Pontes**. Nenhum campo novo entra no protocolo e nenhuma tecla existente é removida.
 
 **Why this priority**: sem a tecla a ação não é acessível e sem a contagem o jogador não percebe o efeito da conversão; a leitura é feita diretamente do estado já replicado, sem nova superfície de contrato.
 
-**Independent Test**: apertar `G` no cliente e conferir o comando gerado; converter um Súdito na sim e verificar o incremento de `Convertidos` no HUD; confirmar que `crates/contratos` e `PROTOCOL_VERSION` permanecem intactos.
+**Independent Test**: apertar `G` no cliente e conferir o comando gerado; converter um Súdito na sim e verificar o incremento do valor exibido em `Súditos` no HUD; confirmar que `crates/contratos` e `PROTOCOL_VERSION` permanecem intactos.
 
 **Acceptance Scenarios**:
 1. **Given** o cliente em execução, **When** `G` é pressionado, **Then** um comando `propaganda` é enfileirado.
-2. **Given** um Súdito convertido no estado, **When** o HUD é renderizado, **Then** exibe `Convertidos: 1` sem campo de protocolo novo.
+2. **Given** um Súdito convertido no estado, **When** o HUD é renderizado, **Then** exibe `Súditos: 1` sem campo de protocolo novo.
 3. **Given** o estado final do ciclo, **When** os arquivos de contrato são conferidos, **Then** `crates/contratos`, `PROTOCOL_VERSION` e `Cargo.toml` permanecem intactos.
 
 ### US6 — Fronteira de stack e governança (P2)
@@ -87,11 +87,12 @@ A implementação permanece no core determinístico e no cliente já existentes,
 ### Edge Cases
 - `propaganda_ticks = 119`: ainda inimigo; tick 120 converte; ticks adicionais não acumulam além do limiar enquanto `convertido = true`.
 - Dois comandos `propaganda` para o mesmo ID no mesmo tick: exposição incrementa 1 (`BTreeSet<u64>` deduplica por ID).
+- Dois jogadores no mesmo ponto com um Súdito e o mesmo tick de comando/auto-avanço: no máximo **1 avanço por Súdito por tick** (`BTreeSet<u64>` de IDs compartilhado); `mover` para posição diferente limpa `propaganda_alvo` e zera `propaganda_ticks` do Súdito anterior.
 - Dano aplicado antes da conversão (`propaganda_ticks < 120`): `reversao_ticks` é registrado, mas não há conversão a desfazer; a exposição permanece e a conversão ocorre no prazo canônico se a Propaganda continuar.
 - Dano aplicado a Súdito já convertido: `reversao_ticks = 90`; conversão persiste nos ticks 1..89 e cessa no tick 90.
 - Novo dano durante a reversão: a contagem é reiniciada em 90 (monotônica por evento de dano, sem acumulação).
 - `aplicar_dano_a_sudito` com ID inexistente: operação sem efeito, sem pânico.
-- Nenhum Súdito injetado: `hash_estado` permanece determinístico e o HUD exibe `Convertidos: 0`.
+- Nenhum Súdito injetado: `hash_estado` permanece determinístico e o HUD exibe `Súditos: 0`.
 - Dois Súditos: `id` explícitos distintos, hash em ordem de `BTreeMap`, sem limite arbitrário introduzido neste ciclo.
 - Comando `propaganda` com `seq`/`request_id` em replay: recusado antes da contagem de exposição.
 - Súdito convertido não gera renda, não credita autogestão e não altera barricadas, pontes ou vitória; renda de trabalhador (60 s) é `[HIPÓTESE]` fora de escopo.
@@ -101,10 +102,10 @@ A implementação permanece no core determinístico e no cliente já existentes,
 ### Functional Requirements
 
 - **FR-001 (regra canônica)**: a exposição de um Súdito inimigo à Propaganda converte após **4 s = 120 ticks** a 1/30 s (GDD §9.2:464); convertido, ele **para de atacar estruturas e passa a panfletar**, representado pela transição de estado `convertido = true`; se levar **dano de jogador**, a conversão **reverte em 3 s = 90 ticks**. Spawn por pulso de 30 s, raio de 6 m, limite de 3 conversões, permanência de 60 s e funções trabalhador/propagandista/miliciano são `[HIPÓTESE]` e ficam **fora de escopo**, registradas como limitações.
-- **FR-002 (contrato/estado)**: acrescentar `"propaganda"` a `ACOES_PERMITIDAS` **na sim**; struct pública `Sudito { id: u64, posicao: (f64, f64), convertido: bool, propaganda_ticks: i64, reversao_ticks: i64 }` em `BTreeMap<u64, Sudito>` no campo `Mundo::suditos`; APIs públicas e documentadas `adicionar_sudito(id, posicao)` (injeção determinística) e `aplicar_dano_a_sudito(id)` (dano de jogador); constantes públicas e documentadas `TICKS_PROPAGANDA = 120`, `TICKS_REVERSAO = 90`. **Nenhuma mudança** em `crates/contratos`, `PROTOCOL_VERSION`, `Cargo.toml`/`Cargo.lock`, manifesto ou CI; nenhum novo código de protocolo; sem Lightyear, async, sockets, janela ou relógio externo.
-- **FR-003 (comportamento/fase)**: auto-avanço por comando com `BTreeSet<u64>` — cada Súdito alvejado incrementa `propaganda_ticks` no máximo **1 tick por Súdito por tick**, com deduplicação por ID; ao completar 120 ticks, `convertido = true`; `aplicar_dano_a_sudito(id)` fixa `reversao_ticks = 90` e, ao zerar, `convertido = false` e `propaganda_ticks = 0`; processamento em ordem estável de `BTreeMap`, sem relógio, aleatoriedade ou efeito colateral em jogadores, barricadas ou pontes.
+- **FR-002 (contrato/estado)**: acrescentar `"propaganda"` a `ACOES_PERMITIDAS` **na sim**; struct pública `Sudito { id: u64, posicao: (f64, f64), convertido: bool, propaganda_ticks: i64, reversao_ticks: i64 }` em `BTreeMap<u64, Sudito>` no campo `Mundo::suditos`; APIs públicas e documentadas `adicionar_sudito(id, posicao)` (injeção determinística) e `aplicar_dano_a_sudito(id)` (dano de jogador); constantes públicas e documentadas `TICKS_PROPAGANDA = 120`, `TICKS_REVERSAO_SUDITO = 90`. **Nenhuma mudança** em `crates/contratos`, `PROTOCOL_VERSION`, `Cargo.toml`/`Cargo.lock`, manifesto ou CI; nenhum novo código de protocolo; sem Lightyear, async, sockets, janela ou relógio externo.
+- **FR-003 (comportamento/fase)**: auto-avanço por comando com `BTreeSet<u64>` de IDs de Súditos — cada Súdito alvejado incrementa `propaganda_ticks` no máximo **1 tick por Súdito por tick**, com deduplicação por `id` do Súdito em conjunto compartilhado entre comando e auto-avanço (dois jogadores no mesmo ponto não aceleram); `mover` para posição diferente limpa `propaganda_alvo` e zera `propaganda_ticks` do Súdito anterior; ao completar 120 ticks, `convertido = true`; `aplicar_dano_a_sudito(id)` fixa `reversao_ticks = 90` e, ao zerar, `convertido = false` e `propaganda_ticks = 0`; processamento em ordem estável de `BTreeMap`, sem relógio, aleatoriedade ou efeito colateral em jogadores, barricadas ou pontes.
 - **FR-004 (hash/determinismo)**: `hash_estado()` inclui cada `Sudito` (`id`, `posicao`, `convertido`, `propaganda_ticks`, `reversao_ticks`) em ordem estável de `BTreeMap`, além dos campos já presentes; estados idênticos geram hash idêntico; injeção, conversão e reversão alteram o hash; duas execuções com o mesmo input produzem o mesmo estado e hash, sem `HashMap`, relógio, aleatoriedade ou ordem instável.
-- **FR-005 (cliente/HUD)**: a tecla **`G`** (`KeyCode::KeyG`, `just_pressed`) envia `propaganda`; o HUD exibe **Convertidos** com a contagem de Súditos com `convertido = true` (filtro em `Mundo::suditos`) ao lado de **Pontes**, sem novo campo de protocolo e sem remover teclas existentes; a exibição é somente leitura do estado já replicado.
+- **FR-005 (cliente/HUD)**: a tecla **`G`** (`KeyCode::KeyG`, `just_pressed`) envia `propaganda`; o HUD exibe **`Súditos`** com a contagem de Súditos com `convertido = true` (filtro em `Mundo::suditos`) ao lado de **Pontes**, sem novo campo de protocolo e sem remover teclas existentes; a exibição é somente leitura do estado já replicado.
 - **FR-006 (governança/testes)**: `#![forbid(unsafe_code)]`, `#![deny(clippy::pedantic)]`, sem `unwrap`/`.expect()`/`#[allow]`, `max_width = 100`, `///` em itens públicos; testes determinísticos cobrindo 120 ticks, conversão no limiar, dano e 90 ticks de reversão, deduplicação por `BTreeSet`, ID inexistente, ordem, hash, tecla `G` e HUD; R1 `go`, R6 **N/A** por v1.2.2, R4 antes de R7 `1.0.0-local`; commits em PT-BR com staging explícito; gates, build, testes, formatadores, commit/push/PR **[NV]** para este agente.
 
 ### Key Entities
@@ -113,9 +114,9 @@ A implementação permanece no core determinístico e no cliente já existentes,
 - **Mundo**: ganha `suditos: BTreeMap<u64, Sudito>`, mantendo `pontes`, `barreiras`, `jogadores`, comandos e tick/epoch intactos.
 - **Ação `propaganda`**: nova entrada em `ACOES_PERMITIDAS` da sim; sem mudança em `crates/contratos` ou `PROTOCOL_VERSION`.
 - **APIs determinísticas**: `adicionar_sudito(id, posicao)` e `aplicar_dano_a_sudito(id)`, sem sistema de combate, física ou projétil.
-- **Constantes canônicas**: `TICKS_PROPAGANDA = 120` (4 s) e `TICKS_REVERSAO = 90` (3 s), a 1/30 s (`PASSO_SEGUNDOS`).
+- **Constantes canônicas**: `TICKS_PROPAGANDA = 120` (4 s) e `TICKS_REVERSAO_SUDITO = 90` (3 s), a 1/30 s (`PASSO_SEGUNDOS`).
 - **Hash do estado**: assinatura SHA-256 de `Mundo`; passa a incluir os súditos em ordem de `BTreeMap`.
-- **HUD `Convertidos` / tecla `G`**: único acréscimo visível e de input; nenhum campo novo de protocolo.
+- **HUD `Súditos` / tecla `G`**: único acréscimo visível e de input; o rótulo `Súditos` conta os convertidos; nenhum campo novo de protocolo.
 
 ## Clarificações
 
@@ -123,7 +124,7 @@ A implementação permanece no core determinístico e no cliente já existentes,
 - O que é `[HIPÓTESE]` e fica fora de escopo: spawn a cada pulso de 30 s (2 por ilha convertida, 3 na Rota Central), raio de 6 m, conversão de até 3 Súditos por pulso, conservação da função por 60 s e as funções trabalhador/propagandista/miliciano.
 - Conversão é representada no estado (`convertido = true`), no hash e no HUD; **nenhum sistema de ataque a estruturas nem de panfletar é simulado** neste ciclo — combate/Fôlego é candidato separado (48/625) e permanece fora de escopo. "Para de atacar e passa a panfletar" traduz-se na transição de estado, não em física ou projétil.
 - Dano de jogador é exercitado pela API determinística `aplicar_dano_a_sudito(id)`; nenhum sistema de dano, projétil ou física é introduzido.
-- Auto-avanço por um comando com `BTreeSet<u64>`: cada Súdito recebe no máximo 1 tick de exposição por tick, com IDs rastreados em `BTreeSet` e processados em ordem estável; comandos duplicados no mesmo tick não acumulam exposição extra.
+- Auto-avanço por um comando com `BTreeSet<u64>`: cada Súdito recebe no máximo 1 tick de exposição por tick, com os **IDs dos Súditos** rastreados em conjunto compartilhado entre comando e auto-avanço e processados em ordem estável; comandos duplicados ou dois jogadores no mesmo ponto não acumulam exposição extra, e `mover` para posição diferente zera `propaganda_ticks` do Súdito anterior.
 - A vedação a `unwrap`/`expect`/`#[allow]` não atinge o atributo de lint `#[expect(clippy::needless_pass_by_value, reason = "...")]`: é atributo permitido, distinto da chamada de método `.expect()`; a vedação a `expect` refere-se a `.expect()`.
 - Súdito convertido não credita pontos de autogestão, não modifica barricadas ou pontes e não altera condições de vitória; os ciclos 044 e 045 permanecem como estão.
 - Sem mudança em `crates/contratos`, `PROTOCOL_VERSION`, `Cargo.toml`/`Cargo.lock`, manifesto ou CI; ADR-004 mantém a rede bloqueada até decisão da SE.
@@ -133,10 +134,10 @@ A implementação permanece no core determinístico e no cliente já existentes,
 ## Success Criteria
 
 - **SC-001 (regra canônica)**: 119 ticks mantêm o Súdito inimigo e o 120.º converte; o convertido para de atacar estruturas e passa a panfletar no estado; dano de jogador fixa 90 ticks e o Súdito reverte exatamente no 90.º; spawn/raio/funções `[HIPÓTESE]` estão registrados como fora de escopo.
-- **SC-002 (contrato/estado)**: `ACOES_PERMITIDAS` contém `propaganda`, `Sudito` e `Mundo::suditos` existem com `BTreeMap<u64, Sudito>`, as APIs `adicionar_sudito`/`aplicar_dano_a_sudito` e as constantes `TICKS_PROPAGANDA = 120`, `TICKS_REVERSAO = 90` estão documentadas; `crates/contratos`, `PROTOCOL_VERSION`, `Cargo.toml`/`Cargo.lock`, manifesto e CI permanecem intactos; nenhuma dependência, Lightyear, async, socket ou janela é introduzida.
+- **SC-002 (contrato/estado)**: `ACOES_PERMITIDAS` contém `propaganda`, `Sudito` e `Mundo::suditos` existem com `BTreeMap<u64, Sudito>`, as APIs `adicionar_sudito`/`aplicar_dano_a_sudito` e as constantes `TICKS_PROPAGANDA = 120`, `TICKS_REVERSAO_SUDITO = 90` estão documentadas; `crates/contratos`, `PROTOCOL_VERSION`, `Cargo.toml`/`Cargo.lock`, manifesto e CI permanecem intactos; nenhuma dependência, Lightyear, async, socket ou janela é introduzida.
 - **SC-003 (comportamento/fase)**: cada Súdito alvejado avança no máximo 1 tick por tick com deduplicação por `BTreeSet<u64>`; a conversão ocorre no tick 120; o dano reinicia a reversão em 90 ticks e a conversão cessa ao zerar, em ordem estável de `BTreeMap`, sem relógio/aleatoriedade e sem afetar outros estados.
 - **SC-004 (hash/determinismo)**: `hash_estado` muda com injeção, conversão e reversão, é idêntico entre duas execuções com o mesmo input e inclui os súditos em ordem de `BTreeMap`.
-- **SC-005 (cliente/HUD)**: a tecla `G` gera `propaganda` e o HUD exibe `Convertidos` com a contagem do estado, sem novo campo de protocolo e sem remover teclas existentes.
+- **SC-005 (cliente/HUD)**: a tecla `G` gera `propaganda` e o HUD exibe `Súditos` com a contagem dos convertidos, sem novo campo de protocolo e sem remover teclas existentes.
 - **SC-006 (governança/testes)**: `forbid(unsafe_code)`, `deny(clippy::pedantic)`, sem `unwrap`/`.expect()`/`#[allow]` (atributo de lint `#[expect(...)]` permitido), `max_width = 100`, testes determinísticos cobrindo os casos limítrofes; R1 `go`, R6 N/A, R4 antes de R7 `1.0.0-local`; gates, build, testes, formatadores e publicação ficam **[NV]** até execução pelo orquestrador.
 
 ## Assumptions

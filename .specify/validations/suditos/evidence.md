@@ -20,3 +20,11 @@
 **Gate agregado (07:08Z)**: `./verify.sh` **ALL STAGES OK**, **92 testes run: 92 passed** (86 anteriores + 6 novos), `VERIFY_EXIT=0`. `cargo fmt --all` aplicado uma vez antes do gate. Nenhum `#[allow]` introduzido.
 
 **Limitações**: spawn por pulso, raio de 6 m e funções trabalhador/propagandista/miliciano permanecem `[HIPÓTESE]` e não foram implementados; súditos são injetados deterministicamente pela API de simulação.
+
+## Nota pós-ACR (2026-11-23) — [NV]
+
+O histórico **10/10 PASS**, **92/92 testes** e as capturas de 07:08–07:09Z acima permanecem como registro da execução original; nada foi reexecutado nem reescrito. Após a revisão do PR #58, a semântica de **saída** foi reforçada na documentação: um `mover` para posição diferente limpa `propaganda_alvo` e **zera `propaganda_ticks`** do Súdito anterior. Foi também acrescentado ao roteiro/testes o caso `dois_jogadores_nao_aceleram_propaganda`: dois peers no mesmo ponto, com um Súdito e o mesmo tick de comando/auto-avanço, produzem **no máximo 1 incremento por Súdito por tick**, pois o dedup usa o `id` do Súdito (compartilhado entre comando e auto-avanço), não o `peer_id`. Essas correções pós-ACR não foram executadas por este agente: capturas, gates e testes das mudanças permanecem **[NV]** até revalidação pelo orquestrador.
+
+### Revalidação final — 2026-11-23T07:18Z
+
+- Gate reexecutado após as correções: `./verify.sh` **ALL STAGES OK**, **93 testes run: 93 passed** (92 anteriores + 1 novo teste `dois_jogadores_nao_aceleram_propaganda`), `VERIFY_EXIT=0`. Um RED de `clippy::explicit_counter_loop` no novo teste foi corrigido na fonte antes do verde. Cinco gates locais PASS. O verde anterior de 92 testes foi descartado; a decisão usa o head corrigido.
