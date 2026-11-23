@@ -24,3 +24,7 @@
 **Nota pós-ACR (2026-11-23):** as asserções finais `pontos_autogestao == 0` e `defesa_ticks == 0` do passo 5 foram reforçadas no teste `barricada_expira_apos_360_ticks` após a revisão do PR #56; o registro de execução acima permanece como histórico.
 
 **Nota pós-ACR (janela, 2026-11-23):** a regra do passo 6 foi corrigida no roteiro: cada barricada credita +1 por janela de 300 ticks, duas barricadas sobrepostas do mesmo dono podem somar +2 e a mesma barricada nunca credita duas vezes na janela; a linha histórica do passo 6 acima permanece inalterada.
+
+### Revalidação final — 2026-11-23T06:09Z
+
+- Após as correções pós-ACR (guarda `ticks_restantes <= 1` e reforço das asserções de expiração), `./verify.sh` reportou `ALL STAGES OK` com **77 testes run: 77 passed** (76 anteriores + 1 novo teste `defesa_nao_credita_no_tick_de_expiracao`). Cinco gates locais PASS. A linha 76/76 acima permanece como registro histórico da execução anterior.
