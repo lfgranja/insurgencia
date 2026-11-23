@@ -29,6 +29,12 @@ pub const PV_BARREIRA: i64 = 200;
 /// Duração de uma barricada em ticks (12 s a 30 Hz).
 pub const TICKS_DURACAO_BARREIRA: i64 = 360;
 
+/// Ticks de defesa ininterrupta necessários para um ponto de autogestão (10 s a 30 Hz).
+pub const TICKS_AUTOGESTAO_POR_PONTO: i64 = 300;
+
+/// Pontos de autogestão creditados por uma defesa completa de barricada.
+pub const PONTOS_AUTOGESTAO_POR_DEFESA: i64 = 1;
+
 /// Número máximo de barricadas ativas por jogador.
 pub const MAX_BARREIRAS_POR_JOGADOR: usize = 2;
 
@@ -73,6 +79,8 @@ pub struct Jogador {
     pub construcao_ticks: i64,
     /// Ponto fixado pela construção corrente.
     pub construcao_ponto: Option<(f64, f64)>,
+    /// Pontos de autogestão acumulados por defesas de barricada.
+    pub pontos_autogestao: i64,
 }
 
 /// Barricada ativa no mundo, identificada por `id`.
@@ -88,6 +96,8 @@ pub struct Barreira {
     pub pv: i64,
     /// Ticks restantes de duração; zero expira a barricada.
     pub ticks_restantes: i64,
+    /// Ticks de defesa contínua acumulados no ponto da barricada.
+    pub defesa_ticks: i64,
 }
 
 /// Comando enfileirado por um par para o próximo tick.
@@ -163,6 +173,7 @@ impl Mundo {
                 coleta_ponto: None,
                 construcao_ticks: 0,
                 construcao_ponto: None,
+                pontos_autogestao: 0,
             },
         );
     }
@@ -196,10 +207,11 @@ impl Mundo {
         self.comandos_pendentes.push_back(comando);
     }
 
-    /// Avança um tick nas fases `prepare`, `skills` e `finish`.
+    /// Avança um tick nas fases `prepare`, `skills`, `defesa` e `finish`.
     pub fn avancar_tick(&mut self) {
         self.fase_prepare();
         self.fase_skills();
+        self.fase_defesa();
         self.fase_finish();
         self.tick += 1;
     }
@@ -241,6 +253,37 @@ impl Mundo {
         }
         self.avancar_coletas_automaticas(&mut coleta_avancada);
         self.comandos_do_tick = comandos;
+    }
+
+    /// Avança a defesa das barricadas intactas, creditando autogestão a cada 300 ticks.
+    fn fase_defesa(&mut self) {
+        for barreira in self.barreiras.values_mut() {
+            if barreira.pv <= 0 || barreira.ticks_restantes <= 0 {
+                barreira.defesa_ticks = 0;
+                continue;
+            }
+            // `fase_finish` remove a barricada quando `ticks_restantes` chega a
+            // 1 neste tick: não acumular nem creditar defesa que não sobrevive.
+            if barreira.ticks_restantes <= 1 {
+                barreira.defesa_ticks = 0;
+                continue;
+            }
+            let Some(jogador) = self.jogadores.get_mut(&barreira.dono) else {
+                barreira.defesa_ticks = 0;
+                continue;
+            };
+            if !ponto_igual(jogador.posicao, barreira.posicao) {
+                barreira.defesa_ticks = 0;
+                continue;
+            }
+            barreira.defesa_ticks += 1;
+            if barreira.defesa_ticks >= TICKS_AUTOGESTAO_POR_PONTO {
+                jogador.pontos_autogestao = jogador
+                    .pontos_autogestao
+                    .saturating_add(PONTOS_AUTOGESTAO_POR_DEFESA);
+                barreira.defesa_ticks = 0;
+            }
+        }
     }
 
     /// Aplica um comando de coleta, no máximo uma vez por jogador a cada tick.
@@ -391,6 +434,7 @@ impl Mundo {
                 // O tick de criação consome a unidade extra: o valor
                 // serializado ao fim dele é `TICKS_DURACAO_BARREIRA`.
                 ticks_restantes: TICKS_DURACAO_BARREIRA + 1,
+                defesa_ticks: 0,
             },
         );
         if self
@@ -434,7 +478,7 @@ impl Mundo {
             .map(|(&peer_id, jogador)| {
                 let (x, y) = jogador.posicao;
                 format!(
-                    "{0}:{1}:{2}:{3}:{4}:{5}:{6}:{7}:{8}:{9:?}:{10}:{11:?}",
+                    "{0}:{1}:{2}:{3}:{4}:{5}:{6}:{7}:{8}:{9:?}:{10}:{11:?}:{12}",
                     peer_id,
                     x,
                     y,
@@ -447,6 +491,7 @@ impl Mundo {
                     jogador.coleta_ponto,
                     jogador.construcao_ticks,
                     jogador.construcao_ponto,
+                    jogador.pontos_autogestao,
                 )
             })
             .collect::<Vec<_>>()
@@ -460,7 +505,8 @@ impl Mundo {
                 let dono = barreira.dono;
                 let pv = barreira.pv;
                 let ticks = barreira.ticks_restantes;
-                format!("{id}:{dono}:{x}:{y}:{pv}:{ticks}")
+                let defesa = barreira.defesa_ticks;
+                format!("{id}:{dono}:{x}:{y}:{pv}:{ticks}:{defesa}")
             })
             .collect::<Vec<_>>()
             .join(";");

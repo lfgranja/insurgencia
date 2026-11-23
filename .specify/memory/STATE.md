@@ -300,3 +300,16 @@
 | Rede com Lightyear (dep ausente) | 5 | 2 | 1 | 1 | 10/625 |
 
 **Escolha**: `servidor-headless`. É o maior ganho de autoridade sem dependência externa: um binário que possui `Mundo`, consome comandos de entrada determinística e emite hash por tick. Prepara o caminho para rede sem introduzir Lightyear, async ou sockets neste ciclo. R6 permanece **N/A** por constituição v1.2.2.
+
+## 2026-11-23T05:47Z — decisão 80/20 do ciclo 044 (antes da implementação)
+
+**Sessão**: `20261123T054700Z-defesa-barricada` · **Título**: `insurgencia - defesa de barricada`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Defesa de barricada → +1 autogestão/10 s | 4 | 4 | 4 | 4 | **256/625** |
+| Súditos/Propaganda (maioria `[HIPÓTESE]`) | 4 | 2 | 2 | 3 | 48/625 |
+| Ponte provisória | 3 | 3 | 3 | 4 | 108/625 |
+| Rede (bloqueada por ADR-004 até decisão da SE) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `defesa-barricada`. GDD §7.1:306 dá recompensa canônica de +1 ponto de autogestão a cada 10 s de barricada intacta, e o ciclo 040 já entregou a barricada. Nenhuma mudança de stack, dependência ou protocolo. Protótipo usa o dono da barricada como defensor no mesmo ponto; papéis Guerreiro/Artesão ficam registrados como simplificação escopo. R6 permanece **N/A** por constituição v1.2.2.

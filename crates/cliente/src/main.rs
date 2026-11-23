@@ -690,6 +690,7 @@ fn atualizar_texto(
     let remoto = simulacao.0.jogadores.get(&PEER_ID);
     let materiais = remoto.map_or(0, |j| j.materiais);
     let suprimentos = remoto.map_or(0, |j| j.suprimentos);
+    let autogestao = remoto.map_or(0, |j| j.pontos_autogestao);
     let barreiras = simulacao
         .0
         .barreiras
@@ -709,7 +710,7 @@ fn atualizar_texto(
         _ => "nao".to_owned(),
     };
     let conteudo = format!(
-        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nSuprimentos: {suprimentos}\nMateriais: {materiais}\nBarreiras: {barreiras}\nConstruindo: {construindo}\nColeta: {coletando}\nWASD ou setas para mover · B para construir barreira · C para coletar materiais"
+        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nSuprimentos: {suprimentos}\nMateriais: {materiais}\nAutogestão: {autogestao}\nBarreiras: {barreiras}\nConstruindo: {construindo}\nColeta: {coletando}\nWASD ou setas para mover · B para construir barreira · C para coletar materiais"
     );
 
     for mut texto in &mut textos {
