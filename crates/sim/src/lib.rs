@@ -56,6 +56,10 @@ pub const TICKS_PROPAGANDA: i64 = 120;
 /// Ticks de reversão da conversão de um Súdito após dano de jogador (3 s a 30 Hz).
 pub const TICKS_REVERSAO_SUDITO: i64 = 90;
 
+/// Ticks contínuos de presença de Súdito convertido para controlar uma ilha
+/// (10 s a 30 Hz; derivação de protótipo, não número canônico).
+pub const TICKS_CONTROLE_ILHA: i64 = 300;
+
 /// Fôlego máximo por jogador: `[HIPÓTESE]` da GDD §10.1, escolha de protótipo, não cânone.
 pub const FOLEGO_MAXIMO: i64 = 100;
 
@@ -195,6 +199,19 @@ pub struct Sudito {
     pub reversao_ticks: i64,
 }
 
+/// Ilha cujo controle depende da presença contínua de Súdito da Comuna.
+///
+/// Sem mapa no protótipo, a presença de qualquer Súdito convertido é global.
+#[derive(Clone, Copy, Debug)]
+pub struct Ilha {
+    /// Identificador determinístico da ilha.
+    pub id: u64,
+    /// `true` após `TICKS_CONTROLE_ILHA` ticks contínuos de presença.
+    pub controlada: bool,
+    /// Ticks contínuos de presença acumulados, saturando em `TICKS_CONTROLE_ILHA`.
+    pub controle_ticks: i64,
+}
+
 /// Comando enfileirado por um par para o próximo tick.
 #[derive(Clone, Debug)]
 pub struct Comando {
@@ -236,6 +253,11 @@ pub struct Mundo {
     pub proxima_ponte_id: u64,
     /// Súditos indexados por `id`.
     pub suditos: BTreeMap<u64, Sudito>,
+    /// Ilhas indexadas por `id`, em ordem determinística.
+    pub ilhas: BTreeMap<u64, Ilha>,
+    /// Fila de sinais pendentes em ordem FIFO; não é um histórico completo
+    /// dos sinais emitidos.
+    pub sinais: VecDeque<String>,
 }
 
 impl Default for Mundo {
@@ -260,6 +282,8 @@ impl Mundo {
             pontes: BTreeMap::new(),
             proxima_ponte_id: 1,
             suditos: BTreeMap::new(),
+            ilhas: BTreeMap::new(),
+            sinais: VecDeque::new(),
         }
     }
 
@@ -304,6 +328,18 @@ impl Mundo {
                 convertido: false,
                 propaganda_ticks: 0,
                 reversao_ticks: 0,
+            },
+        );
+    }
+
+    /// Insere (ou reinicia) uma ilha com progresso de controle zerado.
+    pub fn adicionar_ilha(&mut self, id: u64) {
+        self.ilhas.insert(
+            id,
+            Ilha {
+                id,
+                controlada: false,
+                controle_ticks: 0,
             },
         );
     }
@@ -390,11 +426,12 @@ impl Mundo {
         self.comandos_pendentes.push_back(comando);
     }
 
-    /// Avança um tick nas fases `prepare`, `skills`, `defesa` e `finish`.
+    /// Avança um tick nas fases `prepare`, `skills`, `defesa`, `controle_ilhas` e `finish`.
     pub fn avancar_tick(&mut self) {
         self.fase_prepare();
         self.fase_skills();
         self.fase_defesa();
+        self.fase_controle_ilhas();
         self.fase_finish();
         self.avancar_reversoes();
         self.tick += 1;
@@ -529,6 +566,33 @@ impl Mundo {
                     .pontos_autogestao
                     .saturating_add(PONTOS_AUTOGESTAO_POR_DEFESA);
                 barreira.defesa_ticks = 0;
+            }
+        }
+    }
+
+    /// Avança o controle das ilhas pela presença de Súdito convertido.
+    ///
+    /// Protótipo sem mapa: qualquer Súdito com `convertido == true` conta como
+    /// presença global em todas as ilhas. A contagem é contínua: um tick sem
+    /// presença zera o progresso e sinaliza a perda das ilhas afetadas.
+    fn fase_controle_ilhas(&mut self) {
+        let presenca = self.suditos.values().any(|sudito| sudito.convertido);
+        let Self { ilhas, sinais, .. } = &mut *self;
+        for (id, ilha) in ilhas.iter_mut() {
+            if presenca {
+                if ilha.controle_ticks < TICKS_CONTROLE_ILHA {
+                    ilha.controle_ticks += 1;
+                }
+                if ilha.controle_ticks == TICKS_CONTROLE_ILHA && !ilha.controlada {
+                    ilha.controlada = true;
+                    sinais.push_back(format!("ilha_convertida:{id}"));
+                }
+            } else {
+                if ilha.controlada || ilha.controle_ticks > 0 {
+                    sinais.push_back(format!("ilha_perdida:{id}"));
+                }
+                ilha.controlada = false;
+                ilha.controle_ticks = 0;
             }
         }
     }
@@ -904,11 +968,9 @@ impl Mundo {
         }
     }
 
-    /// Calcula o hash SHA-256 canônico do estado corrente.
-    #[must_use]
-    pub fn hash_estado(&self) -> String {
-        let jogadores: String = self
-            .jogadores
+    /// Serializa os jogadores em ordem de `peer_id` para o hash canônico.
+    fn serializar_jogadores(&self) -> String {
+        self.jogadores
             .iter()
             .map(|(&peer_id, jogador)| {
                 let (x, y) = jogador.posicao;
@@ -939,7 +1001,13 @@ impl Mundo {
                 )
             })
             .collect::<Vec<_>>()
-            .join(";");
+            .join(";")
+    }
+
+    /// Calcula o hash SHA-256 canônico do estado corrente.
+    #[must_use]
+    pub fn hash_estado(&self) -> String {
+        let jogadores = self.serializar_jogadores();
         let barreiras: String = self
             .barreiras
             .values()
@@ -984,11 +1052,30 @@ impl Mundo {
             })
             .collect::<Vec<_>>()
             .join(";");
+        let ilhas: String = self
+            .ilhas
+            .values()
+            .map(|ilha| format!("{}:{}:{}", ilha.id, ilha.controlada, ilha.controle_ticks))
+            .collect::<Vec<_>>()
+            .join(";");
+        let sinais: String = self
+            .sinais
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join(";");
+
         let entrada = format!(
-            "{tick}|{epoch}|{match_id}|{jogadores}|{barreiras}|{pontes}|{suditos}",
-            tick = self.tick,
-            epoch = self.epoch,
-            match_id = self.match_id,
+            "{0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}",
+            self.tick,
+            self.epoch,
+            self.match_id,
+            jogadores,
+            barreiras,
+            pontes,
+            suditos,
+            ilhas,
+            sinais,
         );
         let resumo = Sha256::digest(entrada.as_bytes());
         format!("{resumo:x}")

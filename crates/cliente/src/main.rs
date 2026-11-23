@@ -804,8 +804,8 @@ fn avancar_simulacao(
     }
 }
 
-/// Atualiza o painel com recursos, Fôlego, Vida, Vida do alvo, barreiras, pontes e
-/// progresso de construção e coleta.
+/// Atualiza o painel com recursos, Fôlego, Vida, Vida do alvo, barreiras, pontes,
+/// progresso de construção e coleta, ilhas controladas e sinais da simulação.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
@@ -850,6 +850,13 @@ fn atualizar_texto(
         .values()
         .filter(|sudito| sudito.convertido)
         .count();
+    let ilhas_controladas = simulacao
+        .0
+        .ilhas
+        .values()
+        .filter(|ilha| ilha.controlada)
+        .count();
+    let sinais = simulacao.0.sinais.len();
     let construindo = match remoto {
         Some(j) if j.construcao_ponto.is_some() => {
             format!("{}/{}", j.construcao_ticks, TICKS_CONSTRUCAO_BARREIRA)
@@ -870,6 +877,7 @@ fn atualizar_texto(
             "Fôlego: {folego}\nVida: {vida}\nAlvo: {vida_alvo}\n",
             "Autogestão: {autogestao}\nBarreiras: {barreiras}\n",
             "Pontes: {pontes}\nSúditos: {suditos}\n",
+            "Ilhas: {ilhas_controladas}\nSinais: {sinais}\n",
             "Construindo: {construindo}\nColeta: {coletando}\n",
             "WASD ou setas para mover · B para construir barreira · P para construir ponte · ",
             "C para coletar materiais · G para propaganda · ",
@@ -889,6 +897,8 @@ fn atualizar_texto(
         barreiras = barreiras,
         pontes = pontes,
         suditos = suditos,
+        ilhas_controladas = ilhas_controladas,
+        sinais = sinais,
         construindo = construindo,
         coletando = coletando,
     );

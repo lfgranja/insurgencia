@@ -361,3 +361,16 @@
 | Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
 
 **Escolha**: `alvo-treino`. A ACR do ciclo 047 apontou que a tecla `Q` gera um comando válido no core, mas o cliente standalone só tem `PEER_ID=1` e nenhum alvo, deixando o ataque inerte e a dica enganosa. Um alvo de treino determinístico resolve o achado sem mudar stack, protocolo ou regra canônica; é scaffolding de protótipo, explicitamente não-canônico. R6 permanece **N/A**.
+
+## 2026-11-23T11:15Z — decisão 80/20 do ciclo 049 (antes da implementação)
+
+**Sessão**: `20261123T111200Z-controle-ilha` · **Título**: `insurgencia - controle de ilha por sudito`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Controle de ilha por Súdito (10 s contínuos) | 4 | 3 | 3 | 3 | **108/625** |
+| Nós de Controle + vitória completa | 4 | 2 | 2 | 3 | 48/625 |
+| Papéis W/E/R + níveis | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `ilhas-vitoria` — subset **controle de ilha**: GDD §9.4:489,501 fixa 10 s contínuos de Súdito da Comuna e sinal `ilha_perdida` quando falta; sem mapa/rede, o protótipo trata Súditos convertidos como presentes globalmente e registra a simplificação. Nós de Controle e Resistência Ideológica ficam para o próximo ciclo. O refresh de `AGENTS.md` solicitado pelo usuário entra neste mesmo commit. R6 permanece **N/A**.

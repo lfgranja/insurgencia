@@ -6,8 +6,9 @@ use insurgencia_sim::{
     CUSTO_BARREIRA_MATERIAIS, CUSTO_PONTE_MATERIAIS, DANO_ATAQUE, FOLEGO_MAXIMO,
     MAX_BARREIRAS_POR_JOGADOR, PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA, PV_PONTE,
     TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA,
-    TICKS_CONSTRUCAO_PONTE, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_PONTE, TICKS_PROPAGANDA,
-    TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE, TICKS_REVERSAO_SUDITO,
+    TICKS_CONSTRUCAO_PONTE, TICKS_CONTROLE_ILHA, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_PONTE,
+    TICKS_PROPAGANDA, TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE,
+    TICKS_REVERSAO_SUDITO,
 };
 
 /// Monta um comando `mover` com os monotônicos já preenchidos.
@@ -2081,4 +2082,222 @@ fn comando_invalido_nao_suprime_ataque_valido_no_mesmo_tick() {
     assert_eq!(mundo.jogadores[&2].vida, 100 - DANO_ATAQUE);
     assert_eq!(mundo.jogadores[&1].combate_ticks, TICKS_COMBATE);
     assert_eq!(mundo.jogadores[&2].combate_ticks, TICKS_COMBATE);
+}
+
+#[test]
+fn ilha_controlada_apos_300_ticks() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_sudito(7, (0.25, 0.0));
+    mundo.adicionar_ilha(3);
+    assert!(!mundo.ilhas[&3].controlada);
+    assert_eq!(mundo.ilhas[&3].controle_ticks, 0);
+
+    if let Some(sudito) = mundo.suditos.get_mut(&7) {
+        sudito.convertido = true;
+    }
+    for _ in 0..(TICKS_CONTROLE_ILHA - 1) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.ilhas[&3].controle_ticks, TICKS_CONTROLE_ILHA - 1);
+    assert!(!mundo.ilhas[&3].controlada);
+    assert!(mundo.sinais.is_empty());
+
+    mundo.avancar_tick();
+    assert_eq!(mundo.ilhas[&3].controle_ticks, TICKS_CONTROLE_ILHA);
+    assert!(mundo.ilhas[&3].controlada);
+    assert_eq!(
+        mundo.sinais.iter().map(String::as_str).collect::<Vec<_>>(),
+        vec!["ilha_convertida:3"]
+    );
+
+    mundo.avancar_tick();
+    assert_eq!(mundo.ilhas[&3].controle_ticks, TICKS_CONTROLE_ILHA);
+    assert_eq!(mundo.sinais.len(), 1);
+}
+
+#[test]
+fn sem_sudito_ilha_perdida_sinal() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_ilha(5);
+    for _ in 0..TICKS_CONTROLE_ILHA {
+        mundo.avancar_tick();
+    }
+    assert!(!mundo.ilhas[&5].controlada);
+    assert_eq!(mundo.ilhas[&5].controle_ticks, 0);
+    assert!(
+        mundo.sinais.is_empty(),
+        "ilha nunca controlada não emite sinal"
+    );
+
+    mundo.adicionar_sudito(7, (0.25, 0.0));
+    if let Some(sudito) = mundo.suditos.get_mut(&7) {
+        sudito.convertido = true;
+    }
+    for _ in 0..10 {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.ilhas[&5].controle_ticks, 10);
+
+    if let Some(sudito) = mundo.suditos.get_mut(&7) {
+        sudito.convertido = false;
+    }
+    mundo.avancar_tick();
+    assert_eq!(mundo.ilhas[&5].controle_ticks, 0);
+    assert!(!mundo.ilhas[&5].controlada);
+    assert_eq!(
+        mundo.sinais.iter().map(String::as_str).collect::<Vec<_>>(),
+        vec!["ilha_perdida:5"]
+    );
+
+    if let Some(sudito) = mundo.suditos.get_mut(&7) {
+        sudito.convertido = true;
+    }
+    for _ in 0..TICKS_CONTROLE_ILHA {
+        mundo.avancar_tick();
+    }
+    assert!(mundo.ilhas[&5].controlada);
+    assert_eq!(
+        mundo.sinais.iter().map(String::as_str).collect::<Vec<_>>(),
+        vec!["ilha_perdida:5", "ilha_convertida:5"]
+    );
+
+    if let Some(sudito) = mundo.suditos.get_mut(&7) {
+        sudito.convertido = false;
+    }
+    mundo.avancar_tick();
+    assert!(!mundo.ilhas[&5].controlada);
+    assert_eq!(mundo.ilhas[&5].controle_ticks, 0);
+    assert_eq!(
+        mundo.sinais.iter().map(String::as_str).collect::<Vec<_>>(),
+        vec!["ilha_perdida:5", "ilha_convertida:5", "ilha_perdida:5"]
+    );
+    for _ in 0..5 {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.sinais.len(), 3);
+
+    // Uma interrupção no meio zera a contagem contínua.
+    let mut interrompida = Mundo::new();
+    interrompida.adicionar_ilha(9);
+    interrompida.adicionar_sudito(1, (0.25, 0.0));
+    if let Some(sudito) = interrompida.suditos.get_mut(&1) {
+        sudito.convertido = true;
+    }
+    for _ in 0..150 {
+        interrompida.avancar_tick();
+    }
+    if let Some(sudito) = interrompida.suditos.get_mut(&1) {
+        sudito.convertido = false;
+    }
+    interrompida.avancar_tick();
+    if let Some(sudito) = interrompida.suditos.get_mut(&1) {
+        sudito.convertido = true;
+    }
+    for _ in 0..150 {
+        interrompida.avancar_tick();
+    }
+    assert_eq!(interrompida.ilhas[&9].controle_ticks, 150);
+    assert!(!interrompida.ilhas[&9].controlada);
+}
+
+#[test]
+fn hash_reflete_ilhas_e_sinais() {
+    let mut primeira = Mundo::new();
+    let mut segunda = Mundo::new();
+    let sem_ilhas = primeira.hash_estado();
+    assert_eq!(sem_ilhas, segunda.hash_estado());
+
+    primeira.adicionar_ilha(2);
+    primeira.adicionar_ilha(7);
+    // Ordem de inserção distinta: a iteração do BTreeMap é canônica.
+    segunda.adicionar_ilha(7);
+    segunda.adicionar_ilha(2);
+    assert_ne!(primeira.hash_estado(), sem_ilhas);
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    if let Some(ilha) = primeira.ilhas.get_mut(&7) {
+        ilha.controle_ticks = 123;
+    }
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+    if let Some(ilha) = segunda.ilhas.get_mut(&7) {
+        ilha.controle_ticks = 123;
+    }
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    if let Some(ilha) = primeira.ilhas.get_mut(&2) {
+        ilha.controlada = true;
+    }
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+    if let Some(ilha) = segunda.ilhas.get_mut(&2) {
+        ilha.controlada = true;
+    }
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    primeira.sinais.push_back("ilha_convertida:2".to_string());
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+    segunda.sinais.push_back("ilha_convertida:2".to_string());
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    // A ordem FIFO faz parte do hash.
+    primeira.sinais.push_back("ilha_perdida:7".to_string());
+    segunda.sinais.push_front("ilha_perdida:7".to_string());
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+    segunda.sinais.pop_front();
+    segunda.sinais.push_back("ilha_perdida:7".to_string());
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    // Reiniciar uma ilha existente também altera o hash.
+    primeira.adicionar_ilha(2);
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+}
+
+#[test]
+fn duas_ilhas_controle_deterministico() {
+    let mut primeira = Mundo::new();
+    let mut segunda = Mundo::new();
+    for mundo in [&mut primeira, &mut segunda] {
+        mundo.adicionar_sudito(7, (0.25, 0.0));
+        if let Some(sudito) = mundo.suditos.get_mut(&7) {
+            sudito.convertido = true;
+        }
+    }
+    primeira.adicionar_ilha(2);
+    primeira.adicionar_ilha(7);
+    segunda.adicionar_ilha(7);
+    segunda.adicionar_ilha(2);
+
+    for _ in 0..TICKS_CONTROLE_ILHA {
+        primeira.avancar_tick();
+        segunda.avancar_tick();
+    }
+    for mundo in [&primeira, &segunda] {
+        assert!(mundo.ilhas[&2].controlada);
+        assert!(mundo.ilhas[&7].controlada);
+        assert_eq!(mundo.ilhas[&2].controle_ticks, TICKS_CONTROLE_ILHA);
+        assert_eq!(mundo.ilhas[&7].controle_ticks, TICKS_CONTROLE_ILHA);
+        assert_eq!(
+            mundo.sinais.iter().map(String::as_str).collect::<Vec<_>>(),
+            vec!["ilha_convertida:2", "ilha_convertida:7"]
+        );
+    }
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    for mundo in [&mut primeira, &mut segunda] {
+        if let Some(sudito) = mundo.suditos.get_mut(&7) {
+            sudito.convertido = false;
+        }
+        mundo.avancar_tick();
+        assert_eq!(
+            mundo.sinais.iter().map(String::as_str).collect::<Vec<_>>(),
+            vec![
+                "ilha_convertida:2",
+                "ilha_convertida:7",
+                "ilha_perdida:2",
+                "ilha_perdida:7"
+            ]
+        );
+        assert!(!mundo.ilhas[&2].controlada);
+        assert!(!mundo.ilhas[&7].controlada);
+    }
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
 }
