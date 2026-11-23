@@ -27,6 +27,12 @@ use insurgencia_sim::{Comando, Mundo, PASSO_SEGUNDOS, TICKS_COLETA, TICKS_CONSTR
 /// Identificador do jogador local no espelho da simulação.
 const PEER_ID: u64 = 1;
 
+/// Identificador do alvo de treino no espelho da simulação (scaffolding não-canônico).
+const PEER_ALVO_TREINO: u64 = 2;
+
+/// Posição fixa do alvo de treino no plano do mapa.
+const ALVO_TREINO_POSICAO: (f64, f64) = (2.0, 0.0);
+
 /// Quantidade de vértices no contorno irregular de cada ilha.
 const LADOS_ILHA: u16 = 8;
 
@@ -69,6 +75,10 @@ struct ModoJanela(bool);
 /// Marca a entidade raiz do avatar.
 #[derive(Component)]
 struct Avatar;
+
+/// Marca o marcador estático do alvo de treino.
+#[derive(Component)]
+struct AlvoTreino;
 
 /// Marca o texto de estado exibido na tela.
 #[derive(Component)]
@@ -461,6 +471,39 @@ fn criar_avatar(
         });
 }
 
+/// Cria o marcador cônico do alvo de treino, estático sobre a ilha.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "As coordenadas do alvo sao literais exatos e cabem em f32"
+)]
+fn criar_alvo_treino(
+    comandos: &mut Commands,
+    malhas: &mut Assets<Mesh>,
+    materiais: &mut Assets<StandardMaterial>,
+) {
+    let material = materiais.add(StandardMaterial {
+        base_color: Color::srgb(0.86, 0.24, 0.18),
+        perceptual_roughness: 0.8,
+        ..default()
+    });
+    let malha = achatar(ConeMeshBuilder::new(RAIO_AVATAR * 0.6, 18.0, 4));
+    let (x, y) = ALVO_TREINO_POSICAO;
+
+    comandos
+        .spawn((
+            Transform::from_xyz(x as f32, ALTURA_ILHA + 3.0, -(y as f32)),
+            AlvoTreino,
+            Visibility::default(),
+        ))
+        .with_children(|filho| {
+            filho.spawn((
+                Mesh3d(malhas.add(malha)),
+                MeshMaterial3d(material),
+                Transform::from_xyz(0.0, 9.0, 0.0),
+            ));
+        });
+}
+
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
@@ -508,6 +551,7 @@ fn configurar(
         criar_ilha(&mut commands, &mut meshes, &mut materiais, ilha, indice_u16);
     }
     criar_avatar(&mut commands, &mut meshes, &mut materiais, jogador.posicao);
+    criar_alvo_treino(&mut commands, &mut meshes, &mut materiais);
 
     commands.spawn((
         Text::new("INSURGÊNCIA — low-poly"),
@@ -528,6 +572,10 @@ fn configurar(
 
     let mut sim = Mundo::new();
     sim.adicionar_jogador(PEER_ID);
+    sim.adicionar_jogador(PEER_ALVO_TREINO);
+    if let Some(alvo) = sim.jogadores.get_mut(&PEER_ALVO_TREINO) {
+        alvo.posicao = ALVO_TREINO_POSICAO;
+    }
     commands.insert_resource(JogadorLocal(jogador));
     commands.insert_resource(ComandoLocal {
         seq: 0,
@@ -680,17 +728,16 @@ fn solicitar_propaganda(
     });
 }
 
-/// Agenda um ataque forte ao pressionar `Q`, usando a própria posição como alvo aproximado.
+/// Agenda um ataque forte ao alvo de treino ao pressionar `Q`.
 ///
-/// Protótipo sem mira: o `destino` é a posição atual do jogador local; a simulação
-/// valida a distância e escolhe o alvo no alcance de contato.
+/// O alvo é scaffolding não-canônico em `ALVO_TREINO_POSICAO`; o núcleo recusa o
+/// ataque quando o jogador está fora do alcance de contato de 2 m.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
 )]
 fn solicitar_ataque(
     teclado: Res<ButtonInput<KeyCode>>,
-    jogador: Res<JogadorLocal>,
     mut local: ResMut<ComandoLocal>,
     mut simulacao: ResMut<Simulacao>,
 ) {
@@ -700,13 +747,12 @@ fn solicitar_ataque(
 
     local.seq += 1;
     local.request_id += 1;
-    let (x, y) = jogador.0.posicao;
     simulacao.0.agendar_comando(Comando {
         peer_id: PEER_ID,
         acao: "atacar_forte".to_owned(),
         seq: local.seq,
         request_id: local.request_id,
-        destino: Some((f64::from(x), f64::from(y))),
+        destino: Some(ALVO_TREINO_POSICAO),
     });
 }
 
@@ -758,8 +804,8 @@ fn avancar_simulacao(
     }
 }
 
-/// Atualiza o painel com recursos, Fôlego, Vida, barreiras, pontes e progresso de
-/// construção e coleta.
+/// Atualiza o painel com recursos, Fôlego, Vida, Vida do alvo, barreiras, pontes e
+/// progresso de construção e coleta.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
@@ -781,6 +827,11 @@ fn atualizar_texto(
     let autogestao = remoto.map_or(0, |j| j.pontos_autogestao);
     let folego = remoto.map_or(0, |j| j.folego);
     let vida = remoto.map_or(0, |j| j.vida);
+    let vida_alvo = if let Some(alvo) = simulacao.0.jogadores.get(&PEER_ALVO_TREINO) {
+        alvo.vida
+    } else {
+        0
+    };
     let barreiras = simulacao
         .0
         .barreiras
@@ -816,12 +867,13 @@ fn atualizar_texto(
             "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\n",
             "Limites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\n",
             "Suprimentos: {suprimentos}\nMateriais: {materiais}\n",
-            "Fôlego: {folego}\nVida: {vida}\n",
+            "Fôlego: {folego}\nVida: {vida}\nAlvo: {vida_alvo}\n",
             "Autogestão: {autogestao}\nBarreiras: {barreiras}\n",
             "Pontes: {pontes}\nSúditos: {suditos}\n",
             "Construindo: {construindo}\nColeta: {coletando}\n",
             "WASD ou setas para mover · B para construir barreira · P para construir ponte · ",
-            "C para coletar materiais · G para propaganda · Q para atacar"
+            "C para coletar materiais · G para propaganda · ",
+            "Aproxime-se do alvo e use Q para atacar"
         ),
         x = x,
         y = y,
@@ -832,6 +884,7 @@ fn atualizar_texto(
         materiais = materiais,
         folego = folego,
         vida = vida,
+        vida_alvo = vida_alvo,
         autogestao = autogestao,
         barreiras = barreiras,
         pontes = pontes,

@@ -1,0 +1,35 @@
+# Release (R7) — 048-alvo-treino
+
+**Data:** 2026-11-23T08:19Z · **Versão:** `1.0.0-local` (SemVer, pré-release local) · **R4:** aprovado em `.specify/validations/alvo-treino/validate.md` **(condicionado à execução do roteiro)**, antes desta release
+
+**Aviso de valor:** alvo de treino é **scaffolding de protótipo, explicitamente não-canônico**. Não cria regra de produto, não altera GDD e não promove números: custo 30, dano 10, alcance 2 m e regeneração de Fôlego permanecem **`[HIPÓTESE]`** do ciclo 047. O ciclo apenas corrige, no cliente standalone, a limitação registrada na ACR 047: `Q` gera comando válido, mas não há alvo contra o qual exercê-lo.
+
+## Changelog
+
+### [1.0.0-local] — 2026-11-23
+
+### Added
+- FR-001 / T001, T002 — rotulação e âncoras registradas: ACR 047 (`release.md`, "Limitação da verificação do cliente standalone") motiva o ciclo; decisão 80/20 em `.specify/memory/STATE.md` (2026-11-23T08:18Z) escolhe alvo de treino **240/625** (`3×4×4×5`) contra ilhas/vitória 48 e rede 10, com R1 `go`. Constantes documentadas `PEER_ALVO_TREINO = 2` e `ALVO_TREINO_POSICAO = (2.0, 0.0)` em `crates/cliente/src/main.rs`, identificadas como protótipo não-canônico; nenhum valor de combate promovido a cânone, nenhum `[NEEDS CLARIFICATION]` aberto.
+- FR-002 / T003, T004 — presença do alvo no cliente: `configurar` preserva `PEER_ID = 1` e registra o peer 2 no espelho `Mundo`, posicionando-o em `(2.0, 0.0)`; spawn de marcador simples (cubo/cone) com componente `AlvoTreino`, na convenção de coordenadas do avatar. Nenhuma alteração em `crates/sim`: `Mundo`, `adicionar_jogador`, casamento de alvo por `ponto_igual` e `aplicar_ataque` permanecem como entregues no ciclo 047.
+- FR-003 / T005, T006 — uso do comando: `solicitar_ataque` passa a enviar `destino = ALVO_TREINO_POSICAO` em vez da posição do jogador, mantendo `KeyCode::KeyQ`, uma pressão por comando e `seq`/`request_id` monotônicos. O core continua responsável pela validação: o alvo é casado por igualdade exata e o ataque é recusado quando a distância do jogador ao destino é `> 2.0` (2,0 m inclusivo). Dano 10 com piso zero e vida inicial 100 permanecendo como `[HIPÓTESE]`; sem respawn de vida no mesmo binário — para recomeçar, reiniciar a aplicação.
+- FR-004 / T007 — orientação e feedback: `atualizar_texto` mostra **`Alvo: {vida}`** com a vida lida de `jogadores[PEER_ALVO_TREINO]`, distinta de `Vida: N` (jogador local), e a dica passa a ser **"Aproxime-se do alvo e use Q para atacar"**, substituindo a dica enganosa "Q para atacar". Todos os campos anteriores do HUD preservados; nenhum campo de protocolo novo.
+- FR-005 / T001–T012 — fronteira, determinismo e regras Rust: nenhuma mudança em `crates/sim`, `crates/contratos`, `PROTOCOL_VERSION`, `Cargo.toml`/`Cargo.lock`, manifesto, CI ou stack; sem Lightyear, async, sockets, relógio externo, aleatoriedade ou `HashMap`. O peer 2 nasce de constantes, em ordem estável, e a cobertura determinística existente da sim segue válida. Convenções mantidas: `#![forbid(unsafe_code)]`, `#![deny(clippy::pedantic)]`, sem `unwrap()`/`.expect()`/`#[allow]` (o atributo `#[expect(...)]` preexistente não é chamada `.expect()`), `max_width = 100` e `///` em itens públicos.
+- FR-006 / T009–T012 — governança registrada: constituição **v1.2.2**, ordem `... 09 checklist → revisão → 10 tasks (T009) → 11 analyze (T010, READ-ONLY) → 12 implement → 13 converge → 27 validate (T011, R4) → 26 release (T012, R7 `1.0.0-local`)`; R1 `go`, R4 condicionado ao roteiro e antes de R7, `converge` append-only; **R6 N/A** — fora da sequência executável até existir `resolve-tasks.sh`/adaptador, PARE se invocada, nenhuma issue simulada, nenhum `gh` improvisado, dívida de automação registrada.
+- FR-006 / T012 — rastreabilidade formal: `test-roadmap.md` escrito antes do PR com **exatamente 10 passos** cobrindo âncora e rotulação, peer 2 e marcador, posição/destino e alcance de 2 m, dica/HUD, `Q` em alcance, `Q` fora de alcance, dano visível e piso, fronteira e regras Rust, execução `--minimizado` com capturas de terminal/HUD e governança/R6 N/A. Toda execução de cliente usa `--minimizado`; não há superfície automatizável de imagem, então a captura visual real é **[NV]** e a verificação do HUD é estrutural.
+- FR-006 / T012 — não-execução: nenhum build/gate/formatador/teste/commit/push/PR/merge/deploy; nenhum verde afirmado sem comando; pendências **[NV]**; código, gates e verificação ao SWE/orquestrador.
+
+## Rastreabilidade
+
+FR-001..FR-006 · SC-001..SC-006 · T001..T012 (`tasks` = T009, `analyze` READ-ONLY = T010, `converge`/R4 = T011, `release` R7 = T012) · R1 `go` (`.specify/memory/STATE.md`, decisão 80/20 do ciclo 048, 240/625 `3×4×4×5`) · R4 (`.specify/validations/alvo-treino/validate.md`, aprovado condicionado à execução do roteiro) · roteiro (`.specify/validations/alvo-treino/test-roadmap.md`, passos 1–10) · âncoras: ACR 047 em `.specify/releases/combate-folego/release.md`, `crates/cliente/src/main.rs`, `crates/cliente/src/lib.rs:18` e `crates/sim/src/lib.rs:72,75,108-110,267-276,472-503` · constituição v1.2.2.
+
+## Rollback
+
+Para reverter o ciclo 048: excluir os 5 artefatos escritos nesta etapa — `specs/048-alvo-treino/analyze.md`, `specs/048-alvo-treino/converge.md`, `.specify/validations/alvo-treino/test-roadmap.md`, `.specify/validations/alvo-treino/validate.md` e `.specify/releases/alvo-treino/release.md` — preservando ou restaurando `specs/048-alvo-treino/spec.md`, `plan.md`, `tasks.md` e `checklists/` conforme o estado de chegada definido pelo SDD. Se a implementação tiver sido entregue pelo SWE, remover as constantes `PEER_ALVO_TREINO`/`ALVO_TREINO_POSICAO`, o registro e a posição do peer 2, o marcador `AlvoTreino`, a linha `Alvo: {vida}` e a dica de aproximação; restaurar `solicitar_ataque` com o `destino` original (posição do jogador) e a dica "Q para atacar". Não tocar `PEER_ID = 1`, `crates/sim`, contratos, protocolo, Cargo, stack ou quaisquer outros ciclos. Rollback documentado, **nunca executado** por este agente.
+
+## Não incluído
+
+Implementação em `crates/cliente/src/main.rs` por este agente; mudanças em `crates/sim`, `crates/contratos`, `PROTOCOL_VERSION`, Cargo, stack, dependências, rede, GDD ou regra canônica de combate; execução de `./verify.sh`, gates, roteiro, testes, capturas ou formatadores; promessa de captura visual real da janela minimizada; adoção de R6 como regra ativa, `taskstoissues`/`resolve-tasks.sh` ou simulação de issues e `gh` improvisado; edição de `converge.md` existente, `.specify/memory/STATE.md`, `.specify/feature.json`, `AGENTS.md`, `concurrency.jsonl` ou paths alheios; commits, push, PRs, merge, deploy, assinatura GPG deste agente — todos **[NV]** até o orquestrador/SWE.
+
+## Execução pelo orquestrador — 2026-11-23T08:29Z
+
+R4 foi cumprido: roteiro **10/10 PASS**, `./verify.sh` **ALL STAGES OK** com **101/101 testes**, evidência em `.specify/validations/alvo-treino/evidence.md`. Peer 2, marcador, destino do `Q`, HUD e dica passam a fazer parte do escopo entregue como scaffolding não-canônico. Rollback segue documentado e não executado; promoção e merge em `main` dependem do SWE.

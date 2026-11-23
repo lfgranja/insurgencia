@@ -117,6 +117,10 @@
     "specs/047-combate-folego/converge.md": {
       "bytes": 7545,
       "sha256": "a784f2adff1f8881b187c5d09843855a36a97d9747e7e98b0b5231455ab7961c"
+    },
+    "specs/048-alvo-treino/converge.md": {
+      "bytes": 8018,
+      "sha256": "5bbaf33eb29d16a115b3f11e5a34ccbc94b5dd041abe0c6218998edca91fe920"
     }
   },
   "_provenance": {

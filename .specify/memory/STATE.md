@@ -349,3 +349,15 @@
 | Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
 
 **Escolha**: `combate-folego`. Única frente de produto restante sem mudança de stack: GDD §10.1 define Fôlego 100, regeneração 10/s fora de combate e 5/s em combate, todos rotulados `[HIPÓTESE]`; a spec deve registrá-los como escolhas de protótipo, não dogmas canônicos. Dano e alcance também hipotéticos. R6 permanece **N/A**.
+
+## 2026-11-23T08:18Z — decisão 80/20 do ciclo 048 (antes da implementação)
+
+**Sessão**: `20261123T081800Z-alvo-treino` · **Título**: `insurgencia - alvo de treino jogavel`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Alvo de treino no cliente standalone | 3 | 4 | 4 | 5 | **240/625** |
+| Ilhas/condição de vitória | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `alvo-treino`. A ACR do ciclo 047 apontou que a tecla `Q` gera um comando válido no core, mas o cliente standalone só tem `PEER_ID=1` e nenhum alvo, deixando o ataque inerte e a dica enganosa. Um alvo de treino determinístico resolve o achado sem mudar stack, protocolo ou regra canônica; é scaffolding de protótipo, explicitamente não-canônico. R6 permanece **N/A**.
