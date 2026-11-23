@@ -459,9 +459,6 @@ impl Mundo {
 
     /// Aplica no máximo um `atacar_forte` por atacante a cada tick.
     fn aplicar_ataque(&mut self, comando: &Comando, ataques: &mut BTreeSet<u64>) {
-        if !ataques.insert(comando.peer_id) {
-            return;
-        }
         let Some(destino) = comando.destino else {
             return;
         };
@@ -486,6 +483,11 @@ impl Mundo {
             return;
         }
         if folego < CUSTO_ATAQUE_FOLEGO {
+            return;
+        }
+        // A cota só é consumida por um ataque válido: um comando recusado não pode
+        // suprimir um ataque válido do mesmo atacante neste tick.
+        if !ataques.insert(comando.peer_id) {
             return;
         }
         if let Some(atacante) = self.jogadores.get_mut(&comando.peer_id) {

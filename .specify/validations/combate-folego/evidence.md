@@ -20,3 +20,12 @@
 **Gate agregado (07:54Z)**: `./verify.sh` **ALL STAGES OK**, **100 testes run: 100 passed** (93 anteriores + 7 novos), `VERIFY_EXIT=0`. Vários REDs determinísticos foram corrigidos na fonte antes do verde: sintaxe `concat!` no HUD, janela de combate serializada em 90, piso de vida 0 e movimento fora do limite no teste de dois atacantes. `cargo fmt --all` aplicado uma vez.
 
 **Limitações**: todos os valores de combate são `[HIPÓTESE]`/escolha de protótipo conforme GDD §10.1 — nenhum é apresentado como cânone.
+
+## Ajuste documental pós-ACR — 2026-11-23
+
+- **Correção da deduplicação (P2):** `ataques.insert(comando.peer_id)` passa a ocorrer depois de todas as validações (destino/alvo, alcance e Fôlego) e imediatamente antes do débito de Fôlego e do dano. Um comando recusado não registra o atacante e, portanto, não consome a cota de ataque do tick: um comando válido do mesmo `peer_id` no mesmo tick aplica custo **30** e dano **10** normalmente. Caso coberto pelo teste determinístico `comando_invalido_nao_suprime_ataque_valido_no_mesmo_tick`, na sim. O histórico **10/10 PASS** do roteiro e **100/100 testes** do `./verify.sh` acima permanece intacto como registro da execução de 07:54Z; a revalidação do ajuste fica **[NV]** e cabe ao orquestrador, sem gates, build, testes ou formatadores executados por este agente.
+- **Limitação da verificação do cliente standalone (P2/P3):** o cliente roda com um único jogador local (`PEER_ID = 1`, `crates/cliente/src/main.rs`), sem segundo jogador nem spawn remoto. A tecla `Q` emite `atacar_forte` e o comando é validado pelo core, mas o dano depende de um alvo existente no `destino`; sem alvo, o HUD não apresenta queda de `Vida`. A verificação do cliente é **estrutural** (comando gerado, rótulos `Fôlego`/`Vida` presentes, contrato intacto), **não visual**; a ausência de dano na tela do cliente isolado não é falha e não substitui os testes determinísticos da sim.
+
+### Revalidação final — 2026-11-23T08:02Z
+
+- `./verify.sh` **ALL STAGES OK** com **101 testes run: 101 passed** (100 anteriores + 1 novo teste `comando_invalido_nao_suprime_ataque_valido_no_mesmo_tick`), `VERIFY_EXIT=0`. Cinco gates locais PASS. O verde anterior de 100 testes foi descartado; a decisão usa o head corrigido. Um bloco duplicado de validação introduzido durante a edição do dedup foi removido da fonte antes do verde.

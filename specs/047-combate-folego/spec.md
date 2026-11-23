@@ -34,7 +34,7 @@ O núcleo determinístico dá efeito à ação `atacar_forte`, já presente em `
 
 ### US3 — Validação de alvo, alcance, Fôlego e deduplicação (P1)
 
-`atacar_forte` é recusado quando não há jogador no `destino` informado ou quando o alvo está além do alcance contato (`[HIPÓTESE]` de **2 m**) — `CodigoRecusa::AlvoInvalido` — e quando o atacante tem Fôlego abaixo do custo (`[HIPÓTESE]` de **30**) — `CodigoRecusa::FolegoInsuficiente`. Um `BTreeSet<u64>` rastreia os **peer_ids dos atacantes** já atendidos no tick corrente, garantindo **no máximo um ataque por jogador por tick** mesmo com flood de comandos; a validação do alvo usa o mesmo critério de ponto exato já adotado para coleta e construção.
+`atacar_forte` é recusado quando não há jogador no `destino` informado ou quando o alvo está além do alcance contato (`[HIPÓTESE]` de **2 m**) — `CodigoRecusa::AlvoInvalido` — e quando o atacante tem Fôlego abaixo do custo (`[HIPÓTESE]` de **30**) — `CodigoRecusa::FolegoInsuficiente`. O `peer_id` entra no `BTreeSet<u64>` de atacantes atendidos no tick corrente **somente depois** de todas as validações (destino/alvo, alcance e Fôlego), garantindo **no máximo um ataque por jogador por tick** e que uma recusa não consuma a cota de um comando válido no mesmo tick; a validação do alvo usa o mesmo critério de ponto exato já adotado para coleta e construção.
 
 **Why this priority**: sem deduplicação por atacante, comandos repetidos drenariam Fôlego e causariam dano múltiplo no mesmo tick, quebrando o determinismo; sem validação de alvo/alcance/Fôlego o ataque agiria à distância e sem custo (Princípio VI).
 
@@ -102,6 +102,8 @@ A implementação permanece no core determinístico e no cliente já existentes,
 - `folego = 10`, dano de ataque: vida vai a `0` por `saturating_sub`; novos ataques ao mesmo alvo não produzem valor negativo.
 - Dois comandos `atacar_forte` do mesmo atacante no mesmo tick: custo e dano aplicados uma única vez (`BTreeSet<u64>` de peer_ids).
 - Dois atacantes distintos no mesmo tick, cada um com seu alvo: ambos atacam (dedup é por atacante, não global).
+- Comando `atacar_forte` inválido (destino/alvo, alcance ou Fôlego) seguido de um comando válido do mesmo `peer_id` no mesmo tick: a recusa não registra o atacante no `BTreeSet<u64>`; o comando válido aplica custo e dano normalmente — a cota de ataque do tick não é consumida por comando inválido.
+- Cliente standalone (`PEER_ID = 1` em `crates/cliente/src/main.rs`): sem segundo jogador/spawn não há alvo no `destino`, logo a tecla `Q` gera o comando validado pelo core, mas o HUD não mostra dano; a verificação do cliente é estrutural, não visual.
 - Alvo no `destino` mas a mais de **2 m** (`[HIPÓTESE]`) do atacante: `AlvoInvalido`, sem custo de Fôlego.
 - `destino` sem jogador correspondente: `AlvoInvalido`, sem pânico.
 - `combate_ticks = 1`: o último tick decrementa para 0; a regeneração seguinte já usa a taxa fora de combate.
@@ -139,7 +141,7 @@ A implementação permanece no core determinístico e no cliente já existentes,
 - O combate é representado por `combate_ticks` no estado, no hash e na taxa de regeneração; **nenhum sistema de física, projétil, animação ou habilidade completa é simulado** — apenas o ataque forte determinístico.
 - Dano é aplicado no alvo por `saturating_sub` sobre `vida`; a API de dano de Súditos do ciclo 046 permanece como está e não é reaberta.
 - Alvo é identificado pelo `destino` do comando: exige jogador nesse ponto (`ponto_igual`) e distância ≤ 2 m (`[HIPÓTESE]`) do atacante. Sem alvo ou fora de alcance, `AlvoInvalido`.
-- Deduplicação por `BTreeSet<u64>` de **peer_ids dos atacantes**: no máximo um ataque por jogador por tick; atacantes distintos não se bloqueiam.
+- Deduplicação por `BTreeSet<u64>` de **peer_ids dos atacantes**: no máximo um ataque por jogador por tick; atacantes distintos não se bloqueiam. O registro ocorre após todas as validações, então uma recusa não consome a cota do tick.
 - A vedação a `unwrap`/`expect`/`#[allow]` não atinge o atributo de lint `#[expect(clippy::needless_pass_by_value, reason = "...")]`: é atributo permitido, distinto da chamada de método `.expect()`; a vedação a `expect` refere-se a `.expect()`.
 - As hipóteses de progressão do GDD (desbloqueio Q/W/E/R, teto de nível 12, alcances curto 6 m/médio 12 m/ilha 25 m, funções e ultimate) ficam **fora de escopo**; este ciclo usa apenas `Q` como atalho do ataque forte.
 - Súditos/Propaganda (ciclo 046), barricada (044), ponte provisória (045) e autogestão permanecem como estão; nenhum efeito colateral nesses subsistemas.

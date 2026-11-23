@@ -2058,3 +2058,27 @@ fn um_ataque_por_jogador_por_tick() {
         assert_eq!(outro.jogadores[&peer_id].combate_ticks, TICKS_COMBATE);
     }
 }
+
+#[test]
+fn comando_invalido_nao_suprime_ataque_valido_no_mesmo_tick() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    let ponto = (0.5, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    agendar_mover(&mut mundo, 2, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    // Destino sem alvo: comando inválido, mas primeiro na fila do mesmo tick.
+    mundo.agendar_comando(comando_ataque(1, 2, 2, (9.0, 9.0)));
+    agendar_ataque(&mut mundo, 1, 3, 3, ponto);
+    mundo.avancar_tick();
+
+    assert_eq!(
+        mundo.jogadores[&1].folego,
+        FOLEGO_MAXIMO - CUSTO_ATAQUE_FOLEGO
+    );
+    assert_eq!(mundo.jogadores[&2].vida, 100 - DANO_ATAQUE);
+    assert_eq!(mundo.jogadores[&1].combate_ticks, TICKS_COMBATE);
+    assert_eq!(mundo.jogadores[&2].combate_ticks, TICKS_COMBATE);
+}
