@@ -262,6 +262,12 @@ impl Mundo {
                 barreira.defesa_ticks = 0;
                 continue;
             }
+            // `fase_finish` remove a barricada quando `ticks_restantes` chega a
+            // 1 neste tick: não acumular nem creditar defesa que não sobrevive.
+            if barreira.ticks_restantes <= 1 {
+                barreira.defesa_ticks = 0;
+                continue;
+            }
             let Some(jogador) = self.jogadores.get_mut(&barreira.dono) else {
                 barreira.defesa_ticks = 0;
                 continue;

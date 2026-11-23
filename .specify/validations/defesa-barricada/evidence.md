@@ -8,7 +8,7 @@
 | 2 | 300 ticks/+1 | `defesa_gera_ponto_apos_300_ticks`: `exit=0`, 1 passed | PASS | `caso-300-ticks.txt` |
 | 3 | Dono fora do ponto | `dono_fora_do_ponto_nao_pontua`: `exit=0`, 1 passed | PASS | `dono-fora.txt` |
 | 4 | Destruição | `barricada_destruida_nao_pontua`: `exit=0`, 1 passed | PASS | `destruicao.txt` |
-| 5 | Expiração | `barricada_expira_apos_360_ticks`: `exit=0`, 1 passed | PASS | `expiracao.txt` |
+| 5 | Expiração | `barricada_expira_apos_360_ticks`: `exit=0`, 1 passed; o teste também afirma `pontos_autogestao == 0` e `defesa_ticks == 0` ao final | PASS | `expiracao.txt` |
 | 6 | Janela única/sem dupla contagem | `terceira_barricada_remove_a_mais_antiga`: `exit=0`, 1 passed | PASS | `janela-unica.txt` |
 | 7 | Hash/determinismo | `hash_reflete_autogestao`, `hash_deterministico`, `determinismo_de_duas_simulacoes_identicas`: `exit=0`, 1 passed cada | PASS | `hash-determinismo.txt` |
 | 8 | HUD | `Autogestão` presente em `atualizar_texto`; campos anteriores preservados | PASS (inspeção) | `hud.txt` |
@@ -20,3 +20,7 @@
 **Gate agregado (05:55Z)**: `./verify.sh` **ALL STAGES OK**, **76 testes run: 76 passed** (72 anteriores + 4 novos), `VERIFY_EXIT=0`. `cargo fmt --all` aplicado uma vez antes do gate. Nenhum `#[allow]` introduzido.
 
 **Nota de fase**: a documentação foi alinhada ao comportamento entregue: `fase_defesa` roda entre `fase_skills` e `fase_finish`; a expiração permanece em `fase_finish`.
+
+**Nota pós-ACR (2026-11-23):** as asserções finais `pontos_autogestao == 0` e `defesa_ticks == 0` do passo 5 foram reforçadas no teste `barricada_expira_apos_360_ticks` após a revisão do PR #56; o registro de execução acima permanece como histórico.
+
+**Nota pós-ACR (janela, 2026-11-23):** a regra do passo 6 foi corrigida no roteiro: cada barricada credita +1 por janela de 300 ticks, duas barricadas sobrepostas do mesmo dono podem somar +2 e a mesma barricada nunca credita duas vezes na janela; a linha histórica do passo 6 acima permanece inalterada.

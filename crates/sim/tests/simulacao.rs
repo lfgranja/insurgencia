@@ -752,13 +752,43 @@ fn barricada_expira_apos_360_ticks() {
     concluir_barreira(&mut mundo, 1, 2, ponto);
     assert_eq!(mundo.barreiras[&1].ticks_restantes, TICKS_DURACAO_BARREIRA);
 
+    // Este caso cobre só a expiração: o dono sai do ponto para que a defesa
+    // não credite durante os 360 ticks e o saldo final seja verificável.
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.posicao = (0.75, 0.75);
+    }
+
     for _ in 0..(TICKS_DURACAO_BARREIRA - 1) {
         mundo.avancar_tick();
     }
     assert_eq!(mundo.barreiras[&1].ticks_restantes, 1);
+    let defesa_ticks_antes = mundo.barreiras[&1].defesa_ticks;
     mundo.avancar_tick();
     assert!(mundo.barreiras.is_empty());
     assert_eq!(mundo.proxima_barreira_id, 2);
+    assert_eq!(defesa_ticks_antes, 0);
+    assert_eq!(mundo.jogadores[&1].pontos_autogestao, 0);
+}
+
+#[test]
+fn defesa_nao_credita_no_tick_de_expiracao() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let ponto = (0.25, 0.0);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.posicao = ponto;
+    }
+    mundo
+        .barreiras
+        .insert(1, barreira_teste(1, 1, ponto, PV_BARREIRA, 1));
+    if let Some(barreira) = mundo.barreiras.get_mut(&1) {
+        barreira.defesa_ticks = TICKS_AUTOGESTAO_POR_PONTO - 1;
+    }
+
+    mundo.avancar_tick();
+
+    assert!(mundo.barreiras.is_empty());
+    assert_eq!(mundo.jogadores[&1].pontos_autogestao, 0);
 }
 
 #[test]

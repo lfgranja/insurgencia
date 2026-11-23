@@ -31,3 +31,9 @@ FR-001..FR-006 e SC-001..SC-006 registrados na spec, com rastreabilidade até `.
 - **Defesa entregue**: `pontos_autogestao` em `Jogador` e `defesa_ticks` em `Barreira`, `fase_defesa` entre `fase_skills` e `fase_finish`, +1 após 300 ticks com dono no mesmo ponto, hash refletivo e HUD `Autogestão`.
 - **Alinhamento documental**: spec/roadmap/validate/release passaram a descrever `fase_defesa`, não defesa dentro de `fase_finish`.
 - **Fronteira**: contratos, `PROTOCOL_VERSION`, Cargo e stack intactos; nenhum papel ou rede adicionado. `[NV]`: CI/merge do ciclo 044 e decisão do SWE sobre PR #48.
+
+### Correção pós-ACR — 2026-11-23
+
+- **Guarda de expiração**: `fase_defesa` passou a ignorar barricadas com `ticks_restantes <= 1`, o tick em que `fase_finish` remove a barreira; não há acúmulo nem crédito nesse tick e `defesa_ticks` fica irrelevante. Testes: `defesa_nao_credita_no_tick_de_expiracao` (novo, estado público com `ticks_restantes = 1` e dono no ponto) e `barricada_expira_apos_360_ticks` com asserções finais `pontos_autogestao == 0` e `defesa_ticks == 0`.
+- **Documentação alinhada**: FR-003 em `checklists/requirements.md` descreve `fase_defesa` entre `fase_skills` e `fase_finish` (não defesa em `fase_finish` após decremento/`retain`); passo 6 de `test-roadmap.md` descreve a janela por barricada (+1 por 300 ticks, duas barricadas sobrepostas do mesmo dono podem creditar +2, a mesma barricada nunca credita duas vezes na janela); passo 5 de `evidence.md` registra as asserções reforçadas; `validate.md` registra a correção. Histórico anterior preservado, sem reescrita.
+- **Fronteira**: nenhum gate, build, teste, formatador, commit, push ou PR executado por este agente nesta correção; CI/merge do ciclo 044 e decisão sobre PR #56 continuam a cargo do orquestrador.
