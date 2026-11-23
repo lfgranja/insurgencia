@@ -32,3 +32,9 @@ Nenhum teste foi afrouxado; todos os RED corrigidos na fonte e o verde final usa
 ## Limitações
 
 Análise Materialista, 20 Fôlego, 12 m, 150 ticks (5 s), recarga 450 ticks (15 s), bônus 25% (10 → 12) e tecla `E` são `[HIPÓTESE]`/protótipo de GDD §10.2. Escopo restrito a PNJs: sem afetar jogadores, estruturas, visibilidade, canalização, RNG, magia, mapa, rede, protocolo, Cargo, habilidades W/R ou janela normal. Captura visual real **[NV]**; CI remoto e merge **[NV]** até execução pelo orquestrador.
+
+## ACR pós-PR #66 (17:28Z)
+
+- ACR: nenhum BLOCKER. Um NONBLOCKER em `crates/cliente/src/main.rs:884`: `posicao_analise_materialista` não exigia `pnj.ativo`, permitindo que `E` escolhesse um PNJ morto e avançasse `seq`/`request_id` com comando recusado. Corrigido no predicado do `.filter(...)`: `pnj.ativo && dx.mul_add(dx, dy * dy) <= alcance2`.
+- Reexecução: `./verify.sh` **ALL STAGES OK**, **136 testes run: 136 passed, 0 skipped**, `VERIFY_EXIT=0`; cinco gates locais PASS. Nenhuma expectativa afrouxada.
+- CI remoto no commit anterior (`1050c47`): `gates` e `rust` SUCCESS. O head corrigido será revalidado antes do merge. R6 permanece **N/A**, versão `1.0.0-local` não promovida.

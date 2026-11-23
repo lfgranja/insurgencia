@@ -881,7 +881,7 @@ fn posicao_analise_materialista(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f
         .filter(|pnj| {
             let dx = pnj.posicao.0 - x;
             let dy = pnj.posicao.1 - y;
-            dx.mul_add(dx, dy * dy) <= alcance2
+            pnj.ativo && dx.mul_add(dx, dy * dy) <= alcance2
         })
         .min_by(|a, b| {
             let da = (a.posicao.0 - x).mul_add(a.posicao.0 - x, (a.posicao.1 - y).powi(2));

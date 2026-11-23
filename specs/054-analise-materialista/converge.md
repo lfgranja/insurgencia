@@ -31,3 +31,9 @@ FR-001..FR-006 e SC-001..SC-006 registrados na spec, com rastreabilidade até `.
 - **Implementação**: `marca_ticks`, `analise_recarga_ticks`, cinco constantes `[HIPÓTESE]`, ação nível 3, bônus 10→12, recarga 450 ticks, hash, HUD `Análise: N` e tecla `E` executados na worktree, sob orquestração.
 - **Correção na fonte**: três RED corrigidos na fonte — especificadores de hash restaurados, `validar` fragmentado em helpers sem mudar precedência de recusas e `"atacar_no" => 6` restaurado no mapa de níveis após regressão detectada por `acao_bloqueada_por_nivel`. Nenhuma expectativa afrouxada.
 - **Fronteira**: CI/merge do ciclo 054, acionamento de R6, promoção de `1.0.0-local` a `1.0.0` e decisão do SWE sobre PRs permanecem **[NV]** nesta entrada; executados pelo orquestrador em etapa posterior.
+
+### ACR pós-PR #66 — 2026-11-23T17:28Z
+
+- **ACR**: nenhum BLOCKER; um NONBLOCKER em `posicao_analise_materialista` (`cliente:884`) corrigido ao exigir `pnj.ativo` no filtro de alvo da tecla `E`, evitando comando recusado com monotônicos avançados.
+- **Verificação**: `./verify.sh` ALL STAGES OK, **136 testes run: 136 passed, 0 skipped**, `VERIFY_EXIT=0`; cinco gates locais PASS; detalhes em `.specify/validations/analise-materialista/evidence.md`.
+- **Fronteira**: CI do novo head, merge e promoção continuam **[NV]** até verificação ao vivo. R6 permanece **N/A**, scorecard **48/625**, versão `1.0.0-local` não promovida. A seção `[NV]` e o green de 17:20Z acima permanecem como histórico pré-ACR.

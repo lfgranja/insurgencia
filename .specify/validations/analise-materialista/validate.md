@@ -27,3 +27,7 @@ Aprovado para R7, **condicionado à execução do roteiro de 10 passos** pelo or
 ## Execução observada (2026-11-23T17:20Z)
 
 Roteiro **10/10 PASS** (`evidence.md`); `./verify.sh` **ALL STAGES OK**, **136 testes run: 136 passed, 0 skipped** (131 anteriores + 5 novos), `VERIFY_EXIT=0`. Cinco gates locais PASS após bootstrap do baseline (`files=36 baselined=36`). Três RED corrigidos na fonte (hash, extração de helpers de validação e restauração do gate R6 `atacar_no => 6`); nenhuma expectativa afrouxada. R4 PASS sobre o estado verificado; R7 `1.0.0-local` não promovido; R6 N/A. CI remoto/merge/promoção **[NV]** até verificação ao vivo.
+
+## ACR pós-PR #66 — 2026-11-23T17:28Z
+
+Nenhum BLOCKER; um NONBLOCKER corrigido: `posicao_analise_materialista` agora exige `pnj.ativo`, garantindo que a tecla `E` só agenda análise com alvo válido e não avança monotônicos em comando recusado. Reexecução: `./verify.sh` ALL STAGES OK, **136 testes run: 136 passed**, cinco gates locais PASS. R4 permanece PASS sobre o head corrigido; R7 `1.0.0-local` não promovido; R6 N/A. CI do novo head e merge **[NV]** até verificação ao vivo.
