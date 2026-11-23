@@ -255,7 +255,8 @@ pub struct Mundo {
     pub suditos: BTreeMap<u64, Sudito>,
     /// Ilhas indexadas por `id`, em ordem determinística.
     pub ilhas: BTreeMap<u64, Ilha>,
-    /// Sinais pendentes em ordem FIFO.
+    /// Fila de sinais pendentes em ordem FIFO; não é um histórico completo
+    /// dos sinais emitidos.
     pub sinais: VecDeque<String>,
 }
 
@@ -576,22 +577,19 @@ impl Mundo {
     /// presença zera o progresso e sinaliza a perda das ilhas afetadas.
     fn fase_controle_ilhas(&mut self) {
         let presenca = self.suditos.values().any(|sudito| sudito.convertido);
-        let ids: Vec<u64> = self.ilhas.keys().copied().collect();
-        for id in ids {
-            let Some(ilha) = self.ilhas.get_mut(&id) else {
-                continue;
-            };
+        let Self { ilhas, sinais, .. } = &mut *self;
+        for (id, ilha) in ilhas.iter_mut() {
             if presenca {
                 if ilha.controle_ticks < TICKS_CONTROLE_ILHA {
                     ilha.controle_ticks += 1;
                 }
                 if ilha.controle_ticks == TICKS_CONTROLE_ILHA && !ilha.controlada {
                     ilha.controlada = true;
-                    self.sinais.push_back(format!("ilha_convertida:{id}"));
+                    sinais.push_back(format!("ilha_convertida:{id}"));
                 }
             } else {
                 if ilha.controlada || ilha.controle_ticks > 0 {
-                    self.sinais.push_back(format!("ilha_perdida:{id}"));
+                    sinais.push_back(format!("ilha_perdida:{id}"));
                 }
                 ilha.controlada = false;
                 ilha.controle_ticks = 0;

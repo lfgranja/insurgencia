@@ -37,7 +37,7 @@ O controle de ilha vence porque é a única opção que materializa uma regra **
 
 1. **Modelo e API**: `Ilha { id, controlada, controle_ticks }`, `Mundo.ilhas: BTreeMap<u64, Ilha>` e `adicionar_ilha(id)` declarados em `crates/sim/src/lib.rs`; a spec fixa quantas ilhas o protótipo registra, sem inventar topologia ou geometria.
 2. **Regra canônica**: com pelo menos um Súdito convertido, `controle_ticks` avança 1 por tick e, aos **300 ticks contínuos** (10 s a 30 Hz, GDD §9.4:489), `controlada = true`. Um único tick sem Súdito zera `controle_ticks` e marca `controlada = false` (Latente) — nenhum acúmulo intermitente.
-3. **Sinal de perda**: `Mundo.sinais: VecDeque<String>` (ou equivalente determinístico) recebe `ilha_perdida` **uma vez por transição** de `controlada → Latente` por falta de Súdito. A hipótese `[HIPÓTESE]` de dedupe em 2 s (§9.1:439) **não** é implementada; emissão de `ilha_convertida` fica como pergunta a validar na spec e, se admitida, é escolha de protótipo.
+3. **Sinal de perda**: `Mundo.sinais: VecDeque<String>` (ou equivalente determinístico) recebe `ilha_perdida:<id>` **uma vez por evento de perda** — transição `controlada → Latente` **ou** perda de progresso parcial (`controle_ticks > 0` antes de 300) — por falta de Súdito, conforme spec/código. A hipótese `[HIPÓTESE]` de dedupe em 2 s (§9.1:439) **não** é implementada; emissão de `ilha_convertida` fica como pergunta a validar na spec e, se admitida, é escolha de protótipo.
 4. **Fase no tick**: `fase_controle_ilhas()` executada em `avancar_tick` entre `fase_defesa()` e `fase_finish()`, observando o estado `convertido` já resolvido no mesmo tick; ordem das demais fases e incremento final de `tick` preservados.
 5. **Determinismo**: `hash_estado` passa a incluir ilhas (`id`, `controlada`, `controle_ticks`) e a fila de sinais em ordem estável; estados diferentes produzem hashes diferentes e o replay determinístico existente permanece válido.
 6. **HUD e simplificação**: a HUD exibe contagem de ilhas controladas e os sinais, com rótulo que identifica a leitura como protótipo. A **presença de qualquer Súdito convertido é tratada como global** — ausência de mapa/rede — e o Súdito é proxy da condição "Desafio de Ilha concluído" de §9.4; essa simplificação deve ser registrada em spec e comentários, sem promoção a cânone.
@@ -48,7 +48,7 @@ O controle de ilha vence porque é a única opção que materializa uma regra **
 
 - **Presença global indevida**: mitigado por decisão — rótulo explícito de simplificação em spec, HUD e comentários; nenhum raio, posição por ilha, mapa ou rota é inventado. Se a spec tratar a presença global como texto canônico de §9.4, é violação deste assessment.
 - **Proxy do Desafio**: o GDD exige duas condições; o protótipo observa apenas o Súdito convertido. A distinção precisa constar na spec para que o proxy não vire regra canônica.
-- **Sinal repetido e hash**: `ilha_perdida` apenas na transição evita fila espúria e divergência de `hash_estado`; inclusão de ilhas e sinais no hash é obrigatória, não opcional. Permanece **[NV]** até execução.
+- **Sinal repetido e hash**: `ilha_perdida:<id>` apenas em eventos de perda (transição `controlada → Latente` ou progresso parcial) evita fila espúria e divergência de `hash_estado`; inclusão de ilhas e sinais no hash é obrigatória, não opcional. Permanece **[NV]** até execução.
 - **Continuidade dos 10 s**: um único tick sem presença zera o progresso; não pode haver tolerância, acúmulo intermitente ou "perdão" de tick.
 - **Fronteira de stack**: nenhuma mudança em contratos/protocolo/Cargo/stack/rede; ADR-004 continua bloqueando rede até decisão da SE.
 - **Dívida R6**: N/A por constituição v1.2.2, não é dívida de produto; nenhuma issue simulada, nenhum `gh` improvisado.
@@ -68,13 +68,13 @@ O controle de ilha vence porque é a única opção que materializa uma regra **
 |---|---|---|
 | FR-001 | `Ilha { id, controlada, controle_ticks }`, `Mundo.ilhas: BTreeMap<u64, Ilha>`, `adicionar_ilha(id)` | contrato da sessão; `intake.md` |
 | FR-002 | regra canônica §9.4: 300 ticks contínuos com Súdito → `controlada`; ausência → Latente e `controle_ticks = 0` | `docs/GDD - Insurgência.md:489,501`; `define.md` |
-| FR-003 | `Mundo.sinais: VecDeque<String>` e `ilha_perdida` uma vez por transição de perda | GDD §9.1:447-448, §9.4:489; `shape.md` · Opção A |
+| FR-003 | `Mundo.sinais: VecDeque<String>` e `ilha_perdida:<id>` uma vez por evento de perda (transição `controlada → Latente` ou progresso parcial) | GDD §9.1:447-448, §9.4:489; `shape.md` · Opção A |
 | FR-004 | `fase_controle_ilhas` entre `fase_defesa` e `fase_finish`, lendo `sudito.convertido` do mesmo tick | `crates/sim/src/lib.rs:393-399,858-865`; `define.md` |
 | FR-005 | presença global de qualquer Súdito convertido como **simplificação documentada**; sem mapa/geometria e sem modelar o Desafio de Ilha | contrato da sessão; `.specify/memory/STATE.md:363-372`; `research.md` |
 | FR-006 | ilhas e sinais em `hash_estado`, HUD com contagem/sinais, fronteira intacta, rastros e constituição v1.2.2 | contrato; `crates/sim/src/lib.rs:909-980`; `.specify/memory/constitution.md` |
 | SC-001 | com Súdito convertido, `controle_ticks` cresce 1/tick e `controlada = true` aos 300 ticks | `define.md` · Success Metrics 1 |
 | SC-002 | qualquer tick sem Súdito zera o progresso e impede a conclusão dos 10 s | `define.md` · Success Metrics 2 |
-| SC-003 | perda de ilha controlada → Latente e `ilha_perdida` uma vez por transição, sem sinais espúrios | `define.md` · Success Metrics 3 |
+| SC-003 | perda de ilha controlada → Latente **ou** de progresso parcial → `ilha_perdida:<id>` uma vez por evento, sem sinais espúrios | `define.md` · Success Metrics 3 |
 | SC-004 | ordem das fases preservada; controle observa conversão/reversão do mesmo tick | `define.md` · Success Metrics 4 |
 | SC-005 | `hash_estado` reflete ilhas e sinais; replay determinístico preservado | `define.md` · Success Metrics 5 |
 | SC-006 | HUD com contagem de ilhas controladas e sinais; fronteira e estilo Rust intactos | `define.md` · Success Metrics 6 |
@@ -83,7 +83,7 @@ O controle de ilha vence porque é a única opção que materializa uma regra **
 | T003 | checagem de presença via `suditos.values().any(|s| s.convertido)` (presença global) | `shape.md` · Opção A |
 | T004 | acumulador `controle_ticks` com marco de 300 ticks e continuidade rígida | `shape.md` · Assumptions |
 | T005 | transição para `controlada = true` aos 300 ticks | `shape.md` · Opção A |
-| T006 | enfileiramento de `ilha_perdida` apenas na transição de perda | `shape.md` · Opção A |
+| T006 | enfileiramento de `ilha_perdida:<id>` apenas em eventos de perda (transição de `controlada` ou progresso parcial) | `shape.md` · Opção A |
 | T007 | `fase_controle_ilhas()` inserida entre `fase_defesa()` e `fase_finish()` em `avancar_tick` | `shape.md` · Opção A |
 | T008 | ilhas e sinais incluídos em `hash_estado` em ordem estável | `shape.md` · Assumptions |
 | T009 | HUD com contagem de ilhas controladas e sinais da fila | `shape.md` · Opção A |

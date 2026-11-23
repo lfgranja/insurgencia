@@ -20,3 +20,8 @@
 **Gate agregado (12:25Z)**: `./verify.sh` **ALL STAGES OK**, **105 testes run: 105 passed** (101 anteriores + 4 novos), `VERIFY_EXIT=0`. Três REDs determinísticos foram corrigidos na fonte antes do verde: `uninlined_format_args` nos sinais, `too_many_lines` em `hash_estado` (extração de `serializar_jogadores`) e divergência documental dos sinais (reconciliada antes do PR).
 
 **Limitações**: presença de Súdito convertido tratada como global (sem mapa/raio); Nós de Controle, Resistência Ideológica e condição de vitória completa ficam para o próximo ciclo; captura visual real permanece **[NV]**.
+
+### Revalidação pós-ACR — 2026-11-23T12:34Z
+
+- Quatro achados advisory do PR #61 (`7101193975`) fechados: HUD/release/roadmap passam a falar em **contagem de sinais pendentes**, assessments registram `ilha_perdida:<id>` também na perda de progresso parcial, `fase_controle_ilhas` não aloca `Vec<u64>` por tick e `Mundo.sinais` está documentado como fila pendente (não histórico).
+- `./verify.sh` reexecutado: **ALL STAGES OK**, **105/105 testes**, cinco gates locais PASS. O verde anterior permanece como histórico; a decisão usa o head corrigido.

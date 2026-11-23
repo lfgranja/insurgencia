@@ -52,7 +52,7 @@ A recomendação **não** propõe criar topologia de ilhas, promover a simplific
 - `adicionar_ilha(id)` e o campo `Mundo.ilhas: BTreeMap<u64, Ilha>` são acrescentados sem alterar a assinatura pública de `avancar_tick` nem o formato do contrato; a spec confirma quantas ilhas o protótipo registra.
 - A checagem `suditos.values().any(|s| s.convertido)` reflete o estado **do mesmo tick**, pois conversão/reversão ocorreram em fases anteriores de `avancar_tick` (858-865 e 344-345) — validar na leitura da spec.
 - `300` ticks = 10 s a 30 Hz é o valor canônico de §9.4 e o mesmo compasso de `defesa_ticks` em `fase_defesa`; a spec não deve substituí-lo por valor `[HIPÓTESE]`.
-- `ilha_perdida` é enfileirado uma única vez por transição `controlada → Latente`; a emissão de `ilha_convertida` na transição contrária é pergunta em aberto em `define.md` e, se admitida, deve ser rotulada escolha de protótipo.
+- `ilha_perdida:<id>` é enfileirado uma única vez por **evento de perda** — transição `controlada → Latente` **ou** progresso parcial (`controle_ticks > 0`) —, conforme spec/código; a emissão de `ilha_convertida` na transição contrária é pergunta em aberto em `define.md` e, se admitida, deve ser rotulada escolha de protótipo.
 - `Mundo.sinais` é `VecDeque<String>` (ou equivalente determinístico) e sua inclusão em `hash_estado` usa ordem de inserção estável; drenagem da fila, se houver, precisa ser determinística.
 - A HUD lê `Mundo.ilhas` e `Mundo.sinais` sem inventar geometria; rótulo explícito de "protótipo/presença global" evita leitura canônica indevida.
 - A cobertura determinística existente (coleta, barricada, Fôlego, Súditos) permanece válida; verificação é estrutural, com saídas de execução **[NV]** neste assessment.

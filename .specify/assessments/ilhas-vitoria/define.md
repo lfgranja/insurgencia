@@ -10,7 +10,7 @@ A regra canônica de controle de ilha está escrita no GDD desde sempre (§9.4:4
 
 ## Affected Users & Stakeholders
 
-- **Users**: jogadores/observadores da sim — precisam ver uma contagem de ilhas controladas e a lista de sinais na HUD, de modo que a regra §9.4 deixe de ser apenas texto do GDD; quem roda a demo determinística — precisa que o controle seja reproduzível tick a tick, inclusive após perda de presença.
+- **Users**: jogadores/observadores da sim — precisam ver uma contagem de ilhas controladas e a contagem de sinais pendentes na HUD, de modo que a regra §9.4 deixe de ser apenas texto do GDD; quem roda a demo determinística — precisa que o controle seja reproduzível tick a tick, inclusive após perda de presença.
 - **Stakeholders**: mantenedores da sim — precisam de um acumulador `controle_ticks` com o mesmo padrão de 300 ticks já usado por `defesa_ticks`, e de uma fila de sinais determinística; mantenedores do Núcleo Rust — precisam que `forbid(unsafe_code)`, `deny(clippy::pedantic)`, ausência de `unwrap`/`expect`/`#[allow]` e `max_width=100` sejam respeitados e que o hash cubra o novo estado; designer — precisa que a simplificação de presença global e o uso do Súdito como proxy da condição de Desafio concluído fiquem registrados e **não** sejam promovidos a cânone; SWE/orquestrador — precisa de uma fatia verificável por leitura de código e execução determinística, com handoff em `specs/049-ilhas-vitoria/`.
 
 ## Goals
@@ -36,7 +36,7 @@ A regra canônica de controle de ilha está escrita no GDD desde sempre (§9.4:4
 
 - Com **pelo menos um Súdito convertido** presente, `controle_ticks` de cada ilha registrada cresce **exatamente 1 por tick** e, ao completar **300 ticks contínuos**, `controlada == true` (baseline: ilhas inexistentes — **[NV]** até verificação).
 - Com **qualquer tick sem Súdito convertido**, o progresso é interrompido: `controle_ticks == 0` imediatamente, `controlada == false`; um único tick sem presença impede a conclusão dos 10 s contínuos (baseline: **[NV]**).
-- Quando uma ilha **estava controlada** e perde o Súdito, `ilha_perdida` entra em `Mundo.sinais` **uma vez por transição**; sem transição, nenhum sinal espúrio é enfileirado (baseline: **[NV]**).
+- Quando uma ilha **estava controlada** ou tinha **progresso parcial** (`controle_ticks > 0`) e perde o Súdito, `ilha_perdida:<id>` entra em `Mundo.sinais` **uma vez por evento de perda**, conforme spec/código; sem perda de presença, nenhum sinal espúrio é enfileirado (baseline: **[NV]**).
 - A ordem das fases é preservada: `fase_controle_ilhas` executa após `fase_defesa` e antes de `fase_finish` no mesmo tick, e o controle observa o estado `convertido` já atualizado pelas fases de conversão/reversão (baseline: **[NV]**).
 - `hash_estado` reflete `ilhas` e `sinais`: estados com contagens de controle ou filas diferentes produzem hashes diferentes; estados idênticos produzem o mesmo hash, mantendo replay determinístico (baseline: **[NV]**).
 - A HUD mostra a **contagem de ilhas controladas** e os **sinais** da fila, com rótulo que identifica a leitura como estado da sim prototípica (baseline: sem linhas de ilha/sinal — **[NV]**).
@@ -52,7 +52,7 @@ Sem o recorte, a regra de vitória mais importante do GDD permanece apenas docum
 - **[NV]** A spec deve confirmar se `ilha_convertida` (§9.1:447) também será enfileirado na transição para `controlada`, ou se o ciclo se limita a `ilha_perdida` conforme o contrato. Em caso de inclusão, registrar a emissão como escolha de protótipo, não como regra canônica nova.
 - **[NV]** A spec deve definir como as ilhas são registradas (`adicionar_ilha`) e quantas existem no protótipo — o contrato exige a API, não uma topologia.
 - **[NV]** A spec deve fixar o formato dos `String` em `Mundo.sinais` (o nome canônico `ilha_perdida` é obrigatório) e se a fila é drenada em algum ponto do tick.
-- **[NV]** A forma de exibir sinais na HUD (lista completa ou contagem) é escolha de implementação; o contrato exige apenas que os sinais apareçam.
+- **[Resolvido na spec]** A forma de exibir sinais na HUD (lista completa ou contagem) foi fixada como **contagem de sinais pendentes** (`sinais.len()`); o contrato exige apenas que os sinais apareçam.
 - **[NV]** Conformidade de R4 (antes de R7 `1.0.0-local`) depende de gates não executados neste assessment.
 - **[NV]** Os nomes definitivos de T001..T012 serão os de `specs/049-ilhas-vitoria/tasks.md`, ainda a criar pelo `/speckit.specify`.
 
