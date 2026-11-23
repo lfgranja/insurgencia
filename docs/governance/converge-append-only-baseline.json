@@ -141,6 +141,10 @@
     "specs/053-pnj-defensores/converge.md": {
       "bytes": 10023,
       "sha256": "8c81890987bf0d2f433a381c18e03a26a2b74fbf01d2293e2f6d8cb3493edf8f"
+    },
+    "specs/054-analise-materialista/converge.md": {
+      "bytes": 9715,
+      "sha256": "4c607b2c0346acf401c7a65d4b6bb256d01bccb14cec89714de9668df379ee17"
     }
   },
   "_provenance": {
