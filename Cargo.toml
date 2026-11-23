@@ -2,4 +2,4 @@
 # Perfil padrão do Cargo: sem personalizações de perfil.
 [workspace]
 resolver = "2"
-members = ["crates/*"]
+members = ["crates/*", "crates/servidor"]

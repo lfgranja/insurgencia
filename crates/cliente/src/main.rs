@@ -22,10 +22,27 @@ use insurgencia_cliente::{
     deslocar, estado_inicial, ilha_em, EstadoJogador, Geometria3d, Ilha, ILHAS, LIMITE_X, LIMITE_Y,
     VELOCIDADE,
 };
-use insurgencia_sim::Mundo;
+use insurgencia_sim::{
+    Comando, Mundo, ResultadoPartida, MAX_RECONQUISTAS, NIVEL_MAXIMO, PASSO_SEGUNDOS, TICKS_COLETA,
+    TICKS_CONSTRUCAO_BARREIRA,
+};
 
 /// Identificador do jogador local no espelho da simulação.
 const PEER_ID: u64 = 1;
+
+/// Identificador do alvo de treino no espelho da simulação (scaffolding não-canônico).
+const PEER_ALVO_TREINO: u64 = 2;
+
+/// Posição fixa do alvo de treino no plano do mapa (scaffolding não-canônico).
+const ALVO_TREINO_POSICAO: (f64, f64) = (2.0, 0.0);
+
+/// Posições fixas dos quatro guardas no protótipo (`[HIPÓTESE]`: sem mapa canônico).
+const PNJS_INICIAIS: [(u64, (f64, f64)); 4] = [
+    (1, (4.0, -236.0)),
+    (2, (-4.0, -236.0)),
+    (3, (0.0, -232.0)),
+    (4, (0.0, -240.0)),
+];
 
 /// Quantidade de vértices no contorno irregular de cada ilha.
 const LADOS_ILHA: u16 = 8;
@@ -51,6 +68,17 @@ struct JogadorLocal(EstadoJogador);
 #[derive(Resource)]
 struct Simulacao(Mundo);
 
+/// Sequências locais usadas nos comandos enviados à simulação.
+#[derive(Resource)]
+struct ComandoLocal {
+    seq: i64,
+    request_id: i64,
+}
+
+/// Tempo acumulado para avançar a simulação em passos fixos.
+#[derive(Resource)]
+struct AccumuladorTick(f64);
+
 /// Quando verdadeiro, a janela inicia minizada (opção `--minimizado`).
 #[derive(Resource)]
 struct ModoJanela(bool);
@@ -58,6 +86,10 @@ struct ModoJanela(bool);
 /// Marca a entidade raiz do avatar.
 #[derive(Component)]
 struct Avatar;
+
+/// Marca o marcador estático do alvo de treino.
+#[derive(Component)]
+struct AlvoTreino;
 
 /// Marca o texto de estado exibido na tela.
 #[derive(Component)]
@@ -77,7 +109,16 @@ fn main() {
             (
                 mover_jogador,
                 sincronizar_avatar,
+                solicitar_barreira,
+                solicitar_coleta,
+                solicitar_ponte,
+                solicitar_propaganda,
+                solicitar_ataque,
+                solicitar_propaganda_no,
+                solicitar_atacar_no,
+                solicitar_atacar_pnj,
                 sincronizar_sim,
+                avancar_simulacao,
                 atualizar_texto,
             )
                 .chain(),
@@ -444,6 +485,39 @@ fn criar_avatar(
         });
 }
 
+/// Cria o marcador cônico do alvo de treino, estático sobre a ilha.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "As coordenadas do alvo sao literais exatos e cabem em f32"
+)]
+fn criar_alvo_treino(
+    comandos: &mut Commands,
+    malhas: &mut Assets<Mesh>,
+    materiais: &mut Assets<StandardMaterial>,
+) {
+    let material = materiais.add(StandardMaterial {
+        base_color: Color::srgb(0.86, 0.24, 0.18),
+        perceptual_roughness: 0.8,
+        ..default()
+    });
+    let malha = achatar(ConeMeshBuilder::new(RAIO_AVATAR * 0.6, 18.0, 4));
+    let (x, y) = ALVO_TREINO_POSICAO;
+
+    comandos
+        .spawn((
+            Transform::from_xyz(x as f32, ALTURA_ILHA + 3.0, -(y as f32)),
+            AlvoTreino,
+            Visibility::default(),
+        ))
+        .with_children(|filho| {
+            filho.spawn((
+                Mesh3d(malhas.add(malha)),
+                MeshMaterial3d(material),
+                Transform::from_xyz(0.0, 9.0, 0.0),
+            ));
+        });
+}
+
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
@@ -491,6 +565,7 @@ fn configurar(
         criar_ilha(&mut commands, &mut meshes, &mut materiais, ilha, indice_u16);
     }
     criar_avatar(&mut commands, &mut meshes, &mut materiais, jogador.posicao);
+    criar_alvo_treino(&mut commands, &mut meshes, &mut materiais);
 
     commands.spawn((
         Text::new("INSURGÊNCIA — low-poly"),
@@ -511,8 +586,20 @@ fn configurar(
 
     let mut sim = Mundo::new();
     sim.adicionar_jogador(PEER_ID);
+    sim.adicionar_jogador(PEER_ALVO_TREINO);
+    for (id, posicao) in PNJS_INICIAIS {
+        sim.adicionar_pnj(id, posicao);
+    }
+    if let Some(alvo) = sim.jogadores.get_mut(&PEER_ALVO_TREINO) {
+        alvo.posicao = ALVO_TREINO_POSICAO;
+    }
     commands.insert_resource(JogadorLocal(jogador));
+    commands.insert_resource(ComandoLocal {
+        seq: 0,
+        request_id: 0,
+    });
     commands.insert_resource(Simulacao(sim));
+    commands.insert_resource(AccumuladorTick(0.0));
 }
 
 /// Lê `WASD` ou as setas e desloca o avatar com passo dependente do tempo.
@@ -550,6 +637,263 @@ fn mover_jogador(
     jogador.0 = deslocar(jogador.0, (passo.x, passo.y));
 }
 
+/// Agenda a construção de uma barreira no ponto atual ao pressionar `B`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_barreira(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyB) {
+        return;
+    }
+
+    local.seq += 1;
+    local.request_id += 1;
+    let (x, y) = jogador.0.posicao;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "construir_barreira".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some((f64::from(x), f64::from(y))),
+    });
+}
+
+/// Agenda a coleta de materiais no ponto atual ao pressionar `C`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_coleta(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyC) {
+        return;
+    }
+
+    local.seq += 1;
+    local.request_id += 1;
+    let (x, y) = jogador.0.posicao;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "coletar_materiais".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some((f64::from(x), f64::from(y))),
+    });
+}
+
+/// Agenda a construção de uma ponte provisória no ponto atual ao pressionar `P`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_ponte(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyP) {
+        return;
+    }
+
+    local.seq += 1;
+    local.request_id += 1;
+    let (x, y) = jogador.0.posicao;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "construir_ponte".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some((f64::from(x), f64::from(y))),
+    });
+}
+
+/// Agenda a propaganda no súdito no ponto atual ao pressionar `G`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_propaganda(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyG) {
+        return;
+    }
+
+    local.seq += 1;
+    local.request_id += 1;
+    let (x, y) = jogador.0.posicao;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "propaganda".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some((f64::from(x), f64::from(y))),
+    });
+}
+
+/// Agenda um ataque forte ao alvo de treino ao pressionar `Q`.
+///
+/// O alvo é scaffolding não-canônico em `ALVO_TREINO_POSICAO`; o núcleo recusa o
+/// ataque quando o jogador está fora do alcance de contato de 2 m.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_ataque(
+    teclado: Res<ButtonInput<KeyCode>>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyQ) {
+        return;
+    }
+
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "atacar_forte".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(ALVO_TREINO_POSICAO),
+    });
+}
+
+/// Devolve a posição do Nó mais próximo do jogador, com desempate pelo menor `id`.
+///
+/// A distância euclidiana ao quadrado preserva a ordem da distância e `total_cmp`
+/// mantém a comparação determinística sem raiz quadrada. As posições dos Nós são
+/// simplificação de protótipo `[HIPÓTESE]` da simulação.
+#[must_use]
+fn posicao_no_mais_proximo(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, f64)> {
+    let (x, y) = (f64::from(jogador.0), f64::from(jogador.1));
+    mundo
+        .nos
+        .values()
+        .min_by(|a, b| {
+            let da = (a.posicao.0 - x).mul_add(a.posicao.0 - x, (a.posicao.1 - y).powi(2));
+            let db = (b.posicao.0 - x).mul_add(b.posicao.0 - x, (b.posicao.1 - y).powi(2));
+            da.total_cmp(&db).then_with(|| a.id.cmp(&b.id))
+        })
+        .map(|no| no.posicao)
+}
+
+/// Agenda Propaganda no Nó mais próximo ao pressionar `R`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_propaganda_no(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyR) {
+        return;
+    }
+    let Some(destino) = posicao_no_mais_proximo(&simulacao.0, jogador.0.posicao) else {
+        return;
+    };
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "propaganda_no".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(destino),
+    });
+}
+
+/// Agenda dano no Nó mais próximo ao pressionar `F`; o dano nunca converte o Nó.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_atacar_no(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyF) {
+        return;
+    }
+    let Some(destino) = posicao_no_mais_proximo(&simulacao.0, jogador.0.posicao) else {
+        return;
+    };
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "atacar_no".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(destino),
+    });
+}
+
+/// Devolve a posição do PNJ ativo mais próximo, com desempate pelo menor `id`.
+///
+/// A comparação usa distância ao quadrado e `total_cmp` para permanecer determinística.
+#[must_use]
+fn posicao_pnj_mais_proximo(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, f64)> {
+    let (x, y) = (f64::from(jogador.0), f64::from(jogador.1));
+    mundo
+        .pnjs
+        .values()
+        .filter(|pnj| pnj.ativo)
+        .min_by(|a, b| {
+            let da = (a.posicao.0 - x).mul_add(a.posicao.0 - x, (a.posicao.1 - y).powi(2));
+            let db = (b.posicao.0 - x).mul_add(b.posicao.0 - x, (b.posicao.1 - y).powi(2));
+            da.total_cmp(&db).then_with(|| a.id.cmp(&b.id))
+        })
+        .map(|pnj| pnj.posicao)
+}
+
+/// Agenda `atacar_pnj` no guarda ativo mais próximo ao pressionar `T`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_atacar_pnj(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyT) {
+        return;
+    }
+    let Some(destino) = posicao_pnj_mais_proximo(&simulacao.0, jogador.0.posicao) else {
+        return;
+    };
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "atacar_pnj".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(destino),
+    });
+}
+
 /// Copia a posição do estado para a transformação 3D do avatar no plano do mapa.
 #[expect(
     clippy::needless_pass_by_value,
@@ -578,22 +922,166 @@ fn sincronizar_sim(jogador: Res<JogadorLocal>, mut simulacao: ResMut<Simulacao>)
     remoto.posicao = (f64::from(x), f64::from(y));
 }
 
-/// Atualiza o painel com posição, ilha corrente e limites do mapa.
+/// Avança a simulação em passos fixos, com teto de quatro ticks por frame.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
 )]
-fn atualizar_texto(jogador: Res<JogadorLocal>, mut textos: Query<&mut Text, With<TextoEstado>>) {
+fn avancar_simulacao(
+    tempo: Res<Time>,
+    mut simulacao: ResMut<Simulacao>,
+    mut acumulador: ResMut<AccumuladorTick>,
+) {
+    acumulador.0 += f64::from(tempo.delta_secs());
+    for _ in 0..4 {
+        if acumulador.0 < PASSO_SEGUNDOS {
+            break;
+        }
+        simulacao.0.avancar_tick();
+        acumulador.0 -= PASSO_SEGUNDOS;
+    }
+}
+
+/// Descreve o desfecho da partida para o painel da HUD.
+#[must_use]
+fn texto_resultado(simulacao: &Simulacao) -> String {
+    match simulacao.0.resultado {
+        Some(ResultadoPartida::Vitoria) => "Autogestão estabelecida".to_owned(),
+        Some(ResultadoPartida::DerrotaPorTempo) => "Comuna dissolvida — tempo esgotado".to_owned(),
+        Some(ResultadoPartida::DerrotaPorReconquista) => {
+            format!("Comuna dissolvida — {MAX_RECONQUISTAS} reconquistas")
+        }
+        None => "em curso".to_owned(),
+    }
+}
+
+/// Textos de progresso de construção e coleta exibidos no painel.
+#[must_use]
+fn texto_progresso(simulacao: &Simulacao) -> (String, String) {
+    let remoto = simulacao.0.jogadores.get(&PEER_ID);
+    let construindo = match remoto {
+        Some(j) if j.construcao_ponto.is_some() => {
+            format!("{}/{}", j.construcao_ticks, TICKS_CONSTRUCAO_BARREIRA)
+        }
+        _ => "nao".to_owned(),
+    };
+    let coletando = match remoto {
+        Some(j) if j.coleta_ponto.is_some() => {
+            format!("{}/{}", j.coleta_ticks, TICKS_COLETA)
+        }
+        _ => "nao".to_owned(),
+    };
+    (construindo, coletando)
+}
+
+/// Monta o texto do painel a partir do estado local e do espelho da simulação.
+#[must_use]
+fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
     let (x, y) = jogador.0.posicao;
     let ilha = if let Some(atual) = ilha_em((x, y)) {
         atual.nome
     } else {
         "nenhuma"
     };
-    let conteudo = format!(
-        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nWASD ou setas para mover"
-    );
+    let remoto = simulacao.0.jogadores.get(&PEER_ID);
+    let materiais = remoto.map_or(0, |j| j.materiais);
+    let suprimentos = remoto.map_or(0, |j| j.suprimentos);
+    let autogestao = remoto.map_or(0, |j| j.pontos_autogestao);
+    let folego = remoto.map_or(0, |j| j.folego);
+    let vida = remoto.map_or(0, |j| j.vida);
+    let vida_alvo = if let Some(alvo) = simulacao.0.jogadores.get(&PEER_ALVO_TREINO) {
+        alvo.vida
+    } else {
+        0
+    };
+    let pnjs = simulacao.0.pnjs.values().filter(|pnj| pnj.ativo).count();
+    let funcao = remoto.map_or("Artesão", |j| j.funcao.nome());
+    let nivel = remoto.map_or(1, |j| j.nivel);
+    let barreiras = simulacao
+        .0
+        .barreiras
+        .values()
+        .filter(|barreira| barreira.dono == PEER_ID)
+        .count();
+    let pontes = simulacao
+        .0
+        .pontes
+        .values()
+        .filter(|ponte| ponte.dono == PEER_ID)
+        .count();
+    let suditos = simulacao
+        .0
+        .suditos
+        .values()
+        .filter(|sudito| sudito.convertido)
+        .count();
+    let ilhas_controladas = simulacao
+        .0
+        .ilhas
+        .values()
+        .filter(|ilha| ilha.controlada)
+        .count();
+    let sinais = simulacao.0.sinais.len();
+    let nos_convertidos = simulacao.0.nos.values().filter(|no| no.convertido).count();
+    let resistencia = simulacao.0.resistencia_ideologica;
+    let resultado = texto_resultado(simulacao);
+    let (construindo, coletando) = texto_progresso(simulacao);
+    format!(
+        concat!(
+            "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\n",
+            "Função: {funcao}\nNível: {nivel}/{NIVEL_MAXIMO}\n",
+            "Limites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\n",
+            "Suprimentos: {suprimentos}\nMateriais: {materiais}\n",
+            "Fôlego: {folego}\nVida: {vida}\nAlvo: {vida_alvo}\nPNJs: {pnjs}\n",
+            "Autogestão: {autogestao}\nBarreiras: {barreiras}\n",
+            "Pontes: {pontes}\nSúditos: {suditos}\n",
+            "Resistência: {resistencia}\nNós: {nos_convertidos}/3\n",
+            "Ilhas: {ilhas_controladas}\nSinais: {sinais}\nResultado: {resultado}\n",
+            "Construindo: {construindo}\nColeta: {coletando}\n",
+            "WASD ou setas para mover · B para construir barreira · P para construir ponte · ",
+            "C para coletar materiais · G para propaganda · R para propaganda no Nó · ",
+            "F para atacar o Nó · Aproxime-se do alvo e use Q para atacar · ",
+            "T para atacar o PNJ mais próximo"
+        ),
+        x = x,
+        y = y,
+        ilha = ilha,
+        funcao = funcao,
+        nivel = nivel,
+        NIVEL_MAXIMO = NIVEL_MAXIMO,
+        LIMITE_X = LIMITE_X,
+        LIMITE_Y = LIMITE_Y,
+        suprimentos = suprimentos,
+        materiais = materiais,
+        folego = folego,
+        vida = vida,
+        vida_alvo = vida_alvo,
+        pnjs = pnjs,
+        autogestao = autogestao,
+        barreiras = barreiras,
+        pontes = pontes,
+        suditos = suditos,
+        resistencia = resistencia,
+        nos_convertidos = nos_convertidos,
+        ilhas_controladas = ilhas_controladas,
+        sinais = sinais,
+        resultado = resultado,
+        construindo = construindo,
+        coletando = coletando,
+    )
+}
 
+/// Atualiza o painel com o texto montado por [`texto_hud`].
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn atualizar_texto(
+    jogador: Res<JogadorLocal>,
+    simulacao: Res<Simulacao>,
+    mut textos: Query<&mut Text, With<TextoEstado>>,
+) {
+    let conteudo = texto_hud(&jogador, &simulacao);
     for mut texto in &mut textos {
         (**texto).clone_from(&conteudo);
     }

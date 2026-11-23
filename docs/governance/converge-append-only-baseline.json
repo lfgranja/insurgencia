@@ -81,6 +81,66 @@
     "specs/037-estado-escalonamento-45/converge.md": {
       "bytes": 3795,
       "sha256": "2ef0cd07e15dcdc52492becd78f61ac1ec8cd6c65742686f19c85ea8fd83f9df"
+    },
+    "specs/038-estado-pos-v122/converge.md": {
+      "bytes": 4294,
+      "sha256": "b148559292a3cb0bb6da02a95d5d008db606a1ffb904e1d397f0e3832de050bd"
+    },
+    "specs/039-coleta-materiais-deterministica/converge.md": {
+      "bytes": 5226,
+      "sha256": "02f3838c7d0e6cb47c5e797ccc2e6408f9a4bcb6012f0379306eddd5574b6f21"
+    },
+    "specs/040-barricada-deterministica/converge.md": {
+      "bytes": 7646,
+      "sha256": "45ba61ceb77fe81f51fa06f2d98a5efcadfb05df741af5724b0e7dbe59fd0640"
+    },
+    "specs/041-coleta-jogavel/converge.md": {
+      "bytes": 7204,
+      "sha256": "9cda32d77fdac4c410662bace531e096eeb23069952cdcc65dca020ff4b08628"
+    },
+    "specs/042-servidor-headless/converge.md": {
+      "bytes": 7252,
+      "sha256": "68875506e3506ffcd7142d5edf650f0279c1caa491ada93a553e694df1fcdd2d"
+    },
+    "specs/044-defesa-barricada/converge.md": {
+      "bytes": 7032,
+      "sha256": "8cb6ec5eb648cec919dd73d6c63189024b984f8fc68fc00e83fd5662d832cdf8"
+    },
+    "specs/045-ponte-provisoria/converge.md": {
+      "bytes": 7031,
+      "sha256": "f9cd0ae562b72dda49106476317b72d39b5a942b69b10aba504f142b1d0b5988"
+    },
+    "specs/046-suditos/converge.md": {
+      "bytes": 7343,
+      "sha256": "045531f6bbf1a47183a1f8bca8fa16ac772bd0e012ee4917435b5f075426498c"
+    },
+    "specs/047-combate-folego/converge.md": {
+      "bytes": 7545,
+      "sha256": "a784f2adff1f8881b187c5d09843855a36a97d9747e7e98b0b5231455ab7961c"
+    },
+    "specs/048-alvo-treino/converge.md": {
+      "bytes": 8018,
+      "sha256": "5bbaf33eb29d16a115b3f11e5a34ccbc94b5dd041abe0c6218998edca91fe920"
+    },
+    "specs/049-ilhas-vitoria/converge.md": {
+      "bytes": 8187,
+      "sha256": "e6e4f86aeca066a3d1e767a6a255d87ff8a039cf717a512b5ab0898bd3b50337"
+    },
+    "specs/050-nos-vitoria/converge.md": {
+      "bytes": 9086,
+      "sha256": "59408e00f1542d7e902d0d08421ffe79f1804eb2d97a3d66132f5a2fdc13d264"
+    },
+    "specs/051-derrota/converge.md": {
+      "bytes": 8210,
+      "sha256": "74d3f5d8e1adc535174d087e8f163fbf8a783e384e486980e30db651f8639959"
+    },
+    "specs/052-papeis-niveis/converge.md": {
+      "bytes": 8956,
+      "sha256": "566ba5635bcdcf5d8921003f329627a136254735b6ee9e3f50dfdbaa503b7bf0"
+    },
+    "specs/053-pnj-defensores/converge.md": {
+      "bytes": 10023,
+      "sha256": "8c81890987bf0d2f433a381c18e03a26a2b74fbf01d2293e2f6d8cb3493edf8f"
     }
   },
   "_provenance": {

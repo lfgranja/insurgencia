@@ -261,3 +261,170 @@
 1. ~~Corrigir documentalmente o GDD (N3 e contradição CI) com base nos ADRs~~ — **CONCLUÍDO no ciclo 002** (7 passagens emendadas); mantido como histórico.
 2. Instalar Godot 4.7.2 e validar a suíte headless — exige download e autorização de dependência.
 3. Gate CI remoto (GitHub Actions) — exige autorização e verificação ao vivo.
+
+## 2026-11-23T02:45Z — decisão 80/20 do ciclo 040 (antes da implementação)
+
+**Sessão**: `20261123T024300Z-barricada-deterministica` · **Título**: `insurgencia - barricada deterministica de materiais`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Construir barricada (custo 20, 45 ticks, 200 PV, 360 ticks, máx 2) | 5 | 5 | 4 | 4 | **400/625** |
+| Ponte provisória | 3 | 3 | 3 | 4 | 108/625 |
+| Combate/Fôlego (valores `[HIPÓTESE]`) | 4 | 2 | 2 | 3 | 48/625 |
+| Servidor + Lightyear (dep ausente, docs.rs 0.31 falha) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `construir_barreira`. É o primeiro destino canônico dos Materiais introduzidos no ciclo 039, tem valores tabelados no GDD (§9.3, §10.3), não exige protocolo/Cargo novo e produz efeito verificável no core determinístico e no HUD. Netcode fica habilitado, mas não é o nº 1. R6 permanece **N/A** por constituição v1.2.2 (dívida de automação registrada).
+
+## 2026-11-23T03:54Z — decisão 80/20 do ciclo 041 (antes da implementação)
+
+**Sessão**: `20261123T035400Z-coleta-jogavel` · **Título**: `insurgencia - coleta jogavel no cliente`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Coleta jogável no cliente (tecla C + auto-avanço) | 5 | 5 | 5 | 4 | **500/625** |
+| Corrigir comentário de `Comando.destino` | 2 | 5 | 5 | 5 | 250/625 |
+| Ponte provisória | 3 | 3 | 3 | 4 | 108/625 |
+| Servidor + Lightyear | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `coleta-jogavel`. O ciclo 040 entregou barricada e HUD, mas o espelho local começa com 0 Materiais e não tem como coletar: a cadeia jogável está incompleta. A correção do comentário de `destino` entra no mesmo ciclo por ser trivial e adjacente. R6 continua **N/A** por constituição v1.2.2.
+
+## 2026-11-23T04:30Z — decisão 80/20 do ciclo 042 (antes da implementação)
+
+**Sessão**: `20261123T043000Z-servidor-headless` · **Título**: `insurgencia - servidor headless deterministico`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Servidor headless determinístico (stdin → ticks → hash) | 4 | 4 | 4 | 4 | **256/625** |
+| Dívida documental restante | 2 | 5 | 5 | 5 | 250/625 |
+| Combate/Fôlego (`[HIPÓTESE]`) | 4 | 2 | 2 | 3 | 48/625 |
+| Rede com Lightyear (dep ausente) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `servidor-headless`. É o maior ganho de autoridade sem dependência externa: um binário que possui `Mundo`, consome comandos de entrada determinística e emite hash por tick. Prepara o caminho para rede sem introduzir Lightyear, async ou sockets neste ciclo. R6 permanece **N/A** por constituição v1.2.2.
+
+## 2026-11-23T05:47Z — decisão 80/20 do ciclo 044 (antes da implementação)
+
+**Sessão**: `20261123T054700Z-defesa-barricada` · **Título**: `insurgencia - defesa de barricada`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Defesa de barricada → +1 autogestão/10 s | 4 | 4 | 4 | 4 | **256/625** |
+| Súditos/Propaganda (maioria `[HIPÓTESE]`) | 4 | 2 | 2 | 3 | 48/625 |
+| Ponte provisória | 3 | 3 | 3 | 4 | 108/625 |
+| Rede (bloqueada por ADR-004 até decisão da SE) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `defesa-barricada`. GDD §7.1:306 dá recompensa canônica de +1 ponto de autogestão a cada 10 s de barricada intacta, e o ciclo 040 já entregou a barricada. Nenhuma mudança de stack, dependência ou protocolo. Protótipo usa o dono da barricada como defensor no mesmo ponto; papéis Guerreiro/Artesão ficam registrados como simplificação escopo. R6 permanece **N/A** por constituição v1.2.2.
+
+## 2026-11-23T06:25Z — decisão 80/20 do ciclo 045 (antes da implementação)
+
+**Sessão**: `20261123T062500Z-ponte-provisoria` · **Título**: `insurgencia - ponte provisoria deterministica`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Ponte provisória (15 Materiais, 60 PV, 45 s) | 3 | 3 | 3 | 4 | **108/625** |
+| Súditos/Propaganda | 4 | 2 | 2 | 3 | 48/625 |
+| Combate/Fôlego | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `ponte-provisoria`. É o próximo recurso canônico implementável sem nova stack: GDD §9.3:475,483 fixa custo 15 Materiais e §8.4:407 fixa 60 PV e 45 s de duração; o atalho de 8 s depende de mapa/ilhas e fica fora de escopo, registrado como limitação. R6 continua **N/A**.
+
+## 2026-11-23T06:58Z — decisão 80/20 do ciclo 046 (antes da implementação)
+
+**Sessão**: `20261123T065800Z-suditos` · **Título**: `insurgencia - suditos e propaganda`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Súditos/Propaganda (4 s de exposição, 3 s de reversão) | 4 | 2 | 2 | 3 | **48/625** |
+| Combate/Fôlego | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `suditos`. A regra de aceitação GDD §9.2:464 (4 s de Propaganda interrompe ataque a estruturas; dano de jogador reverte em 3 s) é verificável mesmo com spawn/controle de ilha ainda `[HIPÓTESE]`. Valores de spawn, raio e função do Súdito ficam fora de escopo e registrados como hipóteses. R6 continua **N/A**.
+
+## 2026-11-23T07:35Z — decisão 80/20 do ciclo 047 (antes da implementação)
+
+**Sessão**: `20261123T073500Z-combate-folego` · **Título**: `insurgencia - combate e folego`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Combate/Fôlego (`atacar_forte`) | 4 | 2 | 2 | 3 | **48/625** |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `combate-folego`. Única frente de produto restante sem mudança de stack: GDD §10.1 define Fôlego 100, regeneração 10/s fora de combate e 5/s em combate, todos rotulados `[HIPÓTESE]`; a spec deve registrá-los como escolhas de protótipo, não dogmas canônicos. Dano e alcance também hipotéticos. R6 permanece **N/A**.
+
+## 2026-11-23T08:18Z — decisão 80/20 do ciclo 048 (antes da implementação)
+
+**Sessão**: `20261123T081800Z-alvo-treino` · **Título**: `insurgencia - alvo de treino jogavel`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Alvo de treino no cliente standalone | 3 | 4 | 4 | 5 | **240/625** |
+| Ilhas/condição de vitória | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `alvo-treino`. A ACR do ciclo 047 apontou que a tecla `Q` gera um comando válido no core, mas o cliente standalone só tem `PEER_ID=1` e nenhum alvo, deixando o ataque inerte e a dica enganosa. Um alvo de treino determinístico resolve o achado sem mudar stack, protocolo ou regra canônica; é scaffolding de protótipo, explicitamente não-canônico. R6 permanece **N/A**.
+
+## 2026-11-23T11:15Z — decisão 80/20 do ciclo 049 (antes da implementação)
+
+**Sessão**: `20261123T111200Z-controle-ilha` · **Título**: `insurgencia - controle de ilha por sudito`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Controle de ilha por Súdito (10 s contínuos) | 4 | 3 | 3 | 3 | **108/625** |
+| Nós de Controle + vitória completa | 4 | 2 | 2 | 3 | 48/625 |
+| Papéis W/E/R + níveis | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `ilhas-vitoria` — subset **controle de ilha**: GDD §9.4:489,501 fixa 10 s contínuos de Súdito da Comuna e sinal `ilha_perdida` quando falta; sem mapa/rede, o protótipo trata Súditos convertidos como presentes globalmente e registra a simplificação. Nós de Controle e Resistência Ideológica ficam para o próximo ciclo. O refresh de `AGENTS.md` solicitado pelo usuário entra neste mesmo commit. R6 permanece **N/A**.
+
+## 2026-11-23T12:50Z — decisão 80/20 do ciclo 050 (antes da implementação)
+
+**Sessão**: `20261123T125000Z-nos-vitoria` · **Título**: `insurgencia - nos de controle e vitoria`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Nós de Controle + Resistência + vitória | 5 | 2 | 2 | 3 | **60/625** |
+| Papéis W/E/R + níveis | 4 | 2 | 2 | 3 | 48/625 |
+| PVE/PNJs | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `nos-vitoria`. É a condição de vitória do GDD, agora factível após controle de ilha e Súditos. Todos os números (3 Nós, 100 Resistência, −30/Nó, pulso final −10, dano cap −20, 20 s por Nó) são `[HIPÓTESE]` no GDD e devem ser rotulados como protótipo. R6 permanece **N/A**.
+
+## 2026-11-23T14:25Z — decisão 80/20 do ciclo 051 (antes da implementação)
+
+**Sessão**: `20261123T142500Z-derrota` · **Título**: `insurgencia - derrota por timeout e reconquista`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Derrota por timeout/reconquista | 4 | 3 | 4 | 4 | **192/625** |
+| Papéis W/E/R + níveis | 4 | 2 | 2 | 3 | 48/625 |
+| PVE/PNJs | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `derrota`. GDD §6.2:277 define derrota por relógio de 20 min ou 3 reconquistas; §9.4:489,501 já fornece perda de ilha e sinal `ilha_perdida`. A implementação reusa esses sinais e o contador de ilhas, sem mapa/rede. Números permanecem `[HIPÓTESE]`/protótipo. R6 permanece **N/A**.
+
+## 2026-11-23T15:08Z — decisão 80/20 do ciclo 052 (antes da implementação)
+
+**Sessão**: `20261123T150800Z-papeis-niveis` · **Título**: `insurgencia - papeis e niveis`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Papéis + níveis + desbloqueio Q/W/E/R | 4 | 2 | 2 | 3 | **48/625** |
+| PVE/PNJs | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `papeis-niveis`. GDD §10.1 fixa papéis materiais, nível 1–12 e desbloqueio Q no 1, W no 2, E no 3, R no 6 — todos rotulados `[HIPÓTESE]`. Implementação mínima: campo `funcao`, nível por pulso, desbloqueio de ações existentes por nível e HUD; novas habilidades W/E/R ficam para ciclo posterior. R6 permanece **N/A**.
+
+## 2026-11-23T15:53Z — decisão 80/20 do ciclo 053 (antes da implementação)
+
+**Sessão**: `20261123T155300Z-pnj-defensores` · **Título**: `insurgencia - pnjs defensores`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| PNJs defensores (PV + dano determinístico) | 4 | 2 | 2 | 3 | **48/625** |
+| Novas habilidades W/E/R | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `pnj-defensores`. GDD §8.4/§8.5 descreve guardas/patrulhas com dano e PV como `[HIPÓTESE]`; o ciclo implementa entidades determinísticas com PV, ataque em alcance e reação a dano do jogador, sem mapa/rede. Novas habilidades W/E/R ficam para o próximo ciclo. R6 permanece **N/A**.
+
+## 2026-11-23T16:11Z — fechamento do ciclo 053
+
+**Sessão**: `20261123T155300Z-pnj-defensores` · **Título**: `insurgencia - pnjs defensores`. Roteiro **10/10 PASS** (`.specify/validations/pnj-defensores/evidence.md`); `./verify.sh` **ALL STAGES OK**, **128 testes run: 128 passed, 0 skipped**, `VERIFY_EXIT=0`; cinco gates locais PASS após bootstrap do baseline de `specs/053-pnj-defensores/converge.md` (`files=35 baselined=35`). Implementação: `Pnj`/`Mundo.pnjs`/`adicionar_pnj`/`aplicar_dano_a_pnj` com piso zero/`atacar_pnj` nível 1/`fase_ataque_pnjs` 8 dmg a cada 90 ticks em 2 m/hash/HUD `PNJs: N`/tecla `T`. Três RED corrigidos na fonte (não em expectativa): `texto_hud` <100 linhas, piso zero do dano e asserção da transição letal. R4 PASS, R7 `1.0.0-local` pronto, R6 N/A. CI/merge/promoção pendentes nesta entrada; captura visual real **[NV]**.
