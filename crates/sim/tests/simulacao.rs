@@ -4,12 +4,12 @@
 use insurgencia_sim::{
     Barreira, CodigoRecusa, Comando, Mundo, Ponte, ResultadoPartida, ValidacaoComandos,
     CONTRIBUICAO_NO, CUSTO_ATAQUE_FOLEGO, CUSTO_BARREIRA_MATERIAIS, CUSTO_PONTE_MATERIAIS,
-    DANO_ATAQUE, DANO_MAXIMO_NOS, FOLEGO_MAXIMO, MAX_BARREIRAS_POR_JOGADOR,
+    DANO_ATAQUE, DANO_MAXIMO_NOS, FOLEGO_MAXIMO, MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS,
     PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA, PV_PONTE, RESISTENCIA_INICIAL,
     TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA,
     TICKS_CONSTRUCAO_PONTE, TICKS_CONTROLE_ILHA, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_PONTE,
-    TICKS_INATIVIDADE_NO, TICKS_PROPAGANDA, TICKS_PROPAGANDA_NO, TICKS_REGENERACAO_COMBATE,
-    TICKS_REGENERACAO_FORA_COMBATE, TICKS_REVERSAO_SUDITO,
+    TICKS_INATIVIDADE_NO, TICKS_LIMITE_PARTIDA, TICKS_PROPAGANDA, TICKS_PROPAGANDA_NO,
+    TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE, TICKS_REVERSAO_SUDITO,
 };
 
 /// Monta um comando `mover` com os monotônicos já preenchidos.
@@ -2666,4 +2666,177 @@ fn atacar_no_inativo_recusado() {
         RESISTENCIA_INICIAL - DANO_MAXIMO_NOS
     );
     assert!(!mundo.nos[&1].convertido);
+}
+
+#[test]
+fn derrota_por_timeout() {
+    let mut antes = Mundo::new();
+    antes.tick = TICKS_LIMITE_PARTIDA - 2;
+    antes.avancar_tick();
+    assert_eq!(antes.tick, TICKS_LIMITE_PARTIDA - 1);
+    assert!(antes.resultado.is_none());
+
+    let mut mundo = Mundo::new();
+    mundo.tick = TICKS_LIMITE_PARTIDA - 1;
+    mundo.avancar_tick();
+    assert_eq!(mundo.tick, TICKS_LIMITE_PARTIDA);
+    assert_eq!(mundo.resultado, Some(ResultadoPartida::DerrotaPorTempo));
+
+    for _ in 0..3 {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.resultado, Some(ResultadoPartida::DerrotaPorTempo));
+}
+
+#[test]
+fn derrota_apos_tres_reconquistas() {
+    let mut mundo = Mundo::new();
+    for id in [1_u64, 2] {
+        mundo.adicionar_ilha(id);
+        if let Some(ilha) = mundo.ilhas.get_mut(&id) {
+            ilha.controlada = true;
+        }
+    }
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo
+            .ilhas_reconquistadas
+            .iter()
+            .copied()
+            .collect::<Vec<_>>(),
+        vec![1, 2]
+    );
+    assert!(mundo.resultado.is_none());
+
+    mundo.adicionar_ilha(3);
+    if let Some(ilha) = mundo.ilhas.get_mut(&3) {
+        ilha.controlada = true;
+    }
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo
+            .ilhas_reconquistadas
+            .iter()
+            .copied()
+            .collect::<Vec<_>>(),
+        vec![1, 2, 3]
+    );
+    assert_eq!(
+        mundo.resultado,
+        Some(ResultadoPartida::DerrotaPorReconquista)
+    );
+}
+
+#[test]
+fn vitoria_precede_derrota() {
+    let mut mundo = Mundo::new();
+    for (id, posicao) in posicoes_nos() {
+        mundo.adicionar_no(id, posicao);
+        if let Some(no) = mundo.nos.get_mut(&id) {
+            no.convertido = true;
+        }
+    }
+    for id in [7_u64, 2, 5] {
+        mundo.adicionar_ilha(id);
+        if let Some(ilha) = mundo.ilhas.get_mut(&id) {
+            ilha.controlada = true;
+        }
+    }
+    mundo.resistencia_ideologica = RESISTENCIA_INICIAL - 3 * CONTRIBUICAO_NO;
+    mundo.tick = TICKS_LIMITE_PARTIDA - 1;
+
+    mundo.avancar_tick();
+    assert_eq!(mundo.tick, TICKS_LIMITE_PARTIDA);
+    assert_eq!(mundo.ilhas_reconquistadas.len(), MAX_RECONQUISTAS);
+    assert_eq!(mundo.resultado, Some(ResultadoPartida::Vitoria));
+
+    for _ in 0..2 {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.resultado, Some(ResultadoPartida::Vitoria));
+}
+
+#[test]
+fn hash_reflete_derrota() {
+    let mut primeiro = Mundo::new();
+    let mut segundo = Mundo::new();
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    primeiro.ilhas_reconquistadas.insert(7);
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    segundo.ilhas_reconquistadas.insert(7);
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    // A serialização em ordem crescente não depende da ordem de inserção.
+    let mut ordem_a = Mundo::new();
+    let mut ordem_b = Mundo::new();
+    for id in [7, 2, 5] {
+        ordem_a.ilhas_reconquistadas.insert(id);
+    }
+    for id in [5, 7, 2] {
+        ordem_b.ilhas_reconquistadas.insert(id);
+    }
+    assert_eq!(ordem_a.hash_estado(), ordem_b.hash_estado());
+    ordem_a.ilhas_reconquistadas.insert(9);
+    assert_ne!(ordem_a.hash_estado(), ordem_b.hash_estado());
+
+    primeiro.resultado = Some(ResultadoPartida::DerrotaPorTempo);
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    segundo.resultado = Some(ResultadoPartida::DerrotaPorTempo);
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+    segundo.resultado = Some(ResultadoPartida::DerrotaPorReconquista);
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+}
+
+#[test]
+fn reconquista_duplicada_nao_conta() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_ilha(5);
+    if let Some(ilha) = mundo.ilhas.get_mut(&5) {
+        ilha.controlada = true;
+    }
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo
+            .ilhas_reconquistadas
+            .iter()
+            .copied()
+            .collect::<Vec<_>>(),
+        vec![5]
+    );
+    assert!(mundo.resultado.is_none());
+
+    if let Some(ilha) = mundo.ilhas.get_mut(&5) {
+        ilha.controlada = true;
+    }
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo.sinais.iter().map(String::as_str).collect::<Vec<_>>(),
+        vec!["ilha_perdida:5", "ilha_perdida:5"]
+    );
+    assert_eq!(
+        mundo
+            .ilhas_reconquistadas
+            .iter()
+            .copied()
+            .collect::<Vec<_>>(),
+        vec![5]
+    );
+    assert!(mundo.resultado.is_none());
+
+    // Ilha latente sem progresso não emite sinal nem entra no conjunto.
+    mundo.adicionar_ilha(9);
+    for _ in 0..5 {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.sinais.len(), 2);
+    assert_eq!(
+        mundo
+            .ilhas_reconquistadas
+            .iter()
+            .copied()
+            .collect::<Vec<_>>(),
+        vec![5]
+    );
+    assert!(mundo.resultado.is_none());
 }

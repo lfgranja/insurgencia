@@ -129,6 +129,10 @@
     "specs/050-nos-vitoria/converge.md": {
       "bytes": 9086,
       "sha256": "59408e00f1542d7e902d0d08421ffe79f1804eb2d97a3d66132f5a2fdc13d264"
+    },
+    "specs/051-derrota/converge.md": {
+      "bytes": 8210,
+      "sha256": "74d3f5d8e1adc535174d087e8f163fbf8a783e384e486980e30db651f8639959"
     }
   },
   "_provenance": {

@@ -60,6 +60,13 @@ pub const TICKS_REVERSAO_SUDITO: i64 = 90;
 /// (10 s a 30 Hz; derivação de protótipo, não número canônico).
 pub const TICKS_CONTROLE_ILHA: i64 = 300;
 
+/// Limite de ticks da partida: 20 min a 30 Hz (`[HIPÓTESE]`/protótipo, não cânone).
+pub const TICKS_LIMITE_PARTIDA: i64 = 36_000;
+
+/// Número máximo de ilhas distintas perdidas antes da dissolução da Comuna
+/// (`[HIPÓTESE]`/protótipo, não cânone).
+pub const MAX_RECONQUISTAS: usize = 3;
+
 /// Número de Nós de Controle do protótipo (`[HIPÓTESE]` da GDD §6.2, nunca cânone).
 pub const TOTAL_NOS: usize = 3;
 
@@ -267,11 +274,15 @@ pub struct NoControle {
     pub inativo_ticks: i64,
 }
 
-/// Desfecho observável da partida; o protótipo implementa apenas a vitória.
+/// Desfecho observável da partida (`[HIPÓTESE]`/protótipo, não cânone).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ResultadoPartida {
     /// Autogestão estabelecida pela conversão dos Nós e pelo pulso final.
     Vitoria,
+    /// Comuna dissolvida ao atingir o limite de ticks da partida.
+    DerrotaPorTempo,
+    /// Comuna dissolvida após o limite de ilhas distintas perdidas.
+    DerrotaPorReconquista,
 }
 
 /// Comando enfileirado por um par para o próximo tick.
@@ -317,6 +328,8 @@ pub struct Mundo {
     pub suditos: BTreeMap<u64, Sudito>,
     /// Ilhas indexadas por `id`, em ordem determinística.
     pub ilhas: BTreeMap<u64, Ilha>,
+    /// Ids das ilhas distintas que emitiram `ilha_perdida`, em ordem crescente.
+    pub ilhas_reconquistadas: BTreeSet<u64>,
     /// Nós de Controle indexados por `id`, em ordem determinística.
     pub nos: BTreeMap<u64, NoControle>,
     /// Resistência Ideológica corrente (`[HIPÓTESE]`/protótipo, não cânone).
@@ -351,6 +364,7 @@ impl Mundo {
             proxima_ponte_id: 1,
             suditos: BTreeMap::new(),
             ilhas: BTreeMap::new(),
+            ilhas_reconquistadas: BTreeSet::new(),
             sinais: VecDeque::new(),
             nos: BTreeMap::new(),
             resistencia_ideologica: RESISTENCIA_INICIAL,
@@ -514,7 +528,7 @@ impl Mundo {
     }
 
     /// Avança um tick nas fases `prepare`, `skills`, `defesa`, `controle_ilhas`,
-    /// `vitoria` e `finish`.
+    /// `vitoria` e `finish`; a derrota é avaliada após o incremento do tick.
     pub fn avancar_tick(&mut self) {
         let convertidos_no_inicio = self.nos.values().filter(|no| no.convertido).count();
         self.fase_prepare();
@@ -525,6 +539,7 @@ impl Mundo {
         self.fase_finish();
         self.avancar_reversoes();
         self.tick += 1;
+        self.fase_derrota();
     }
 
     /// Seleciona os comandos pendentes e esvazia a fila de entrada.
@@ -675,7 +690,12 @@ impl Mundo {
     /// presença zera o progresso e sinaliza a perda das ilhas afetadas.
     fn fase_controle_ilhas(&mut self) {
         let presenca = self.suditos.values().any(|sudito| sudito.convertido);
-        let Self { ilhas, sinais, .. } = &mut *self;
+        let Self {
+            ilhas,
+            ilhas_reconquistadas,
+            sinais,
+            ..
+        } = &mut *self;
         for (id, ilha) in ilhas.iter_mut() {
             if presenca {
                 if ilha.controle_ticks < TICKS_CONTROLE_ILHA {
@@ -688,6 +708,7 @@ impl Mundo {
             } else {
                 if ilha.controlada || ilha.controle_ticks > 0 {
                     sinais.push_back(format!("ilha_perdida:{id}"));
+                    ilhas_reconquistadas.insert(*id);
                 }
                 ilha.controlada = false;
                 ilha.controle_ticks = 0;
@@ -1196,6 +1217,21 @@ impl Mundo {
         self.resultado = Some(ResultadoPartida::Vitoria);
     }
 
+    /// Registra a derrota por tempo ou por reconquistas, sem sobrescrever a vitória.
+    ///
+    /// A guarda inicial congela qualquer desfecho já definido por `fase_vitoria`,
+    /// que roda antes desta fase no mesmo tick (`[HIPÓTESE]`/protótipo, não cânone).
+    fn fase_derrota(&mut self) {
+        if self.resultado.is_some() {
+            return;
+        }
+        if self.tick >= TICKS_LIMITE_PARTIDA {
+            self.resultado = Some(ResultadoPartida::DerrotaPorTempo);
+        } else if self.ilhas_reconquistadas.len() >= MAX_RECONQUISTAS {
+            self.resultado = Some(ResultadoPartida::DerrotaPorReconquista);
+        }
+    }
+
     /// Descarta comandos, regenera Fôlego e expira barricadas e pontes vencidas.
     fn fase_finish(&mut self) {
         self.comandos_do_tick.clear();
@@ -1274,10 +1310,8 @@ impl Mundo {
             .join(";")
     }
 
-    /// Calcula o hash SHA-256 canônico do estado corrente.
-    #[must_use]
-    pub fn hash_estado(&self) -> String {
-        let jogadores = self.serializar_jogadores();
+    /// Serializa barricadas, pontes, súditos, ilhas, reconquistas e sinais.
+    fn serializar_estruturas(&self) -> String {
         let barreiras: String = self
             .barreiras
             .values()
@@ -1328,12 +1362,26 @@ impl Mundo {
             .map(|ilha| format!("{}:{}:{}", ilha.id, ilha.controlada, ilha.controle_ticks))
             .collect::<Vec<_>>()
             .join(";");
+        let ilhas_reconquistadas: String = self
+            .ilhas_reconquistadas
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(";");
         let sinais: String = self
             .sinais
             .iter()
             .map(String::as_str)
             .collect::<Vec<_>>()
             .join(";");
+        format!("{barreiras}|{pontes}|{suditos}|{ilhas}|{ilhas_reconquistadas}|{sinais}")
+    }
+
+    /// Calcula o hash SHA-256 canônico do estado corrente.
+    #[must_use]
+    pub fn hash_estado(&self) -> String {
+        let jogadores = self.serializar_jogadores();
+        let estruturas = self.serializar_estruturas();
 
         let nos: String = self
             .nos
@@ -1350,23 +1398,24 @@ impl Mundo {
             .join(";");
         let resultado = match self.resultado {
             Some(ResultadoPartida::Vitoria) => "vitoria",
+            Some(ResultadoPartida::DerrotaPorTempo) => "derrota_por_tempo",
+            Some(ResultadoPartida::DerrotaPorReconquista) => "derrota_por_reconquista",
             None => "nenhum",
         };
 
         let entrada = format!(
-            "{0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}|{9}|{10}|{11}",
-            self.tick,
-            self.epoch,
-            self.match_id,
-            jogadores,
-            barreiras,
-            pontes,
-            suditos,
-            ilhas,
-            sinais,
-            nos,
-            self.resistencia_ideologica,
-            resultado,
+            concat!(
+                "{tick}|{epoch}|{match_id}|{jogadores}|{estruturas}|",
+                "{nos}|{resistencia}|{resultado}",
+            ),
+            tick = self.tick,
+            epoch = self.epoch,
+            match_id = self.match_id,
+            jogadores = jogadores,
+            estruturas = estruturas,
+            nos = nos,
+            resistencia = self.resistencia_ideologica,
+            resultado = resultado,
         );
         let resumo = Sha256::digest(entrada.as_bytes());
         format!("{resumo:x}")

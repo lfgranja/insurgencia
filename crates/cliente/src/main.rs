@@ -930,10 +930,11 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
     let sinais = simulacao.0.sinais.len();
     let nos_convertidos = simulacao.0.nos.values().filter(|no| no.convertido).count();
     let resistencia = simulacao.0.resistencia_ideologica;
-    let resultado = if matches!(simulacao.0.resultado, Some(ResultadoPartida::Vitoria)) {
-        "Autogestão estabelecida"
-    } else {
-        "em curso"
+    let resultado = match simulacao.0.resultado {
+        Some(ResultadoPartida::Vitoria) => "Autogestão estabelecida",
+        Some(ResultadoPartida::DerrotaPorTempo) => "Comuna dissolvida — tempo esgotado",
+        Some(ResultadoPartida::DerrotaPorReconquista) => "Comuna dissolvida — 3 reconquistas",
+        None => "em curso",
     };
     let construindo = match remoto {
         Some(j) if j.construcao_ponto.is_some() => {

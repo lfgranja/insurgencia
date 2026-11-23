@@ -1,0 +1,84 @@
+# Implementation Plan — 051-derrota
+
+**Ordem normativa (constituição v1.2.2 do alvo, ratificada 2026-11-19, última emenda 2026-11-23)**: 00 constituição → 01 intake → 02 research → 03 define → 04 shape → 05 decide → 06 specify → 07 clarify → 08 plan → 09 checklist → revisão do checklist → 10 tasks → 11 analyze → 12 implement → 13 converge → 27 validate → 26 release. **`tasks` precede `analyze` (READ-ONLY)**; R1 `go`; R4 (validate) antes de R7 (release `1.0.0-local`); `converge` append-only. **R6 é N/A por constituição v1.2.2**: fora da sequência executável enquanto `resolve-tasks.sh` e o adaptador de issues não existem; se invocada, **PARE e escale ao SWE** — nunca simular issue, nunca `gh` improvisado, nunca alegar execução. A dívida de automação é registrada, não executada.
+
+**Fronteira explícita**: este agente escreve **somente** `specs/051-derrota/{spec.md, plan.md, checklists/requirements.md, tasks.md}` no worktree `.specify/queue/worktrees/derrota-051/` (branch `051-derrota`, base `3132f47`). Não toca `.specify/queue/concurrency.jsonl`, `.specify/memory/STATE.md`, `AGENTS.md`, `crates/contratos`, `PROTOCOL_VERSION`, `Cargo.toml`, `Cargo.lock`, `crates/sim`, `crates/cliente`, documentos derivados, artefatos de validação nem código-fonte (salvo agentes de implementação na etapa 12, que recebem `crates/sim/src/lib.rs`, `crates/sim/tests/simulacao.rs` e `crates/cliente/src/main.rs`). Não executa gates, build, testes ou formatadores; não faz commit/push/PR. Tudo o que depende de execução externa fica **[NV]**.
+
+**Rotulagem obrigatória**: a condição de derrota de GDD §6.2:277 e §6.2:285 — relógio de 20 min sem conversão ou 3 ilhas reconquistadas, com a mensagem "Comuna dissolvida" — é cânone narrativo, mas **todos os números são `[HIPÓTESE]` no GDD**: 20 min, 3 reconquistas e 3 ilhas. A conversão para **36000 ticks** é derivação de `PASSO_SEGUNDOS = 1 / 30` (20 min × 30 Hz = 1200 s × 30), e o uso do sinal `ilha_perdida` de GDD §9.4:489,501 como proxy de reconquista é simplificação de protótipo sem mapa, sem Corporação autônoma e sem os 20 s de reconversão — ambos rotulados como não-canônicos nos 4 artefatos. Derrota por causas adicionais, variante duas Comunas, Plano Mestre, papéis W/E/R, PVE/PNJs, níveis e rede permanecem fora de escopo. O mapa FR-001 → T011, FR-002 → T011, FR-003 → T011, FR-004 → T011, FR-005 → T011/T012 e FR-006 → T001/T011/T012 é idêntico nos 4 artefatos.
+
+## Passos (00 → 26)
+
+1. **00 Constituição**: v1.2.2 lida e aplicada; sequência executável acima; R6 **N/A** (não executada, não simulada); R1 `go`.
+2. **01 Intake**: sessão `20261123T142500Z-derrota`, título `insurgencia - derrota por timeout e reconquista`; 80/20 = **192/625** (`derrota`: 4×3×4×4) contra Papéis W/E/R + níveis **48/625** (4×2×2×3), PVE/PNJs **48/625** (4×2×2×3) e rede **10/625** (5×2×1×1, bloqueada por ADR-004 até decisão da SE); decisão em `.specify/memory/STATE.md` (2026-11-23T14:25Z).
+3. **02 Research**: GDD §6.2:277 ([HIPÓTESE] "Derrota: a Comuna é dissolvida se o relógio de 20 min se esgotar sem a conversão ou se a Corporação reconquistar 3 ilhas já libertadas"), §6.2:285 (critério de aceitação: "Reconquistar 3 ilhas libertadas encerra a partida com 'Comuna dissolvida', mesmo que a Resistência da Ilha Central já esteja abaixo de 50") e §9.4:489,501 (sem Súdito por 10 s, ilha volta a Latente e emite `ilha_perdida`; o sinal está mapeado em §9.1); `.specify/memory/STATE.md` (decisão 14:25Z); `crates/sim/src/lib.rs` (`PASSO_SEGUNDOS = 1/30`, `tick`, `avancar_tick` com `prepare`→`skills`→`defesa`→`controle_ilhas`→`vitoria`→`finish`→reversões, `Mundo` com `BTreeMap`/`BTreeSet`/`VecDeque`, `Mundo.ilhas`, `Mundo.sinais`, emissão de `ilha_perdida:<id>`, `ResultadoPartida::Vitoria`, `hash_estado`); `crates/cliente/src/main.rs` (`atualizar_texto`, espelho `Mundo`, linha `Resultado` existente e teclado sem novas teclas).
+4. **03 Define (problema)**: a sim implementa defesa, pontes, coleta, súditos, combate, ilhas, Nós e vitória (ciclos 044–050), mas não possui cronômetro de partida, contador de reconquistas nem desfecho de derrota; logo a condição canônica de GDD §6.2:277 não é observável. Faltam `ResultadoPartida::Derrota`, `Mundo.ilhas_reconquistadas`, `TICKS_LIMITE_PARTIDA`, `MAX_RECONQUISTAS`, `fase_derrota`, registro do id no ponto de emissão de `ilha_perdida`, hash e mensagem no HUD. Critérios observáveis por FR/SC, com 36000 ticks e proxy `ilha_perdida` rotulados como protótipo.
+5. **04 Shape (concept)**: 4 opções avaliadas no scorecard (derrota, Papéis W/E/R + níveis, PVE/PNJs, rede); recomendação = `derrota`, reaproveitando sinais e contador de ilha existentes, sem mudança de stack.
+6. **05 Decide**: scorecard **4×3×4×4 = 192/625**, `Veredito: go` (R1), 0 clarificações em aberto (R3), R6 N/A; critério impacto × confiança × facilidade ÷ risco, denominador 625.
+7. **06 Specify**: substituir o stub por `spec.md` com US1–US7, FR-001..FR-006 e SC-001..SC-006; regra canônica distinguida de todos os números `[HIPÓTESE]` e de 36000 ticks/proxy `ilha_perdida` (rotulados como protótipo), scorecard e fronteira explícita.
+8. **07 Clarify**: os números do GDD são hipóteses rotuladas, não cânone operacional; 36000 ticks derivam de 20 min × 30 Hz com `tick >= 36000` avaliado antes do incremento; `ilha_perdida` é proxy determinístico de reconquista (sem Corporação/reconversão de 20 s) com dedup por id de ilha; `fase_derrota` fica entre `fase_vitoria` e `fase_finish`, começa com `resultado.is_some()` para preservar a vitória no mesmo tick e é idempotente; uma única variante `Derrota` basta; `hash_estado` ganha o conjunto ordenado e o token `derrota`; a linha `Resultado` do HUD ganha "Comuna dissolvida" sem novas teclas; derrota por outras causas, variante duas Comunas, papéis, PVE e rede ficam de fora; R6 N/A ≠ dívida executada.
+9. **08 Plan**: este arquivo; passos 00→26, fronteira explícita, roteiro de 10 passos, R4 antes de R7 `1.0.0-local`, R6 N/A.
+10. **09 Checklist**: um item `[x]` por FR-001..FR-006 em `checklists/requirements.md`; `[x]` = **revisão de requisitos**, não implementação.
+11. **Revisão do checklist**: FR/SC verificáveis por inspeção; 6 FR/6 SC; rastreabilidade FR-001..FR-006 alinhada aos artefatos de governança; aprovado para `tasks`.
+12. **10 Tasks**: `tasks.md` com T001..T012, IDs únicos e DAG linear; `tasks` antes de `analyze`; R4 antes de R7.
+13. **11 Analyze (READ-ONLY)**: fora da fronteira deste agente, executado depois de `tasks` conforme v1.2.2; nenhuma edição de spec/plano/checklist/código nesta etapa.
+14. **12 Implement (código Rust)**: agentes de implementação aplicam FR-001..FR-006 em `crates/sim/src/lib.rs` (constantes derivadas rotuladas `TICKS_LIMITE_PARTIDA = 36000` e `MAX_RECONQUISTAS = 3`; `ResultadoPartida::Derrota`; `Mundo.ilhas_reconquistadas: BTreeSet<u64>` vazio em `Mundo::new`; inserção do id no mesmo ponto de emissão de `ilha_perdida:<id>` em `fase_controle_ilhas`, com dedup e ordem de `id`; `fase_derrota` entre `fase_vitoria` e `fase_finish` com guardas `resultado.is_some()` → `tick >= TICKS_LIMITE_PARTIDA` → `ilhas_reconquistadas.len() >= MAX_RECONQUISTAS`; `hash_estado` com o conjunto ordenado e o token `derrota`), em `crates/cliente/src/main.rs` (linha `Resultado: Comuna dissolvida`, sem novas teclas) e em `crates/sim/tests/simulacao.rs` (cobertura determinística de 35999/36000 ticks, 2/3 reconquistas, dedup por id, vitória no mesmo tick, idempotência e replay); em `crates/sim/src/lib.rs` e no cliente, `#![forbid(unsafe_code)]`, `#![deny(clippy::pedantic)]`, sem `unwrap()`/`.expect()`/`#[allow]`, `max_width = 100` e `///` em itens públicos.
+15. **13 Converge (append-only)**: primeira entrada datada em `specs/051-derrota/converge.md`; nunca editar converge de outros ciclos. Fora da fronteira deste agente.
+16. **27 Validate (R4)**: `validate.md` aprovando documentalmente; gates/build/testes **[NV]** até execução pelo orquestrador; R4 antes de R7.
+17. **26 Release (R7)**: `release.md` versão `1.0.0-local`, changelog por FR/T, rastreabilidade, rollback (nunca executado), após R4.
+
+> Os números 14–25 da sequência são reservados pela constituição para especificações de implementação não utilizadas neste ciclo; a cadeia executável vai de 00 a 26, com `27 validate` imediatamente antes de `26 release`.
+
+## Roteiro de verificação (10 passos)
+
+Escrever antes do PR em `.specify/validations/derrota/test-roadmap.md` (fora da fronteira deste agente). Superfície: inspeção de `crates/sim/src/lib.rs`, `crates/cliente/src/main.rs`, `crates/sim/tests/simulacao.rs` e da fronteira de arquivos; execução da suíte determinística e do binário com `--minimizado` pelo orquestrador; capturas de terminal e, se houver surface, do texto do HUD **quando aplicável**. Não há surface automatizável para captura visual real do HUD neste alvo headless: toda captura visual/tela é **[NV]** até verificação humana. Rollback documental (limpar capturas em `$TMP`, corrigir a fonte, nunca a expectativa).
+
+| # | Ação | Resultado esperado | Automatizável? |
+|:--|:--|:--|:--|
+| 1 | `git rev-parse HEAD`, `date -u` e listar os artefatos do ciclo; conferir presença dos 4 artefatos desta fronteira e a ordem `tasks` antes de `analyze` | base `3132f47`, branch `051-derrota`, sessão `20261123T142500Z-derrota`, scorecard **192/625**; `STATE.md`, `AGENTS.md`, `concurrency.jsonl` e paths alheiros intactos; R6 fora do fluxo | sim (inspeção/terminal) |
+| 2 | Conferir 6 FR e 6 SC na spec, o mapeamento um-para-um no checklist e a rotulação de todos os números como `[HIPÓTESE]`/protótipo nos 4 artefatos (FR-001 regra, FR-005 hash/HUD, FR-006 governança) | rastreabilidade FR-001..FR-006 idêntica à dos artefatos de governança; 20 min/36000 ticks, 3 reconquistas e o proxy `ilha_perdida` marcados como hipótese/derivação; nenhum número promovido a regra nova | sim (inspeção) |
+| 3 | Inspecionar `ResultadoPartida::Derrota`, `Mundo.ilhas_reconquistadas`, `TICKS_LIMITE_PARTIDA`, `MAX_RECONQUISTAS` e `Mundo::new`; conferir ausência de campo de relógio e de produtor de reconquista fora da fase | `Derrota` documentada, conjunto vazio no início, constantes 36000 e 3 rotuladas `[HIPÓTESE]`; `tick` é o único cronômetro; ordem estável por `id` para o hash; sem crate/dependência nova | sim (inspeção) |
+| 4 | Conferir `fase_controle_ilhas` no ponto de emissão de `ilha_perdida:<id>` e a inserção em `ilhas_reconquistadas` | sinal emitido nas transições já existentes, em ordem de `id`; id registrado uma vez; ilha Latente não emite nem registra; recaptura da mesma ilha não duplica; nenhum sinal/comando/ação novo e nenhuma mudança de semântica do sinal | sim (inspeção) |
+| 5 | Simular `tick = 35999`/`36000`, 2/3 ilhas perdidas e a fase em ordem | 35999 mantém `resultado = None`; 36000 define `Derrota`; 2 reconquistas não encerram e a 3ª define `Derrota` no mesmo tick; `fase_derrota` roda entre `fase_vitoria` e `fase_finish` | sim (inspeção/cálculo); execução ao vivo **[NV]** |
+| 6 | Simular vitória e derrota no mesmo tick, timeout e reconquista no mesmo tick, e ticks posteriores ao desfecho | `fase_vitoria` prevalece; se não há vitória, desfecho é `Derrota` com mensagem única; nenhum segundo sinal, nenhuma troca de desfecho e nenhum dano à regra de vitória do ciclo 050 | sim (inspeção/cálculo) |
+| 7 | Comparar `hash_estado` entre replays idênticos e após inserir id no conjunto e definir `Derrota`; executar a suíte determinística pelo orquestrador | hashes idênticos no replay; inclusão de `ilhas_reconquistadas` (ids ordenados) e do token `derrota` muda o hash de forma previsível; segmentos existentes preservados; cobertura nova e existente passam | parcial (inspeção); gates/testes **[NV]** |
+| 8 | Inspecionar `atualizar_texto` e o tratamento de `KeyCode`; conferir `Resultado: Comuna dissolvida`, a conservação de todas as linhas e a ausência de novas teclas | valores lidos do espelho `Mundo`; "Autogestão estabelecida" e "em curso" preservados; linhas `Posicao`, `Ilha`, `Limites`, `Suprimentos`, `Materiais`, `Fôlego`, `Vida`, `Alvo`, `Autogestão`, `Barreiras`, `Pontes`, `Súditos`, `Ilhas`, `Sinais`, `Construindo`, `Coleta`, `Resistência`, `Nós` e teclas `WASD`/`B`/`P`/`C`/`G`/`Q` intactas; nenhum campo de protocolo novo | sim (inspeção de código); HUD visual **[NV]** |
+| 9 | Conferir que nenhum gatilho de derrota depende de Aleatoriedade, I/O, relógio externo, rede ou segundo jogador; verificar `forbid(unsafe_code)`, `deny(clippy::pedantic)` e ausência de `unwrap`/`.expect()`/`#[allow]` | derrota é passiva e determinística, derivada apenas de `tick`, `ilhas` e `sinais`; estilo Rust v1.2.2 respeitado; `#[expect(...)]` como atributo de lint permanece permitido | sim (inspeção); gates **[NV]** |
+| 10 | Governança, R6 N/A, rollback e rótulos: conferir `tasks` antes de `analyze`, R4 antes de R7 `1.0.0-local`, `converge` append-only, **[NV]** em toda captura e aplicar o rollback documentado | ordem v1.2.2 respeitada; R6 N/A (PARE se invocada, nenhuma issue simulada, nenhum `gh` improvisado); nenhuma mudança em contratos/protocolo/Cargo/rede; nenhum build/gate/commit/push/PR executado por este agente; fonte corrigida se um passo falhar | parcial (revisão humana) |
+
+## Rastreabilidade (FR → etapa/T)
+
+| FR | Etapa | T |
+|---|---|---|
+| FR-001 regra canônica de derrota e rotulação de todos os números `[HIPÓTESE]`/protótipo | 12 implement | T011 |
+| FR-002 `ResultadoPartida::Derrota`, `Mundo.ilhas_reconquistadas`, constantes derivadas e nenhum relógio novo | 12 implement | T011 |
+| FR-003 registro do id em `ilhas_reconquistadas` no ponto de emissão de `ilha_perdida:<id>` | 12 implement | T011 |
+| FR-004 `fase_derrota` entre `fase_vitoria` e `fase_finish`, guardas e precedência da vitória | 12 implement | T011 |
+| FR-005 `hash_estado` com conjunto/token `derrota`, HUD `Resultado: Comuna dissolvida` e fronteira determinística | 12/27 | T011, T012 |
+| FR-006 governança R1/R4/R6/[NV] e estilo Rust | 00/12/26 | T001, T011, T012 |
+
+## Riscos e mitigação
+
+| Risco | Mitigação |
+|---|---|
+| Hipótese promovida a cânone | Rotulação explícita nos 4 artefatos (FR-001/SC-001, passo 2 do roteiro): 20 min, 36000 ticks e 3 reconquistas são protótipo/derivação; GDD é lido, nunca reescrito |
+| Regra canônica alterada por acidente | Nenhum número, condição ou mensagem canônica é redefinida; nenhuma regra de vitória do ciclo 050 é alterada |
+| Derrota sobrescrevendo vitória no mesmo tick | `fase_vitoria` corre antes e `fase_derrota` começa com `resultado.is_some()`; passo 6 do roteiro |
+| Limite de tempo no tick errado | `tick >= TICKS_LIMITE_PARTIDA` avaliado antes de `tick += 1`; cobertura 35999/36000 no passo 5 e em T011 |
+| Reconquista contada duas vezes | `BTreeSet<u64>` deduplica por id; ilha Latente não emite; passos 4–5 |
+| Proxy `ilha_perdida` confundido com cânone | Documentado como simplificação sem mapa/Corporação/reconversão de 20 s; nenhuma regra de reconversão implementada |
+| Derrota repetida ou mensagem duplicada | Guarda `resultado.is_some()` torna `fase_derrota` idempotente; nenhum sinal novo é enfileirado |
+| Ordem de fases regressiva | `fase_derrota` inserida explicitamente entre `fase_vitoria` e `fase_finish` em `avancar_tick`; passos 5–6 |
+| Hash não determinístico | `BTreeSet`/`BTreeMap`/`VecDeque` e ordem estável; novos segmentos previsíveis; passo 7 cobre replay |
+| HUD sobrescreve informações existentes | Apenas o valor da linha `Resultado` muda; todas as linhas e teclas permanecem; passo 8 |
+| Tecla/UI inventada | Derrota é passiva; nenhuma tecla, comando, ação ou surface nova; passos 8–9 |
+| Stack/protocolo/rede alterados | Fronteira explícita: nenhuma mudança em contratos, `PROTOCOL_VERSION`, Cargo, manifesto, CI ou rede; ADR-004 mantém rede bloqueada |
+| R6 adotada ou issue simulada | R6 N/A por v1.2.2; PARE se invocada; nenhum `taskstoissues`/`gh` improvisado; dívida de automação registrada |
+| Ordem invertida por hábito | `tasks` (T009) antes de `analyze` (T010); R4 (T011) antes de R7 (T012) |
+| Captura visual fabricada | Sem surface automatizável: HUD visual e execução ao vivo **[NV]**; apenas inspeção e terminal são marcados como automatizáveis |
+| Fronteira estourada | Só 4 artefatos SDD escritos; `concurrency.jsonl`, `STATE.md`, `AGENTS.md`, sim, cliente e contratos intactos nesta etapa |
+
+## Verificação futura (pelo orquestrador, **[NV]** neste ciclo)
+
+- Executar gates, build, testes e formatador; conferir `forbid(unsafe_code)`, `deny(clippy::pedantic)` e ausência de `unwrap`/`.expect()`/`#[allow]`.
+- Rodar a suíte determinística e, se aplicável, o binário com `--minimizado`, conduzindo o roteiro de 10 passos e registrando capturas de terminal/HUD quando houver surface; comparar notas com o estado ao vivo.
+- Manter R6 fora do fluxo, a rede bloqueada por ADR-004 e a regra de vitória do ciclo 050 intacta; **todos os números rotulados como `[HIPÓTESE]`/protótipo**; R4 antes de R7 `1.0.0-local`.
