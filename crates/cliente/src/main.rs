@@ -22,7 +22,9 @@ use insurgencia_cliente::{
     deslocar, estado_inicial, ilha_em, EstadoJogador, Geometria3d, Ilha, ILHAS, LIMITE_X, LIMITE_Y,
     VELOCIDADE,
 };
-use insurgencia_sim::{Comando, Mundo, PASSO_SEGUNDOS, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA};
+use insurgencia_sim::{
+    Comando, Mundo, ResultadoPartida, PASSO_SEGUNDOS, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA,
+};
 
 /// Identificador do jogador local no espelho da simulação.
 const PEER_ID: u64 = 1;
@@ -103,6 +105,8 @@ fn main() {
                 solicitar_ponte,
                 solicitar_propaganda,
                 solicitar_ataque,
+                solicitar_propaganda_no,
+                solicitar_atacar_no,
                 sincronizar_sim,
                 avancar_simulacao,
                 atualizar_texto,
@@ -756,6 +760,81 @@ fn solicitar_ataque(
     });
 }
 
+/// Devolve a posição do Nó mais próximo do jogador, com desempate pelo menor `id`.
+///
+/// A distância euclidiana ao quadrado preserva a ordem da distância e `total_cmp`
+/// mantém a comparação determinística sem raiz quadrada. As posições dos Nós são
+/// simplificação de protótipo `[HIPÓTESE]` da simulação.
+#[must_use]
+fn posicao_no_mais_proximo(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, f64)> {
+    let (x, y) = (f64::from(jogador.0), f64::from(jogador.1));
+    mundo
+        .nos
+        .values()
+        .min_by(|a, b| {
+            let da = (a.posicao.0 - x).mul_add(a.posicao.0 - x, (a.posicao.1 - y).powi(2));
+            let db = (b.posicao.0 - x).mul_add(b.posicao.0 - x, (b.posicao.1 - y).powi(2));
+            da.total_cmp(&db).then_with(|| a.id.cmp(&b.id))
+        })
+        .map(|no| no.posicao)
+}
+
+/// Agenda Propaganda no Nó mais próximo ao pressionar `R`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_propaganda_no(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyR) {
+        return;
+    }
+    let Some(destino) = posicao_no_mais_proximo(&simulacao.0, jogador.0.posicao) else {
+        return;
+    };
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "propaganda_no".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(destino),
+    });
+}
+
+/// Agenda dano no Nó mais próximo ao pressionar `F`; o dano nunca converte o Nó.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_atacar_no(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyF) {
+        return;
+    }
+    let Some(destino) = posicao_no_mais_proximo(&simulacao.0, jogador.0.posicao) else {
+        return;
+    };
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "atacar_no".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(destino),
+    });
+}
+
 /// Copia a posição do estado para a transformação 3D do avatar no plano do mapa.
 #[expect(
     clippy::needless_pass_by_value,
@@ -804,17 +883,9 @@ fn avancar_simulacao(
     }
 }
 
-/// Atualiza o painel com recursos, Fôlego, Vida, Vida do alvo, barreiras, pontes,
-/// progresso de construção e coleta, ilhas controladas e sinais da simulação.
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
-)]
-fn atualizar_texto(
-    jogador: Res<JogadorLocal>,
-    simulacao: Res<Simulacao>,
-    mut textos: Query<&mut Text, With<TextoEstado>>,
-) {
+/// Monta o texto do painel a partir do estado local e do espelho da simulação.
+#[must_use]
+fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
     let (x, y) = jogador.0.posicao;
     let ilha = if let Some(atual) = ilha_em((x, y)) {
         atual.nome
@@ -857,6 +928,13 @@ fn atualizar_texto(
         .filter(|ilha| ilha.controlada)
         .count();
     let sinais = simulacao.0.sinais.len();
+    let nos_convertidos = simulacao.0.nos.values().filter(|no| no.convertido).count();
+    let resistencia = simulacao.0.resistencia_ideologica;
+    let resultado = if matches!(simulacao.0.resultado, Some(ResultadoPartida::Vitoria)) {
+        "Autogestão estabelecida"
+    } else {
+        "em curso"
+    };
     let construindo = match remoto {
         Some(j) if j.construcao_ponto.is_some() => {
             format!("{}/{}", j.construcao_ticks, TICKS_CONSTRUCAO_BARREIRA)
@@ -869,7 +947,7 @@ fn atualizar_texto(
         }
         _ => "nao".to_owned(),
     };
-    let conteudo = format!(
+    format!(
         concat!(
             "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\n",
             "Limites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\n",
@@ -877,11 +955,12 @@ fn atualizar_texto(
             "Fôlego: {folego}\nVida: {vida}\nAlvo: {vida_alvo}\n",
             "Autogestão: {autogestao}\nBarreiras: {barreiras}\n",
             "Pontes: {pontes}\nSúditos: {suditos}\n",
-            "Ilhas: {ilhas_controladas}\nSinais: {sinais}\n",
+            "Resistência: {resistencia}\nNós: {nos_convertidos}/3\n",
+            "Ilhas: {ilhas_controladas}\nSinais: {sinais}\nResultado: {resultado}\n",
             "Construindo: {construindo}\nColeta: {coletando}\n",
             "WASD ou setas para mover · B para construir barreira · P para construir ponte · ",
-            "C para coletar materiais · G para propaganda · ",
-            "Aproxime-se do alvo e use Q para atacar"
+            "C para coletar materiais · G para propaganda · R para propaganda no Nó · ",
+            "F para atacar o Nó · Aproxime-se do alvo e use Q para atacar"
         ),
         x = x,
         y = y,
@@ -897,12 +976,27 @@ fn atualizar_texto(
         barreiras = barreiras,
         pontes = pontes,
         suditos = suditos,
+        resistencia = resistencia,
+        nos_convertidos = nos_convertidos,
         ilhas_controladas = ilhas_controladas,
         sinais = sinais,
+        resultado = resultado,
         construindo = construindo,
         coletando = coletando,
-    );
+    )
+}
 
+/// Atualiza o painel com o texto montado por [`texto_hud`].
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn atualizar_texto(
+    jogador: Res<JogadorLocal>,
+    simulacao: Res<Simulacao>,
+    mut textos: Query<&mut Text, With<TextoEstado>>,
+) {
+    let conteudo = texto_hud(&jogador, &simulacao);
     for mut texto in &mut textos {
         (**texto).clone_from(&conteudo);
     }

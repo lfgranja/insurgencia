@@ -374,3 +374,16 @@
 | Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
 
 **Escolha**: `ilhas-vitoria` — subset **controle de ilha**: GDD §9.4:489,501 fixa 10 s contínuos de Súdito da Comuna e sinal `ilha_perdida` quando falta; sem mapa/rede, o protótipo trata Súditos convertidos como presentes globalmente e registra a simplificação. Nós de Controle e Resistência Ideológica ficam para o próximo ciclo. O refresh de `AGENTS.md` solicitado pelo usuário entra neste mesmo commit. R6 permanece **N/A**.
+
+## 2026-11-23T12:50Z — decisão 80/20 do ciclo 050 (antes da implementação)
+
+**Sessão**: `20261123T125000Z-nos-vitoria` · **Título**: `insurgencia - nos de controle e vitoria`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Nós de Controle + Resistência + vitória | 5 | 2 | 2 | 3 | **60/625** |
+| Papéis W/E/R + níveis | 4 | 2 | 2 | 3 | 48/625 |
+| PVE/PNJs | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `nos-vitoria`. É a condição de vitória do GDD, agora factível após controle de ilha e Súditos. Todos os números (3 Nós, 100 Resistência, −30/Nó, pulso final −10, dano cap −20, 20 s por Nó) são `[HIPÓTESE]` no GDD e devem ser rotulados como protótipo. R6 permanece **N/A**.
