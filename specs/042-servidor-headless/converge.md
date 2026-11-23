@@ -1,0 +1,37 @@
+# Convergência — 042-servidor-headless
+
+**Data:** 2026-11-23T04:30Z · **Modo:** READ-ONLY, **append-only** — esta é a **1ª entrada** do ciclo; entradas futuras são acrescentadas abaixo, sem reescrever este histórico.
+
+## Evidências (lidas/auditadas nesta sessão, não reexecutadas)
+
+- `04:30Z`: worktree isolado `.specify/queue/worktrees/servidor-headless-042/`, branch `042-servidor-headless`, base `b099093`, sessão `20261123T043000Z-servidor-headless`; título `insurgencia - servidor headless deterministico`. O ciclo sucede o 041 (coleta jogável no cliente, PR #54) e não altera ciclos anteriores.
+- `04:30Z`: [source: `.specify/memory/STATE.md`, decisão 80/20 do ciclo 042] Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**: servidor headless **256/625** (`4×4×4×4`); dívida documental **250**; combate/fôlego `[HIPÓTESE]` **48**; rede com Lightyear **10**. Escolha `servidor-headless`, R1 `go`: maior ganho de autoridade sem dependência externa — binário com `Mundo`, comandos determinísticos e hash por tick, sem introduzir Lightyear, async ou sockets.
+- `04:30Z`: [source: `crates/sim/src/lib.rs:15,38-45,95-107,138,152,195,200,430-431,478-497,504-520`; contrato técnico auditado] A API já oferece `Mundo::new()`, `adicionar_jogador`, `agendar_comando`, `avancar_tick` e `hash_estado() -> String` (SHA-256 canônico). `Comando` contém `peer_id: u64`, `acao: String`, `seq: i64`, `request_id: i64` e `destino: Option<(f64, f64)>`; as ações conhecidas são `mover`, `sinalizar_sincronia`, `sinalizar_alavanca`, `coletar_materiais`, `construir_barreira` e `atacar_forte`, e `CodigoRecusa::AcaoDesconhecida`/`DestinoInvalido` já registram as recusas. O binário apenas traduz linhas da stdin para essa API — nenhuma regra de simulação é reimplementada no servidor.
+- `04:30Z`: [source: `Cargo.toml` da workspace, `crates/sim/Cargo.toml`] A workspace usa `members = ["crates/*"]`; o novo crate entra como membro e `Cargo.lock` é gerado pelo Cargo, nunca editado à mão. `insurgencia-sim` já depende de `insurgencia-contratos`, `thiserror` e `sha2`; o crate do servidor **não** acrescenta dependência externa e depende somente de `insurgencia-sim`.
+- Governança: constituição **v1.2.2** do alvo (`.specify/memory/constitution.md`, ratificada 2026-11-19, última emenda 2026-11-23) — sequência `00 → 01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → revisão → 10 tasks → 11 analyze → 12 implement → 13 converge → 27 validate → 26 release`; `analyze` READ-ONLY **depois** de `tasks`, `converge` append-only, R1 `go`, R4 antes de R7 `1.0.0-local`. **R6 N/A**: ratificada como intenção em v1.2.0, fora da sequência executável em v1.2.2 até `resolve-tasks.sh` e o adaptador existirem; se invocada, **PARE e escale ao SWE**, nunca simular issue, nunca `gh` improvisado — dívida de automação registrada, inclusão só por emenda ratificada.
+- Fronteira: nenhum build, gate, formatador, teste, commit, push, PR, merge ou deploy executado; nenhuma janela, credencial, socket ou rede utilizada. `.specify/memory/STATE.md`, `.specify/feature.json`, `concurrency.jsonl`, `AGENTS.md`, paths alheios e `converge.md` de outros ciclos preservados; nenhum `converge.md` alheio editado.
+
+## Atendimento
+
+FR-001..FR-006 e SC-001..SC-006 registrados na spec, com rastreabilidade até `.specify/validations/servidor-headless/test-roadmap.md`: passo 1 (fronteira dos 5 artefatos e `tasks` antes de `analyze`), passo 2 (`--ticks N` inteiro positivo), passo 3 (parser `peer_id acao seq request_id [x y]`, obrigatoriedade/proibição de coordenadas e ações conhecidas), passo 4 (agendamento em ordem antes do tick 0), passo 5 (uma linha por tick, `0..N-1`), passo 6 (`<tick>\t<hash sha256>` via `hash_estado()`), passo 7 (duas execuções idênticas byte a byte), passo 8 (entrada malformada/ação desconhecida → erro determinístico, saída 2, sem pânico), passo 9 (fronteira de dependências, sem async/sockets/Lightyear, regras Rust e documentação `///`), passo 10 (governança, R6 N/A e rollback documentado). Checklist revisado; R1 `go` registrado na decisão 80/20; `tasks` (T001–T012) precedem `analyze` READ-ONLY; roteiro escrito antes do PR; R4 aprovado em `.specify/validations/servidor-headless/validate.md` **condicionado à execução do roteiro** e antes de R7 `1.0.0-local`.
+
+### Execução pelo orquestrador — **[NV]**
+
+- **Gates**: **[NV]** — `./verify.sh`/gates locais não executados neste ciclo por este agente; nenhum verde afirmado.
+- **Roteiro 10 passos**: **[NV]** — a executar pelo orquestrador/SWE; capturas planejadas em `$TMP/saidas` (ver `test-roadmap.md`), nenhuma produzida por este agente.
+- **Implementação do crate**: **[NV]** — `crates/servidor`, binário `insurgencia-servidor`, membro da workspace e `Cargo.lock` gerado pelo Cargo são handoff ao SWE; nenhuma linha de código escrita nesta etapa.
+- **Correção na fonte**: **[NV]** — se o parser, a contagem de linhas, o hash ou a rejeição falharem nos passos 2–8, corrigir a **fonte** (código/artefato), nunca a expectativa do teste; registrar data/fonte nesta seção, sem reescrever o histórico acima.
+- **Fronteira**: `[NV]` CI/merge do ciclo 042, acionamento de R6, promoção de `1.0.0-local` a `1.0.0`, decisão do SWE sobre PRs e qualquer execução de gates/roteiro. Nada foi executado por este agente.
+
+### Execução pelo orquestrador — 2026-11-23T04:38Z
+
+- **Gate verde**: `./verify.sh` (04:37Z) `ALL STAGES OK`, **71 testes run: 71 passed** (61 anteriores + 6 unitários + 4 de integração), `VERIFY_EXIT=0`. `Cargo.lock` gerado por `cargo check --offline`, sem novas dependências externas. Dois REDs determinísticos corrigidos na fonte antes do verde (`f64: Eq` no derive e valores esperados de `analisar_linha` nos testes unitários).
+- **Roteiro 10/10 PASS** (04:37–04:38Z), capturas em `/tmp/tmp.4vL6foNQAo/saidas/`, relatório em `.specify/validations/servidor-headless/evidence.md`. CLI, parser, agendamento, formato de hash, determinismo byte a byte e rejeição com exit 2 verificados.
+- **Servidor headless**: `crates/servidor` com binário `insurgencia-servidor`, membro da workspace, sem async/socket/Lightyear/tokio; stdin validada antes do tick 0, comandos agendados em ordem e hash canônico emitido por tick.
+- **Gates locais**: SDD `42/0`, DAG `444 tarefas/139 arestas/0 ciclos`, task-id `0 duplicatas`, hub-docs `0 erros`; converge baselinado por bootstrap após esta entrada.
+- **Fronteira**: `crates/contratos`, `PROTOCOL_VERSION` e demais cycles preservados. `[NV]`: CI/merge do ciclo 042, promoção e decisão do SWE sobre PR #48.
+
+### Correção de blocker da ACR e revalidação — 2026-11-23T04:45Z
+
+- **P1 (comentário `7091811530`)**: hash era emitido após `avancar_tick`, deslocando a linha `0`. Correção: `writeln!` com `hash_estado()` antes de `avancar_tick()`; novo teste `primeira_linha_com_stdin_vazia_e_o_estado_inicial` compara a linha `0` ao hash de `Mundo::new()`.
+- **Verificação**: `verify.sh` **ALL STAGES OK**, **72/72 testes**; roteiro reexecutado 10/10 com 5 gates locais PASS. `[NV]`: CI/merge no novo head, ACR de 2ª rodada e decisão do SWE sobre PR #48.

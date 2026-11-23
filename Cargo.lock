@@ -3329,6 +3329,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "insurgencia-servidor"
+version = "0.1.0"
+dependencies = [
+ "insurgencia-sim",
+]
+
+[[package]]
 name = "insurgencia-sim"
 version = "0.1.0"
 dependencies = [

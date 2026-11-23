@@ -287,3 +287,16 @@
 | Servidor + Lightyear | 5 | 2 | 1 | 1 | 10/625 |
 
 **Escolha**: `coleta-jogavel`. O ciclo 040 entregou barricada e HUD, mas o espelho local começa com 0 Materiais e não tem como coletar: a cadeia jogável está incompleta. A correção do comentário de `destino` entra no mesmo ciclo por ser trivial e adjacente. R6 continua **N/A** por constituição v1.2.2.
+
+## 2026-11-23T04:30Z — decisão 80/20 do ciclo 042 (antes da implementação)
+
+**Sessão**: `20261123T043000Z-servidor-headless` · **Título**: `insurgencia - servidor headless deterministico`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Servidor headless determinístico (stdin → ticks → hash) | 4 | 4 | 4 | 4 | **256/625** |
+| Dívida documental restante | 2 | 5 | 5 | 5 | 250/625 |
+| Combate/Fôlego (`[HIPÓTESE]`) | 4 | 2 | 2 | 3 | 48/625 |
+| Rede com Lightyear (dep ausente) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `servidor-headless`. É o maior ganho de autoridade sem dependência externa: um binário que possui `Mundo`, consome comandos de entrada determinística e emite hash por tick. Prepara o caminho para rede sem introduzir Lightyear, async ou sockets neste ciclo. R6 permanece **N/A** por constituição v1.2.2.
