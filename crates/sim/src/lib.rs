@@ -699,7 +699,7 @@ impl Mundo {
         let mut propaganda_no_avancada: BTreeSet<u64> = BTreeSet::new();
         self.avancar_propagandas_no_automaticas(&mut propaganda_no_avancada);
         let mut ataque_no_avancado: BTreeSet<u64> = BTreeSet::new();
-        let mut ataque_pnj_avancado: BTreeSet<u64> = BTreeSet::new();
+        let mut atacantes_pnj_avancado: BTreeSet<u64> = BTreeSet::new();
         let comandos = std::mem::take(&mut self.comandos_do_tick);
         let mut ataques_realizados: BTreeSet<u64> = BTreeSet::new();
 
@@ -751,7 +751,8 @@ impl Mundo {
             } else if comando.acao == "atacar_no" {
                 self.aplicar_atacar_no(comando, &mut ataque_no_avancado);
             } else if comando.acao == "atacar_pnj" {
-                atualizar_monotonicos = self.aplicar_ataque_pnj(comando, &mut ataque_pnj_avancado);
+                atualizar_monotonicos =
+                    self.aplicar_ataque_pnj(comando, &mut atacantes_pnj_avancado);
             }
             if atualizar_monotonicos {
                 if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
@@ -809,24 +810,26 @@ impl Mundo {
         }
     }
 
-    /// Aplica no máximo um `atacar_pnj` por PNJ a cada tick.
+    /// Aplica no máximo um `atacar_pnj` por atacante a cada tick.
     ///
-    /// Retorna `true` somente quando o dano foi aplicado, para que os
-    /// monotônicos avancem apenas com comandos aceitos.
-    fn aplicar_ataque_pnj(&mut self, comando: &Comando, avancado: &mut BTreeSet<u64>) -> bool {
+    /// O `destino` identifica o PNJ ativo; o atacante precisa estar a até
+    /// `ALCANCE_CONTATO_M` (2 m) desse ponto. Retorna `true` somente quando o
+    /// dano foi aplicado, para que os monotônicos avancem só com comandos aceitos.
+    fn aplicar_ataque_pnj(&mut self, comando: &Comando, atacantes: &mut BTreeSet<u64>) -> bool {
         let Some(destino) = comando.destino else {
             return false;
         };
         let Some(jogador) = self.jogadores.get(&comando.peer_id) else {
             return false;
         };
-        if !ponto_igual(destino, jogador.posicao) {
+        if (destino.0 - jogador.posicao.0).hypot(destino.1 - jogador.posicao.1) > ALCANCE_CONTATO_M
+        {
             return false;
         }
         let Some(id) = self.pnj_id_ativo_em_ponto(destino) else {
             return false;
         };
-        if !avancado.insert(id) {
+        if !atacantes.insert(comando.peer_id) {
             return false;
         }
         self.aplicar_dano_a_pnj(id, DANO_ATAQUE);
@@ -866,9 +869,9 @@ impl Mundo {
 
     /// Avança a cadência dos PNJs ativos e resolve seus ataques em ordem de `id`.
     ///
-    /// Ao atingir `TICKS_ATAQUE_PNJ`, o PNJ atinge o jogador mais próximo em até
-    /// `ALCANCE_ATAQUE_PNJ_M` (desempate por menor `peer_id`) e zera o contador.
-    /// Sem alvo em alcance, o contador também zera, sem dano.
+    /// Ao atingir `TICKS_ATAQUE_PNJ`, o PNJ atinge o primeiro jogador em ordem de
+    /// `peer_id` dentro de `ALCANCE_ATAQUE_PNJ_M` (2 m) e zera o contador. Sem
+    /// alvo em alcance, o contador também zera, sem dano.
     fn fase_ataque_pnjs(&mut self) {
         let ids: Vec<u64> = self
             .pnjs
@@ -892,17 +895,12 @@ impl Mundo {
             let alvo = self
                 .jogadores
                 .iter()
-                .filter_map(|(&peer_id, jogador)| {
-                    let distancia =
-                        (jogador.posicao.0 - origem.0).hypot(jogador.posicao.1 - origem.1);
-                    (distancia <= ALCANCE_ATAQUE_PNJ_M).then_some((distancia, peer_id))
+                .filter(|(_, jogador)| {
+                    (jogador.posicao.0 - origem.0).hypot(jogador.posicao.1 - origem.1)
+                        <= ALCANCE_ATAQUE_PNJ_M
                 })
-                .min_by(|(distancia_a, peer_a), (distancia_b, peer_b)| {
-                    distancia_a
-                        .total_cmp(distancia_b)
-                        .then_with(|| peer_a.cmp(peer_b))
-                })
-                .map(|(_, peer_id)| peer_id);
+                .map(|(&peer_id, _)| peer_id)
+                .min();
             if let Some(peer_id) = alvo {
                 if let Some(jogador) = self.jogadores.get_mut(&peer_id) {
                     jogador.vida = jogador.vida.saturating_sub(DANO_ATAQUE_PNJ).max(0);
@@ -1723,8 +1721,9 @@ pub enum CodigoRecusa {
     #[error("folego insuficiente")]
     FolegoInsuficiente,
     /// Destino ausente ou fora do ponto para `mover`, `coletar_materiais`,
-    /// `construir_barreira`, `construir_ponte`, `propaganda`, `propaganda_no`,
-    /// `atacar_no` ou `atacar_pnj`; Nó inativo também recusa `atacar_no`.
+    /// `construir_barreira`, `construir_ponte`, `propaganda`, `propaganda_no` ou
+    /// `atacar_no`; `atacar_pnj` recusa destino sem PNJ ativo ou além de 2 m do
+    /// jogador. Nó inativo também recusa `atacar_no`.
     #[error("destino ausente ou fora do ponto")]
     DestinoInvalido,
     /// Deslocamento acima de `LIMITE_MOVIMENTO_M`.
@@ -1748,7 +1747,8 @@ impl ValidacaoComandos {
     /// par, replay, ação, nível (`AcaoBloqueada`), destino (incluindo o limite
     /// de distância de `mover`), alvo/alcance e Fôlego para `atacar_forte`,
     /// saldo para `construir_barreira` e `construir_ponte`; `propaganda` exige
-    /// Súdito no ponto do jogador, e `atacar_pnj` exige PNJ ativo nesse ponto.
+    /// Súdito no ponto do jogador, e `atacar_pnj` exige PNJ ativo em `destino`
+    /// com o jogador a até 2 m desse ponto.
     /// `propaganda_no`/`atacar_no` exigem Nó no ponto do jogador e não exigem
     /// saldo ou Fôlego.
     pub fn validar(
@@ -1853,8 +1853,8 @@ impl ValidacaoComandos {
 
         if acao == "atacar_pnj" {
             let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
-            if !ponto_igual(ponto, jogador.posicao) || mundo.pnj_id_ativo_em_ponto(ponto).is_none()
-            {
+            let distancia = (ponto.0 - jogador.posicao.0).hypot(ponto.1 - jogador.posicao.1);
+            if distancia > ALCANCE_CONTATO_M || mundo.pnj_id_ativo_em_ponto(ponto).is_none() {
                 return Err(CodigoRecusa::DestinoInvalido);
             }
         }

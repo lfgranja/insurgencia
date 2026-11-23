@@ -3323,3 +3323,91 @@ fn pnj_inativo_nao_ataca() {
     sem_alvo.avancar_tick();
     assert_eq!(sem_alvo.pnjs[&1].ataque_ticks, 0);
 }
+
+/// `atacar_pnj` vale a 1,5 m do guarda, sem exigir co-localização exata.
+#[test]
+fn atacar_pnj_a_1_5m_sem_colocalizacao() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    // Distância hipotética de protótipo, dentro do alcance de contato de 2 m.
+    let ponto_pnj = (1.5, 0.0);
+    mundo.adicionar_pnj(1, ponto_pnj);
+    assert!(ValidacaoComandos::validar(&mundo, 1, "atacar_pnj", 1, 1, Some(ponto_pnj)).is_ok());
+
+    mundo.agendar_comando(comando_ataque_pnj(1, 1, 1, ponto_pnj));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.pnjs[&1].pv, PV_PNJ - DANO_ATAQUE);
+    assert_eq!(mundo.jogadores[&1].seq, 1);
+
+    // O mesmo destino é recusado quando o jogador está fora do alcance.
+    mundo.adicionar_pnj(2, (5.0, 0.0));
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "atacar_pnj", 2, 2, Some((5.0, 0.0))),
+        Err(CodigoRecusa::DestinoInvalido)
+    );
+}
+
+/// A cota de `atacar_pnj` é por atacante: dois atacantes somam dano, um não.
+#[test]
+fn cota_de_ataque_pnj_e_por_atacante() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    let ponto = (0.0, 0.0);
+    mundo.adicionar_pnj(1, ponto);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.posicao = (0.5, 0.0);
+    }
+    if let Some(jogador) = mundo.jogadores.get_mut(&2) {
+        jogador.posicao = (1.0, 0.0);
+    }
+    assert!(ValidacaoComandos::validar(&mundo, 1, "atacar_pnj", 1, 1, Some(ponto)).is_ok());
+    assert!(ValidacaoComandos::validar(&mundo, 2, "atacar_pnj", 1, 1, Some(ponto)).is_ok());
+
+    mundo.agendar_comando(comando_ataque_pnj(1, 1, 1, ponto));
+    mundo.agendar_comando(comando_ataque_pnj(2, 1, 1, ponto));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.pnjs[&1].pv, PV_PNJ - 2 * DANO_ATAQUE);
+    assert_eq!(mundo.jogadores[&1].seq, 1);
+    assert_eq!(mundo.jogadores[&2].seq, 1);
+
+    let mut outro = Mundo::new();
+    outro.adicionar_jogador(1);
+    outro.adicionar_pnj(1, (0.0, 0.0));
+    outro.adicionar_pnj(2, (1.0, 0.0));
+    if let Some(jogador) = outro.jogadores.get_mut(&1) {
+        jogador.posicao = (0.5, 0.0);
+    }
+    outro.agendar_comando(comando_ataque_pnj(1, 1, 1, (0.0, 0.0)));
+    outro.agendar_comando(comando_ataque_pnj(1, 2, 2, (1.0, 0.0)));
+    outro.avancar_tick();
+
+    let dano_total = (PV_PNJ - outro.pnjs[&1].pv) + (PV_PNJ - outro.pnjs[&2].pv);
+    assert_eq!(dano_total, DANO_ATAQUE);
+    assert_eq!(outro.jogadores[&1].seq, 1);
+}
+
+/// O contra-ataque do PNJ recai no menor `peer_id`, mesmo sendo o mais distante.
+#[test]
+fn pnj_ataca_menor_peer_id_em_alcance() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.posicao = (1.9, 0.0);
+    }
+    if let Some(jogador) = mundo.jogadores.get_mut(&2) {
+        jogador.posicao = (0.1, 0.0);
+    }
+    mundo.adicionar_pnj(1, (0.0, 0.0));
+    if let Some(pnj) = mundo.pnjs.get_mut(&1) {
+        pnj.ataque_ticks = TICKS_ATAQUE_PNJ - 1;
+    }
+
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.jogadores[&1].vida, 100 - DANO_ATAQUE_PNJ);
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+}

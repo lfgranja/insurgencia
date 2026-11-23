@@ -31,3 +31,10 @@ FR-001..FR-006 e SC-001..SC-006 registrados na spec, com rastreabilidade até `.
 - **Implementação**: `Pnj`, `Mundo.pnjs`, `adicionar_pnj`, `aplicar_dano_a_pnj` (piso zero), `atacar_pnj` (nível 1), `fase_ataque_pnjs` (8/90 ticks em 2 m), hash, HUD `PNJs: N` e tecla `T` executados na worktree, fractionalmente por agentes SDD/SWE sob orquestração.
 - **Correção na fonte**: três RED corrigidos na fonte/asserção correta — `texto_hud` acima de 100 linhas (extração de `texto_progresso`), `saturating_sub` sem piso zero (`.max(0)`), asserção invertida em `dano_mata_pnj` (transição retorna `true` por contrato). Nenhum teste foi afrouxado.
 - **Fronteira**: CI/merge do ciclo 053, acionamento de R6, promoção de `1.0.0-local` a `1.0.0` e decisão do SWE sobre PRs permanecem **[NV]** nesta entrada; executados pelo orquestrador em etapa posterior.
+
+### Correção ACR pós-PR #65 — 2026-11-23T16:30Z
+
+- **ACR**: um blocker (co-localização exata exigida por `atacar_pnj` tornava a tecla `T` inoperante) e dois nonblocker (cota por PNJ em vez de atacante; alvo do contra-ataque por distância em vez de menor `peer_id`) corrigidos na fonte e na documentação; três testes de regressão adicionados. A seção `Execução pelo orquestrador — [NV]` e o green de 128 testes acima permanecem como histórico **pré-ACR**, não reescritos.
+- **Verificação**: três testes novos PASS; `./verify.sh` **ALL STAGES OK**, **131 testes run: 131 passed, 0 skipped**, `VERIFY_EXIT=0`; cinco gates locais PASS. Captura em `/tmp/tmp.6SlMPonkhP/saidas/acr-correcao.txt`, tabela em `.specify/validations/pnj-defensores/evidence.md`.
+- **Documentação**: `spec.md`, `plan.md`, `tasks.md`, `analyze.md`, `checklists/requirements.md`, roteiro, validação, evidência e release alinhados ao contrato corrigido; nenhuma ocorrência de `ponto_igual` aplicada a `atacar_pnj` permanece. R6 permanece **N/A**, scorecard **48/625**, versão `1.0.0-local` não promovida.
+- **Fronteira**: CI remoto do novo head, merge e promoção continuam **[NV]** até verificação ao vivo.
