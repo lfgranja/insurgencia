@@ -109,6 +109,10 @@
     "specs/045-ponte-provisoria/converge.md": {
       "bytes": 7031,
       "sha256": "f9cd0ae562b72dda49106476317b72d39b5a942b69b10aba504f142b1d0b5988"
+    },
+    "specs/046-suditos/converge.md": {
+      "bytes": 7343,
+      "sha256": "045531f6bbf1a47183a1f8bca8fa16ac772bd0e012ee4917435b5f075426498c"
     }
   },
   "_provenance": {

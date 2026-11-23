@@ -50,6 +50,12 @@ pub const PONTOS_AUTOGESTAO_POR_DEFESA: i64 = 1;
 /// Número máximo de barricadas ativas por jogador.
 pub const MAX_BARREIRAS_POR_JOGADOR: usize = 2;
 
+/// Ticks de exposição à Propaganda necessários para converter um Súdito (4 s a 30 Hz).
+pub const TICKS_PROPAGANDA: i64 = 120;
+
+/// Ticks de reversão da conversão de um Súdito após dano de jogador (3 s a 30 Hz).
+pub const TICKS_REVERSAO_SUDITO: i64 = 90;
+
 /// Distância máxima de um comando `mover`, em metros.
 const LIMITE_MOVIMENTO_M: f64 = 1.0;
 
@@ -62,6 +68,7 @@ const ACOES_PERMITIDAS: &[&str] = &[
     "construir_barreira",
     "atacar_forte",
     "construir_ponte",
+    "propaganda",
 ];
 
 /// Compara dois pontos sem depender de tolerância de arredondamento.
@@ -98,6 +105,8 @@ pub struct Jogador {
     pub ponte_ticks: i64,
     /// Ponto fixado pela construção de ponte corrente.
     pub ponte_ponto: Option<(f64, f64)>,
+    /// Súdito alvejado pela Propaganda em curso.
+    pub propaganda_alvo: Option<u64>,
 }
 
 /// Barricada ativa no mundo, identificada por `id`.
@@ -132,6 +141,21 @@ pub struct Ponte {
     pub ticks_restantes: i64,
 }
 
+/// Súdito inimigo cuja conversão é exercitada pela Propaganda.
+#[derive(Clone, Copy, Debug)]
+pub struct Sudito {
+    /// Identificador determinístico fornecido na injeção.
+    pub id: u64,
+    /// Posição no plano `(x, y)`.
+    pub posicao: (f64, f64),
+    /// `true` ao completar a exposição canônica: deixa de atacar e panfleteia.
+    pub convertido: bool,
+    /// Ticks de exposição acumulados no Súdito.
+    pub propaganda_ticks: i64,
+    /// Ticks restantes de reversão após dano de jogador.
+    pub reversao_ticks: i64,
+}
+
 /// Comando enfileirado por um par para o próximo tick.
 #[derive(Clone, Debug)]
 pub struct Comando {
@@ -144,7 +168,7 @@ pub struct Comando {
     /// Identificador de requisição monotônico do comando.
     pub request_id: i64,
     /// Destino opcional, usado por `mover`, `coletar_materiais`,
-    /// `construir_barreira` e `construir_ponte`.
+    /// `construir_barreira`, `construir_ponte` e `propaganda`.
     pub destino: Option<(f64, f64)>,
 }
 
@@ -171,6 +195,8 @@ pub struct Mundo {
     pub pontes: BTreeMap<u64, Ponte>,
     /// Próximo identificador de ponte, começando em um.
     pub proxima_ponte_id: u64,
+    /// Súditos indexados por `id`.
+    pub suditos: BTreeMap<u64, Sudito>,
 }
 
 impl Default for Mundo {
@@ -194,6 +220,7 @@ impl Mundo {
             proxima_barreira_id: 1,
             pontes: BTreeMap::new(),
             proxima_ponte_id: 1,
+            suditos: BTreeMap::new(),
         }
     }
 
@@ -215,6 +242,7 @@ impl Mundo {
                 pontos_autogestao: 0,
                 ponte_ticks: 0,
                 ponte_ponto: None,
+                propaganda_alvo: None,
             },
         );
     }
@@ -222,6 +250,59 @@ impl Mundo {
     /// Remove um jogador pelo `peer_id`.
     pub fn remover_jogador(&mut self, peer_id: u64) {
         self.jogadores.remove(&peer_id);
+    }
+
+    /// Injeta (ou reinicia) um Súdito com `id` e `posicao` determinísticos.
+    pub fn adicionar_sudito(&mut self, id: u64, posicao: (f64, f64)) {
+        self.suditos.insert(
+            id,
+            Sudito {
+                id,
+                posicao,
+                convertido: false,
+                propaganda_ticks: 0,
+                reversao_ticks: 0,
+            },
+        );
+    }
+
+    /// Aplica dano de jogador a um Súdito, iniciando ou reiniciando a reversão.
+    ///
+    /// Dano não positivo ou `id` inexistente não altera o estado. Cada dano
+    /// reinicia a contagem de `TICKS_REVERSAO_SUDITO`.
+    pub fn aplicar_dano_a_sudito(&mut self, id: u64, dano: i64) {
+        if dano <= 0 {
+            return;
+        }
+        let Some(sudito) = self.suditos.get_mut(&id) else {
+            return;
+        };
+        sudito.reversao_ticks = TICKS_REVERSAO_SUDITO;
+    }
+
+    /// Decrementa em um tick as reversões em curso, em ordem estável de `id`.
+    fn avancar_reversoes(&mut self) {
+        let em_reversao: Vec<u64> = self
+            .suditos
+            .iter()
+            .filter(|(_, sudito)| sudito.reversao_ticks > 0)
+            .map(|(&id, _)| id)
+            .collect();
+        for id in em_reversao {
+            self.avancar_reversao(id);
+        }
+    }
+
+    /// Avança a reversão de um Súdito, concluindo-a quando a contagem zera.
+    fn avancar_reversao(&mut self, id: u64) {
+        let Some(sudito) = self.suditos.get_mut(&id) else {
+            return;
+        };
+        sudito.reversao_ticks -= 1;
+        if sudito.reversao_ticks == 0 && sudito.convertido {
+            sudito.convertido = false;
+            sudito.propaganda_ticks = 0;
+        }
     }
 
     /// Aplica dano a uma barricada, removendo-a se os PV chegam a zero ou menos.
@@ -273,6 +354,7 @@ impl Mundo {
         self.fase_skills();
         self.fase_defesa();
         self.fase_finish();
+        self.avancar_reversoes();
         self.tick += 1;
     }
 
@@ -288,6 +370,8 @@ impl Mundo {
         self.avancar_construcoes_automaticas(&mut construcao_avancada);
         let mut construcao_ponte_avancada: BTreeSet<u64> = BTreeSet::new();
         self.avancar_construcoes_ponte_automaticas(&mut construcao_ponte_avancada);
+        let mut propaganda_avancada: BTreeSet<u64> = BTreeSet::new();
+        self.avancar_propagandas_automaticas(&mut propaganda_avancada);
         let comandos = std::mem::take(&mut self.comandos_do_tick);
 
         for comando in &comandos {
@@ -301,6 +385,7 @@ impl Mundo {
                             jogador.construcao_ponto = None;
                             jogador.ponte_ticks = 0;
                             jogador.ponte_ponto = None;
+                            jogador.propaganda_alvo = None;
                             jogador.posicao = destino;
                         }
                     }
@@ -311,6 +396,8 @@ impl Mundo {
                 self.aplicar_construcao(comando, &mut construcao_avancada);
             } else if comando.acao == "construir_ponte" {
                 self.aplicar_construcao_ponte(comando, &mut construcao_ponte_avancada);
+            } else if comando.acao == "propaganda" {
+                self.aplicar_propaganda(comando, &mut propaganda_avancada);
             }
             if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
                 jogador.seq = comando.seq;
@@ -610,6 +697,79 @@ impl Mundo {
         );
     }
 
+    /// Encontra o Súdito em `ponto`, preferindo o menor `id` em caso de empate.
+    fn sudito_id_em_ponto(&self, ponto: (f64, f64)) -> Option<u64> {
+        self.suditos
+            .iter()
+            .find(|(_, sudito)| ponto_igual(sudito.posicao, ponto))
+            .map(|(&id, _)| id)
+    }
+
+    /// Fixa o alvo e avança a exposição em um tick, no máximo uma vez por jogador.
+    fn aplicar_propaganda(&mut self, comando: &Comando, avancada: &mut BTreeSet<u64>) {
+        if avancada.contains(&comando.peer_id) {
+            return;
+        }
+        let Some(ponto) = comando.destino else {
+            return;
+        };
+        let Some(id) = self.sudito_id_em_ponto(ponto) else {
+            return;
+        };
+        let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) else {
+            return;
+        };
+        if !ponto_igual(ponto, jogador.posicao) {
+            return;
+        }
+        jogador.propaganda_alvo = Some(id);
+        avancada.insert(comando.peer_id);
+        self.avancar_propaganda_sudito(id);
+    }
+
+    /// Avança a exposição automática enquanto o jogador permanece no ponto do alvo.
+    fn avancar_propagandas_automaticas(&mut self, avancada: &mut BTreeSet<u64>) {
+        let alvos: Vec<(u64, u64, (f64, f64))> = self
+            .jogadores
+            .iter()
+            .filter_map(|(&peer_id, jogador)| {
+                jogador
+                    .propaganda_alvo
+                    .map(|id| (peer_id, id, jogador.posicao))
+            })
+            .collect();
+        for (peer_id, id, posicao) in alvos {
+            if avancada.contains(&peer_id) {
+                continue;
+            }
+            let Some(sudito) = self.suditos.get(&id) else {
+                continue;
+            };
+            if !ponto_igual(sudito.posicao, posicao) {
+                if let Some(jogador) = self.jogadores.get_mut(&peer_id) {
+                    jogador.propaganda_alvo = None;
+                }
+                continue;
+            }
+            avancada.insert(peer_id);
+            self.avancar_propaganda_sudito(id);
+        }
+    }
+
+    /// Avança a exposição e converte o Súdito ao atingir o limiar canônico.
+    fn avancar_propaganda_sudito(&mut self, id: u64) {
+        let Some(sudito) = self.suditos.get_mut(&id) else {
+            return;
+        };
+        if sudito.convertido {
+            return;
+        }
+        sudito.propaganda_ticks += 1;
+        if sudito.propaganda_ticks == TICKS_PROPAGANDA {
+            sudito.convertido = true;
+        }
+    }
+
     /// Descarta os comandos já aplicados e expira barricadas e pontes vencidas.
     fn fase_finish(&mut self) {
         self.comandos_do_tick.clear();
@@ -638,7 +798,10 @@ impl Mundo {
             .map(|(&peer_id, jogador)| {
                 let (x, y) = jogador.posicao;
                 format!(
-                    "{0}:{1}:{2}:{3}:{4}:{5}:{6}:{7}:{8}:{9:?}:{10}:{11:?}:{12}:{13}:{14:?}",
+                    concat!(
+                        "{0}:{1}:{2}:{3}:{4}:{5}:{6}:{7}:{8}:{9:?}:{10}:{11:?}:",
+                        "{12}:{13}:{14:?}:{15:?}"
+                    ),
                     peer_id,
                     x,
                     y,
@@ -654,6 +817,7 @@ impl Mundo {
                     jogador.pontos_autogestao,
                     jogador.ponte_ticks,
                     jogador.ponte_ponto,
+                    jogador.propaganda_alvo,
                 )
             })
             .collect::<Vec<_>>()
@@ -685,8 +849,25 @@ impl Mundo {
             })
             .collect::<Vec<_>>()
             .join(";");
+        let suditos: String = self
+            .suditos
+            .values()
+            .map(|sudito| {
+                let (x, y) = sudito.posicao;
+                format!(
+                    "{}:{}:{}:{}:{}:{}",
+                    sudito.id,
+                    x,
+                    y,
+                    sudito.convertido,
+                    sudito.propaganda_ticks,
+                    sudito.reversao_ticks
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(";");
         let entrada = format!(
-            "{tick}|{epoch}|{match_id}|{jogadores}|{barreiras}|{pontes}",
+            "{tick}|{epoch}|{match_id}|{jogadores}|{barreiras}|{pontes}|{suditos}",
             tick = self.tick,
             epoch = self.epoch,
             match_id = self.match_id,
@@ -709,7 +890,7 @@ pub enum CodigoRecusa {
     #[error("acao desconhecida")]
     AcaoDesconhecida,
     /// Destino ausente ou fora do ponto para `mover`, `coletar_materiais`,
-    /// `construir_barreira` ou `construir_ponte`.
+    /// `construir_barreira`, `construir_ponte` ou sem Súdito para `propaganda`.
     #[error("destino ausente ou fora do ponto")]
     DestinoInvalido,
     /// Deslocamento acima de `LIMITE_MOVIMENTO_M`.
@@ -731,7 +912,8 @@ impl ValidacaoComandos {
     ///
     /// Retorna o primeiro [`CodigoRecusa`] aplicável, na ordem do contrato:
     /// par, replay, ação, destino (incluindo o limite de distância de `mover`)
-    /// e saldo para `construir_barreira` e `construir_ponte`.
+    /// e saldo para `construir_barreira` e `construir_ponte`; `propaganda` exige
+    /// Súdito no ponto do jogador.
     pub fn validar(
         mundo: &Mundo,
         peer_id: u64,
@@ -785,6 +967,14 @@ impl ValidacaoComandos {
             }
             if jogador.materiais < CUSTO_PONTE_MATERIAIS {
                 return Err(CodigoRecusa::SaldoInsuficiente);
+            }
+        }
+
+        if acao == "propaganda" {
+            let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
+            let no_ponto = mundo.sudito_id_em_ponto(ponto).is_some();
+            if !ponto_igual(ponto, jogador.posicao) || !no_ponto {
+                return Err(CodigoRecusa::DestinoInvalido);
             }
         }
 

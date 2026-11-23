@@ -326,3 +326,15 @@
 | Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
 
 **Escolha**: `ponte-provisoria`. É o próximo recurso canônico implementável sem nova stack: GDD §9.3:475,483 fixa custo 15 Materiais e §8.4:407 fixa 60 PV e 45 s de duração; o atalho de 8 s depende de mapa/ilhas e fica fora de escopo, registrado como limitação. R6 continua **N/A**.
+
+## 2026-11-23T06:58Z — decisão 80/20 do ciclo 046 (antes da implementação)
+
+**Sessão**: `20261123T065800Z-suditos` · **Título**: `insurgencia - suditos e propaganda`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Súditos/Propaganda (4 s de exposição, 3 s de reversão) | 4 | 2 | 2 | 3 | **48/625** |
+| Combate/Fôlego | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `suditos`. A regra de aceitação GDD §9.2:464 (4 s de Propaganda interrompe ataque a estruturas; dano de jogador reverte em 3 s) é verificável mesmo com spawn/controle de ilha ainda `[HIPÓTESE]`. Valores de spawn, raio e função do Súdito ficam fora de escopo e registrados como hipóteses. R6 continua **N/A**.
