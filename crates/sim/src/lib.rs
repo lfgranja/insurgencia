@@ -63,6 +63,12 @@ pub const TICKS_CONTROLE_ILHA: i64 = 300;
 /// Limite de ticks da partida: 20 min a 30 Hz (`[HIPÓTESE]`/protótipo, não cânone).
 pub const TICKS_LIMITE_PARTIDA: i64 = 36_000;
 
+/// Ticks por nível de papel material: 30 s a 30 Hz (`[HIPÓTESE]`/protótipo, não cânone).
+pub const TICKS_POR_NIVEL: i64 = 900;
+
+/// Nível máximo do protótipo (`[HIPÓTESE]`/GDD §10.1, não cânone).
+pub const NIVEL_MAXIMO: u8 = 12;
+
 /// Número máximo de ilhas distintas perdidas antes da dissolução da Comuna
 /// (`[HIPÓTESE]`/protótipo, não cânone).
 pub const MAX_RECONQUISTAS: usize = 3;
@@ -146,6 +152,18 @@ fn ponto_igual(a: (f64, f64), b: (f64, f64)) -> bool {
     a.0.total_cmp(&b.0).is_eq() && a.1.total_cmp(&b.1).is_eq()
 }
 
+/// Nível mínimo exigido por cada ação (`[HIPÓTESE]`/protótipo, não cânone).
+///
+/// Mapa Q1/W2/E3/R6: ações sem slot permanecem livres (nível 1).
+fn nivel_minimo_para_acao(acao: &str) -> u8 {
+    match acao {
+        "construir_barreira" | "construir_ponte" => 2,
+        "propaganda" | "propaganda_no" => 3,
+        "atacar_no" => 6,
+        _ => 1,
+    }
+}
+
 /// Origem do alvo de Nó fixado no jogador.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum AcaoNo {
@@ -153,6 +171,44 @@ enum AcaoNo {
     Propaganda,
     /// Dano aplicado; sozinho, não inicia Propaganda em um Nó intacto.
     Ataque,
+}
+
+/// Papel material do jogador (`[HIPÓTESE]`/GDD §10.1 e §10.8:744-759, protótipo).
+///
+/// São rótulos de papéis materiais, não classes mágicas; nenhuma variante altera
+/// dano, custo, alcance, recarga, Fôlego ou desbloqueio neste ciclo.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Funcao {
+    /// Artesão: papel fixo atribuído na criação do jogador.
+    Artesao,
+    /// Guerreiro: rótulo material de combate.
+    Guerreiro,
+    /// Intelectual: rótulo material de Propaganda.
+    Intelectual,
+    /// Camponês: rótulo material de coleta e construção.
+    Campones,
+    /// Agitador: rótulo material de mobilização.
+    Agitador,
+}
+
+impl Funcao {
+    /// Nome acentuado do papel para exibição (`[HIPÓTESE]`/protótipo, não cânone).
+    #[must_use]
+    pub fn nome(self) -> &'static str {
+        match self {
+            Self::Artesao => "Artesão",
+            Self::Guerreiro => "Guerreiro",
+            Self::Intelectual => "Intelectual",
+            Self::Campones => "Camponês",
+            Self::Agitador => "Agitador",
+        }
+    }
+}
+
+impl std::fmt::Display for Funcao {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.nome())
+    }
 }
 
 /// Estado de um jogador na simulação.
@@ -164,6 +220,12 @@ pub struct Jogador {
     pub vida: i64,
     /// Último sequencial aceito.
     pub seq: i64,
+    /// Papel material fixo na criação (`[HIPÓTESE]`/protótipo, não cânone).
+    pub funcao: Funcao,
+    /// Nível corrente, de 1 a `NIVEL_MAXIMO` (`[HIPÓTESE]`/protótipo, não cânone).
+    pub nivel: u8,
+    /// Ticks acumulados para o próximo nível (`[HIPÓTESE]`/protótipo, não cânone).
+    pub nivel_ticks: i64,
     /// Último identificador de requisição aceito.
     pub request_id: i64,
     /// Materiais acumulados.
@@ -339,6 +401,9 @@ pub struct Mundo {
     /// Fila de sinais pendentes em ordem FIFO; não é um histórico completo
     /// dos sinais emitidos.
     pub sinais: VecDeque<String>,
+    /// Última recusa aplicada pelo gate de nível no núcleo; não é limpa por
+    /// comandos aceitos (`[HIPÓTESE]`/protótipo, não cânone).
+    pub ultima_recusa: Option<CodigoRecusa>,
 }
 
 impl Default for Mundo {
@@ -366,6 +431,7 @@ impl Mundo {
             ilhas: BTreeMap::new(),
             ilhas_reconquistadas: BTreeSet::new(),
             sinais: VecDeque::new(),
+            ultima_recusa: None,
             nos: BTreeMap::new(),
             resistencia_ideologica: RESISTENCIA_INICIAL,
             resultado: None,
@@ -384,6 +450,9 @@ impl Mundo {
                 combate_ticks: 0,
                 seq: 0,
                 request_id: 0,
+                funcao: Funcao::Artesao,
+                nivel: 1,
+                nivel_ticks: 0,
                 materiais: 0,
                 suprimentos: 0,
                 coleta_ticks: 0,
@@ -563,6 +632,17 @@ impl Mundo {
         let mut ataques_realizados: BTreeSet<u64> = BTreeSet::new();
 
         for comando in &comandos {
+            // O gate de nível também vale no núcleo: a validação isolada não
+            // impede um chamador de enfileirar diretamente um comando acima do
+            // nível do jogador. O comando recusado não executa e não atualiza
+            // `seq`/`request_id`, portanto não é considerado aceito.
+            let Some(jogador) = self.jogadores.get(&comando.peer_id) else {
+                continue;
+            };
+            if jogador.nivel < nivel_minimo_para_acao(&comando.acao) {
+                self.ultima_recusa = Some(CodigoRecusa::AcaoBloqueada);
+                continue;
+            }
             if comando.acao == "mover" {
                 if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
                     if let Some(destino) = comando.destino {
@@ -1235,6 +1315,7 @@ impl Mundo {
     /// Descarta comandos, regenera Fôlego e expira barricadas e pontes vencidas.
     fn fase_finish(&mut self) {
         self.comandos_do_tick.clear();
+        self.avancar_niveis();
         self.regenerar_folego();
         self.barreiras.retain(|_, barreira| {
             // A unidade extra da criação é consumida no próprio tick de criação;
@@ -1250,6 +1331,23 @@ impl Mundo {
             }
             ponte.ticks_restantes > 0
         });
+    }
+
+    /// Incrementa o nível a cada `TICKS_POR_NIVEL` ticks, saturando em `NIVEL_MAXIMO`.
+    ///
+    /// Usa apenas o acumulador do jogador e a ordem estável de `peer_id`
+    /// (`[HIPÓTESE]`/protótipo, não cânone).
+    fn avancar_niveis(&mut self) {
+        for jogador in self.jogadores.values_mut() {
+            if jogador.nivel >= NIVEL_MAXIMO {
+                continue;
+            }
+            jogador.nivel_ticks += 1;
+            if jogador.nivel_ticks >= TICKS_POR_NIVEL {
+                jogador.nivel = (jogador.nivel + 1).min(NIVEL_MAXIMO);
+                jogador.nivel_ticks = 0;
+            }
+        }
     }
 
     /// Regenera o Fôlego com acumulador próprio, em ordem estável de `peer_id`.
@@ -1280,30 +1378,37 @@ impl Mundo {
                 let (x, y) = jogador.posicao;
                 format!(
                     concat!(
-                        "{0}:{1}:{2}:{3}:{4}:{5}:{6}:{7}:{8}:{9:?}:{10}:{11:?}:",
-                        "{12}:{13}:{14:?}:{15:?}:{16}:{17}:{18}:{19:?}:{20:?}"
+                        "{peer_id}:{x}:{y}:{vida}:{seq}:{request_id}:{materiais}:",
+                        "{suprimentos}:{coleta_ticks}:{coleta_ponto:?}:{construcao_ticks}:",
+                        "{construcao_ponto:?}:{pontos_autogestao}:{ponte_ticks}:",
+                        "{ponte_ponto:?}:{propaganda_alvo:?}:{folego}:{folego_ticks}:",
+                        "{combate_ticks}:{no_alvo:?}:{no_acao_no:?}:{funcao:?}:",
+                        "{nivel}:{nivel_ticks}"
                     ),
-                    peer_id,
-                    x,
-                    y,
-                    jogador.vida,
-                    jogador.seq,
-                    jogador.request_id,
-                    jogador.materiais,
-                    jogador.suprimentos,
-                    jogador.coleta_ticks,
-                    jogador.coleta_ponto,
-                    jogador.construcao_ticks,
-                    jogador.construcao_ponto,
-                    jogador.pontos_autogestao,
-                    jogador.ponte_ticks,
-                    jogador.ponte_ponto,
-                    jogador.propaganda_alvo,
-                    jogador.folego,
-                    jogador.folego_ticks,
-                    jogador.combate_ticks,
-                    jogador.no_alvo,
-                    jogador.no_acao_no,
+                    peer_id = peer_id,
+                    x = x,
+                    y = y,
+                    vida = jogador.vida,
+                    seq = jogador.seq,
+                    request_id = jogador.request_id,
+                    materiais = jogador.materiais,
+                    suprimentos = jogador.suprimentos,
+                    coleta_ticks = jogador.coleta_ticks,
+                    coleta_ponto = jogador.coleta_ponto,
+                    construcao_ticks = jogador.construcao_ticks,
+                    construcao_ponto = jogador.construcao_ponto,
+                    pontos_autogestao = jogador.pontos_autogestao,
+                    ponte_ticks = jogador.ponte_ticks,
+                    ponte_ponto = jogador.ponte_ponto,
+                    propaganda_alvo = jogador.propaganda_alvo,
+                    folego = jogador.folego,
+                    folego_ticks = jogador.folego_ticks,
+                    combate_ticks = jogador.combate_ticks,
+                    no_alvo = jogador.no_alvo,
+                    no_acao_no = jogador.no_acao_no,
+                    funcao = jogador.funcao,
+                    nivel = jogador.nivel,
+                    nivel_ticks = jogador.nivel_ticks,
                 )
             })
             .collect::<Vec<_>>()
@@ -1403,10 +1508,14 @@ impl Mundo {
             None => "nenhum",
         };
 
+        let ultima_recusa = match self.ultima_recusa {
+            Some(codigo) => codigo.to_string(),
+            None => "nenhuma".to_owned(),
+        };
         let entrada = format!(
             concat!(
                 "{tick}|{epoch}|{match_id}|{jogadores}|{estruturas}|",
-                "{nos}|{resistencia}|{resultado}",
+                "{nos}|{resistencia}|{resultado}|{ultima_recusa}",
             ),
             tick = self.tick,
             epoch = self.epoch,
@@ -1416,6 +1525,7 @@ impl Mundo {
             nos = nos,
             resistencia = self.resistencia_ideologica,
             resultado = resultado,
+            ultima_recusa = ultima_recusa,
         );
         let resumo = Sha256::digest(entrada.as_bytes());
         format!("{resumo:x}")
@@ -1434,6 +1544,9 @@ pub enum CodigoRecusa {
     /// A ação não pertence ao contrato.
     #[error("acao desconhecida")]
     AcaoDesconhecida,
+    /// Ação fora do nível do jogador (`[HIPÓTESE]`/protótipo, não cânone).
+    #[error("acao bloqueada por nivel")]
+    AcaoBloqueada,
     /// `atacar_forte` sem alvo no destino ou além do alcance de contato.
     #[error("alvo invalido")]
     AlvoInvalido,
@@ -1463,10 +1576,11 @@ impl ValidacaoComandos {
     /// # Errors
     ///
     /// Retorna o primeiro [`CodigoRecusa`] aplicável, na ordem do contrato:
-    /// par, replay, ação, destino (incluindo o limite de distância de `mover`),
-    /// alvo/alcance e Fôlego para `atacar_forte`, saldo para `construir_barreira`
-    /// e `construir_ponte`; `propaganda` exige Súdito no ponto do jogador.
-    /// `propaganda_no`/`atacar_no` exigem Nó no ponto do jogador e não exigem saldo ou Fôlego.
+    /// par, replay, ação, nível (`AcaoBloqueada`), destino (incluindo o limite
+    /// de distância de `mover`), alvo/alcance e Fôlego para `atacar_forte`,
+    /// saldo para `construir_barreira` e `construir_ponte`; `propaganda` exige
+    /// Súdito no ponto do jogador. `propaganda_no`/`atacar_no` exigem Nó no ponto
+    /// do jogador e não exigem saldo ou Fôlego.
     pub fn validar(
         mundo: &Mundo,
         peer_id: u64,
@@ -1486,6 +1600,11 @@ impl ValidacaoComandos {
 
         if !ACOES_PERMITIDAS.contains(&acao) {
             return Err(CodigoRecusa::AcaoDesconhecida);
+        }
+
+        // Mesmo mapa Q1/W2/E3/R6 usado pelo gate de `fase_skills`.
+        if jogador.nivel < nivel_minimo_para_acao(acao) {
+            return Err(CodigoRecusa::AcaoBloqueada);
         }
 
         if acao == "mover" {

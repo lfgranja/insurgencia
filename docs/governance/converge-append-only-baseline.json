@@ -133,6 +133,10 @@
     "specs/051-derrota/converge.md": {
       "bytes": 8210,
       "sha256": "74d3f5d8e1adc535174d087e8f163fbf8a783e384e486980e30db651f8639959"
+    },
+    "specs/052-papeis-niveis/converge.md": {
+      "bytes": 8956,
+      "sha256": "566ba5635bcdcf5d8921003f329627a136254735b6ee9e3f50dfdbaa503b7bf0"
     }
   },
   "_provenance": {

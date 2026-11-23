@@ -400,3 +400,15 @@
 | Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
 
 **Escolha**: `derrota`. GDD §6.2:277 define derrota por relógio de 20 min ou 3 reconquistas; §9.4:489,501 já fornece perda de ilha e sinal `ilha_perdida`. A implementação reusa esses sinais e o contador de ilhas, sem mapa/rede. Números permanecem `[HIPÓTESE]`/protótipo. R6 permanece **N/A**.
+
+## 2026-11-23T15:08Z — decisão 80/20 do ciclo 052 (antes da implementação)
+
+**Sessão**: `20261123T150800Z-papeis-niveis` · **Título**: `insurgencia - papeis e niveis`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Papéis + níveis + desbloqueio Q/W/E/R | 4 | 2 | 2 | 3 | **48/625** |
+| PVE/PNJs | 4 | 2 | 2 | 3 | 48/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `papeis-niveis`. GDD §10.1 fixa papéis materiais, nível 1–12 e desbloqueio Q no 1, W no 2, E no 3, R no 6 — todos rotulados `[HIPÓTESE]`. Implementação mínima: campo `funcao`, nível por pulso, desbloqueio de ações existentes por nível e HUD; novas habilidades W/E/R ficam para ciclo posterior. R6 permanece **N/A**.

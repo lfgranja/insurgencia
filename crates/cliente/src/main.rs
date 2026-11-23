@@ -23,7 +23,7 @@ use insurgencia_cliente::{
     VELOCIDADE,
 };
 use insurgencia_sim::{
-    Comando, Mundo, ResultadoPartida, MAX_RECONQUISTAS, PASSO_SEGUNDOS, TICKS_COLETA,
+    Comando, Mundo, ResultadoPartida, MAX_RECONQUISTAS, NIVEL_MAXIMO, PASSO_SEGUNDOS, TICKS_COLETA,
     TICKS_CONSTRUCAO_BARREIRA,
 };
 
@@ -917,6 +917,8 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
     } else {
         0
     };
+    let funcao = remoto.map_or("Artesão", |j| j.funcao.nome());
+    let nivel = remoto.map_or(1, |j| j.nivel);
     let barreiras = simulacao
         .0
         .barreiras
@@ -960,6 +962,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
     format!(
         concat!(
             "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\n",
+            "Função: {funcao}\nNível: {nivel}/{NIVEL_MAXIMO}\n",
             "Limites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\n",
             "Suprimentos: {suprimentos}\nMateriais: {materiais}\n",
             "Fôlego: {folego}\nVida: {vida}\nAlvo: {vida_alvo}\n",
@@ -975,6 +978,9 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
         x = x,
         y = y,
         ilha = ilha,
+        funcao = funcao,
+        nivel = nivel,
+        NIVEL_MAXIMO = NIVEL_MAXIMO,
         LIMITE_X = LIMITE_X,
         LIMITE_Y = LIMITE_Y,
         suprimentos = suprimentos,
