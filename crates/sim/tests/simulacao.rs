@@ -313,6 +313,39 @@ fn saida_antes_zera() {
 }
 
 #[test]
+fn saida_no_tick_179_nao_credita() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let origem = (0.5, 0.25);
+    let fora = (0.25, 0.5);
+    agendar_mover(&mut mundo, 1, 1, 1, origem);
+    mundo.avancar_tick();
+
+    // Comandos sustentam a canalização até restar um tick para o crédito.
+    for seq in 2..TICKS_COLETA {
+        agendar_coleta(&mut mundo, 1, seq, seq, origem);
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].coleta_ticks, TICKS_COLETA - 2);
+
+    // Sem comando, o auto-avanço sustenta o tick 179 (TICKS_COLETA - 1).
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].coleta_ticks, TICKS_COLETA - 1);
+    assert_eq!(mundo.jogadores[&1].materiais, 0);
+    assert_eq!(mundo.jogadores[&1].suprimentos, 0);
+
+    // A saída no tick 179 é aplicada antes do crédito automático.
+    agendar_mover(&mut mundo, 1, TICKS_COLETA, TICKS_COLETA, fora);
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.posicao, fora);
+    assert_eq!(jogador.coleta_ticks, 0);
+    assert_eq!(jogador.coleta_ponto, None);
+    assert_eq!(jogador.materiais, 0);
+    assert_eq!(jogador.suprimentos, 0);
+}
+
+#[test]
 fn recusa_sem_destino_e_fora_do_ponto() {
     let mut mundo = Mundo::new();
     mundo.adicionar_jogador(1);

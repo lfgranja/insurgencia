@@ -213,7 +213,6 @@ impl Mundo {
     fn fase_skills(&mut self) {
         let mut coleta_avancada: BTreeSet<u64> = BTreeSet::new();
         let mut construcao_avancada: BTreeSet<u64> = BTreeSet::new();
-        self.avancar_coletas_automaticas(&mut coleta_avancada);
         self.avancar_construcoes_automaticas(&mut construcao_avancada);
         let comandos = std::mem::take(&mut self.comandos_do_tick);
 
@@ -240,6 +239,7 @@ impl Mundo {
                 jogador.request_id = comando.request_id;
             }
         }
+        self.avancar_coletas_automaticas(&mut coleta_avancada);
         self.comandos_do_tick = comandos;
     }
 
@@ -273,6 +273,9 @@ impl Mundo {
     fn avancar_coletas_automaticas(&mut self, avancada: &mut BTreeSet<u64>) {
         let mut concluidas: Vec<u64> = Vec::new();
         for (&peer_id, jogador) in &mut self.jogadores {
+            if avancada.contains(&peer_id) {
+                continue;
+            }
             let Some(ponto) = jogador.coleta_ponto else {
                 continue;
             };

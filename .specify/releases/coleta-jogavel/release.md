@@ -28,3 +28,7 @@ Implementação em `crates/sim/src/lib.rs`, `crates/sim/tests/simulacao.rs` e `c
 ## Execução pelo orquestrador — 2026-11-23T04:04Z
 
 R4 foi cumprido: roteiro **10/10 PASS**, `./verify.sh` **ALL STAGES OK** com **60/60 testes**, evidência em `.specify/validations/coleta-jogavel/evidence.md`. Auto-avanço de coleta, tecla `C`, HUD e doc comment passam a fazer parte do escopo entregue. Rollback segue documentado e não executado; promoção e merge em `main` dependem do SWE.
+
+## Correção de ACR — 2026-11-23T04:12Z
+
+O edge case P2 da revisão independente foi corrigido na fonte: sair do ponto no tick 179 não credita mais. Auto-avanço passa a ocorrer após o processamento de comandos, com `BTreeSet<u64>` compartilhado. Documentação alinhada. Gate final: `verify.sh` **ALL STAGES OK** com **61/61 testes**; roteiro 10/10 preservado. Rollback segue documentado e não executado.
