@@ -6,7 +6,7 @@
 //! Espelha a máquina de estados de `nucleo/mundo.gd` e a validação de
 //! `nucleo/sim/validacao.gd`, sem depender da engine.
 
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -150,6 +150,8 @@ impl Mundo {
 
     /// Aplica os comandos selecionados ao estado dos jogadores.
     fn fase_skills(&mut self) {
+        let mut coleta_avancada: BTreeSet<u64> = BTreeSet::new();
+
         for comando in &self.comandos_do_tick {
             if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
                 if comando.acao == "mover" {
@@ -162,7 +164,9 @@ impl Mundo {
                     }
                 } else if comando.acao == "coletar_materiais" {
                     if let Some(ponto) = comando.destino {
-                        if ponto_igual(ponto, jogador.posicao) {
+                        if ponto_igual(ponto, jogador.posicao)
+                            && !coleta_avancada.contains(&comando.peer_id)
+                        {
                             jogador.coleta_ticks = match jogador.coleta_ponto {
                                 Some(anterior) if ponto_igual(anterior, ponto) => {
                                     jogador.coleta_ticks
@@ -171,6 +175,7 @@ impl Mundo {
                             };
                             jogador.coleta_ponto = Some(ponto);
                             jogador.coleta_ticks += 1;
+                            coleta_avancada.insert(comando.peer_id);
                             if jogador.coleta_ticks == TICKS_COLETA {
                                 jogador.suprimentos += 3;
                                 jogador.materiais += 2;
@@ -234,8 +239,8 @@ pub enum CodigoRecusa {
     /// A ação não pertence ao contrato.
     #[error("acao desconhecida")]
     AcaoDesconhecida,
-    /// `mover` sem destino informado.
-    #[error("destino ausente para mover")]
+    /// Destino ausente ou fora do ponto para `mover` ou `coletar_materiais`.
+    #[error("destino ausente ou fora do ponto")]
     DestinoInvalido,
     /// Deslocamento acima de `LIMITE_MOVIMENTO_M`.
     #[error("movimento fora do limite")]

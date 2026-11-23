@@ -87,8 +87,8 @@
       "sha256": "b148559292a3cb0bb6da02a95d5d008db606a1ffb904e1d397f0e3832de050bd"
     },
     "specs/039-coleta-materiais-deterministica/converge.md": {
-      "bytes": 4433,
-      "sha256": "107e991d20d10e4a1cb203a248786b9f304c49a3151654a773fecedcdaf1017c"
+      "bytes": 5226,
+      "sha256": "02f3838c7d0e6cb47c5e797ccc2e6408f9a4bcb6012f0379306eddd5574b6f21"
     }
   },
   "_provenance": {

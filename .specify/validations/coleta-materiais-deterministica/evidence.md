@@ -18,3 +18,9 @@
 **Resultado**: 10/10 PASS. `evidence_status: passed`. Rollback do roteiro: `rm -rf /tmp/tmp.ADNoP5fSgj`.
 
 **Correções reais**: dois REDs determinísticos de clippy (`explicit_counter_loop`, `range_plus_one`) corrigidos em `crates/sim/tests/simulacao.rs` sem `#[allow]`; `cargo fmt --all` aplicado uma vez. LSP diagnostics indisponível (`rust-analyzer` ausente); gate Rust do CI é a autoridade.
+
+### Revalidação após ACR — 2026-11-23T02:14Z
+
+- **Bug corrigido**: ACR (comentário `7089743411`) apontou dupla contagem de `coleta_ticks` quando vários comandos válidos chegam no mesmo tick. `fase_skills` agora usa `BTreeSet<u64>` local ao tick, garantindo no máximo um incremento por jogador por tick; `seq`/`request_id` continuam atualizados para todos os comandos válidos.
+- **Novo teste**: `dupla_coleta_no_mesmo_tick_nao_acelera_credito` — 2 coletas por tick durante 179 ticks não creditam; crédito ocorre exatamente no 180.º tick real.
+- **Gate reexecutado (02:14Z)**: `verify.sh` `ALL STAGES OK`, **48 testes run: 48 passed**; cinco gates Python PASS (SDD `39/0`, DAG `406/104/0`, task-id `0`, converge `22/22`, hub-docs `0`). O verde anterior de 47 testes foi descartado; a decisão usa o head corrigido.

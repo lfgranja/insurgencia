@@ -230,6 +230,41 @@ fn coleta_apos_180_ticks() {
 }
 
 #[test]
+fn dupla_coleta_no_mesmo_tick_nao_acelera_credito() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let ponto = (0.25, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    let mut seq = 2_i64;
+    // Dois comandos válidos por tick não podem valer dois ticks de permanência.
+    for tick in 0..(TICKS_COLETA - 1) {
+        agendar_coleta(&mut mundo, 1, seq, seq, ponto);
+        seq += 1;
+        agendar_coleta(&mut mundo, 1, seq, seq, ponto);
+        seq += 1;
+        mundo.avancar_tick();
+        let jogador = &mundo.jogadores[&1];
+        assert_eq!(jogador.coleta_ticks, tick + 1, "progresso no tick {tick}");
+        assert_eq!(jogador.materiais, 0, "credito antecipado no tick {tick}");
+        assert_eq!(jogador.suprimentos, 0, "credito antecipado no tick {tick}");
+    }
+
+    agendar_coleta(&mut mundo, 1, seq, seq, ponto);
+    seq += 1;
+    agendar_coleta(&mut mundo, 1, seq, seq, ponto);
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.coleta_ticks, 0);
+    assert_eq!(jogador.coleta_ponto, Some(ponto));
+    assert_eq!(jogador.materiais, 2);
+    assert_eq!(jogador.suprimentos, 3);
+    assert_eq!(jogador.seq, seq);
+    assert_eq!(jogador.request_id, seq);
+}
+
+#[test]
 fn saida_antes_zera() {
     let mut mundo = Mundo::new();
     mundo.adicionar_jogador(1);

@@ -20,3 +20,9 @@ FR-001..FR-008 e SC-001..SC-006 registrados na spec, com rastreabilidade até `.
 - **Roteiro 10/10 PASS** (02:04–02:06Z), capturas em `/tmp/tmp.ADNoP5fSgj/saidas/`, relatório em `.specify/validations/coleta-materiais-deterministica/evidence.md`. Seis testes nomeados executados individualmente, todos `exit=0`, 1 passed cada.
 - **Gates locais (02:06Z)**: SDD `39/0`, DAG `406 tarefas/104 arestas/0 ciclos`, task-id `0 duplicatas`, hub-docs `0 erros`; converge baselinado por bootstrap após esta entrada.
 - **Fronteira**: `STATE.md` do worktree idêntico ao HEAD (memória local do SWE preservada); `crates/contratos`, `PROTOCOL_VERSION` e `Cargo.toml` intactos. `[NV]`: CI/merge do ciclo 039 e decisão do SWE sobre PR #48.
+
+### Correção de bug da ACR e revalidação — 2026-11-23T02:14Z
+
+- **Achado médio (comentário `7089743411`)**: `fase_skills` avançava a coleta por comando; dois comandos no mesmo tick podiam creditar antes de 6 s. Correção: `BTreeSet<u64>` local ao tick limita a um incremento por jogador por tick, preservando replay e ordem determinística. Mensagem de `DestinoInvalido` ampliada para cobrir coleta.
+- **Verificação**: `verify.sh` `ALL STAGES OK`, **48/48 testes** (incluindo `dupla_coleta_no_mesmo_tick_nao_acelera_credito`); gates locais PASS. Histórico de 47/47 preservado; nenhuma reescrita.
+- **Racional**: blocker semântico corrigido antes do merge; nenhuma mudança de protocolo, Cargo, docs de estado ou R6. `[NV]`: CI/merge no novo head e decisão do SWE sobre PR #48.
