@@ -20,3 +20,8 @@
 **Gate agregado (14:38Z)**: `./verify.sh` **ALL STAGES OK**, **117 testes run: 117 passed** (112 anteriores + 5 novos), `VERIFY_EXIT=0`. Quatro REDs determinísticos foram corrigidos na fonte antes do verde: `too_many_lines`/`redundant_closure`/`uninlined_format_args` no hash e off-by-one da fase de derrota (`tick` avançava depois da avaliação).
 
 **Limitações**: valores de timeout/reconquista são `[HIPÓTESE]`/protótipo; captura visual real permanece **[NV]**.
+
+### Revalidação pós-ACR — 2026-11-23T14:50Z
+
+- Quatro achados advisory do PR #63 (`7104447713`) fechados: HUD descreve `Resultado: Comuna dissolvida — <motivo>`, sufixo de reconquistas derivado de `MAX_RECONQUISTAS`, variantes/tokens documentados e pipeline com `fase_derrota` após `tick += 1`. Um RED de `too_many_lines` no HUD foi corrigido ao extrair `texto_resultado`.
+- `./verify.sh` reexecutado: **ALL STAGES OK**, **117 testes run: 117 passed**, cinco gates locais PASS. A decisão usa o head corrigido.
