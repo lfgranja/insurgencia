@@ -261,3 +261,16 @@
 1. ~~Corrigir documentalmente o GDD (N3 e contradição CI) com base nos ADRs~~ — **CONCLUÍDO no ciclo 002** (7 passagens emendadas); mantido como histórico.
 2. Instalar Godot 4.7.2 e validar a suíte headless — exige download e autorização de dependência.
 3. Gate CI remoto (GitHub Actions) — exige autorização e verificação ao vivo.
+
+## 2026-11-23T02:45Z — decisão 80/20 do ciclo 040 (antes da implementação)
+
+**Sessão**: `20261123T024300Z-barricada-deterministica` · **Título**: `insurgencia - barricada deterministica de materiais`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Construir barricada (custo 20, 45 ticks, 200 PV, 360 ticks, máx 2) | 5 | 5 | 4 | 4 | **400/625** |
+| Ponte provisória | 3 | 3 | 3 | 4 | 108/625 |
+| Combate/Fôlego (valores `[HIPÓTESE]`) | 4 | 2 | 2 | 3 | 48/625 |
+| Servidor + Lightyear (dep ausente, docs.rs 0.31 falha) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `construir_barreira`. É o primeiro destino canônico dos Materiais introduzidos no ciclo 039, tem valores tabelados no GDD (§9.3, §10.3), não exige protocolo/Cargo novo e produz efeito verificável no core determinístico e no HUD. Netcode fica habilitado, mas não é o nº 1. R6 permanece **N/A** por constituição v1.2.2 (dívida de automação registrada).

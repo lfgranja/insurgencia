@@ -1,7 +1,11 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::pedantic)]
 
-use insurgencia_sim::{CodigoRecusa, Comando, Mundo, ValidacaoComandos, TICKS_COLETA};
+use insurgencia_sim::{
+    Barreira, CodigoRecusa, Comando, Mundo, ValidacaoComandos, CUSTO_BARREIRA_MATERIAIS,
+    MAX_BARREIRAS_POR_JOGADOR, PV_BARREIRA, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA,
+    TICKS_DURACAO_BARREIRA,
+};
 
 /// Monta um comando `mover` com os monotônicos já preenchidos.
 #[must_use]
@@ -430,4 +434,450 @@ fn determinismo_coleta() {
         assert_eq!(jogador.suprimentos, 3);
         assert_eq!(jogador.coleta_ticks, 0);
     }
+}
+
+/// Monta um comando `construir_barreira` com os monotônicos já preenchidos.
+#[must_use]
+fn comando_barreira(peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) -> Comando {
+    Comando {
+        peer_id,
+        acao: "construir_barreira".to_string(),
+        seq,
+        request_id,
+        destino: Some(ponto),
+    }
+}
+
+/// Agenda uma construção somente após validá-la contra o estado corrente.
+fn agendar_barreira(mundo: &mut Mundo, peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) {
+    assert!(ValidacaoComandos::validar(
+        mundo,
+        peer_id,
+        "construir_barreira",
+        seq,
+        request_id,
+        Some(ponto),
+    )
+    .is_ok());
+    mundo.agendar_comando(comando_barreira(peer_id, seq, request_id, ponto));
+}
+
+/// Conclui uma barricada em `ponto`, começando em `seq_base`.
+fn concluir_barreira(mundo: &mut Mundo, peer_id: u64, seq_base: i64, ponto: (f64, f64)) {
+    for offset in 0..TICKS_CONSTRUCAO_BARREIRA {
+        let seq = seq_base + offset;
+        agendar_barreira(mundo, peer_id, seq, seq, ponto);
+        mundo.avancar_tick();
+    }
+}
+
+/// Define diretamente o saldo de materiais de um jogador.
+fn definir_materiais(mundo: &mut Mundo, peer_id: u64, materiais: i64) {
+    if let Some(jogador) = mundo.jogadores.get_mut(&peer_id) {
+        jogador.materiais = materiais;
+    }
+}
+
+/// Monta uma barreira direta para verificações de hash.
+#[must_use]
+fn barreira_teste(
+    id: u64,
+    dono: u64,
+    posicao: (f64, f64),
+    pv: i64,
+    ticks_restantes: i64,
+) -> Barreira {
+    Barreira {
+        id,
+        dono,
+        posicao,
+        pv,
+        ticks_restantes,
+    }
+}
+
+#[test]
+fn barricada_apos_45_ticks_debita_20() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.25, 0.5);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    for offset in 0..(TICKS_CONSTRUCAO_BARREIRA - 1) {
+        let seq = 2 + offset;
+        agendar_barreira(&mut mundo, 1, seq, seq, ponto);
+        mundo.avancar_tick();
+        let jogador = &mundo.jogadores[&1];
+        assert_eq!(jogador.construcao_ticks, 1 + offset, "tick {offset}");
+        assert_eq!(jogador.construcao_ponto, Some(ponto));
+        assert_eq!(jogador.materiais, 100);
+        assert!(mundo.barreiras.is_empty());
+    }
+
+    let seq = 1 + TICKS_CONSTRUCAO_BARREIRA;
+    agendar_barreira(&mut mundo, 1, seq, seq, ponto);
+    mundo.avancar_tick();
+
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.materiais, 100 - CUSTO_BARREIRA_MATERIAIS);
+    assert_eq!(jogador.construcao_ticks, 0);
+    assert_eq!(jogador.construcao_ponto, None);
+    assert_eq!(mundo.barreiras.len(), 1);
+    let barreira = &mundo.barreiras[&1];
+    assert_eq!(barreira.id, 1);
+    assert_eq!(barreira.dono, 1);
+    assert_eq!(barreira.posicao, ponto);
+    assert_eq!(barreira.pv, PV_BARREIRA);
+    assert_eq!(barreira.ticks_restantes, TICKS_DURACAO_BARREIRA);
+    assert_eq!(mundo.proxima_barreira_id, 2);
+}
+
+#[test]
+fn saldo_insuficiente_recusa_sem_debito() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let insuficiente = CUSTO_BARREIRA_MATERIAIS - 1;
+    definir_materiais(&mut mundo, 1, insuficiente);
+    let ponto = (0.25, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    let recusado = ValidacaoComandos::validar(&mundo, 1, "construir_barreira", 2, 2, Some(ponto));
+    assert_eq!(recusado, Err(CodigoRecusa::SaldoInsuficiente));
+    assert_eq!(mundo.jogadores[&1].materiais, insuficiente);
+
+    // Um comando forjado não inicia canalização nem debita.
+    mundo.agendar_comando(comando_barreira(1, 2, 2, ponto));
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.construcao_ticks, 0);
+    assert_eq!(jogador.construcao_ponto, None);
+    assert_eq!(jogador.materiais, insuficiente);
+    assert!(mundo.barreiras.is_empty());
+
+    // O saldo é revalidado no tick de conclusão: sem débito e sem barreira.
+    definir_materiais(&mut mundo, 1, CUSTO_BARREIRA_MATERIAIS);
+    for offset in 0..(TICKS_CONSTRUCAO_BARREIRA - 1) {
+        let seq = 3 + offset;
+        agendar_barreira(&mut mundo, 1, seq, seq, ponto);
+        mundo.avancar_tick();
+    }
+    assert_eq!(
+        mundo.jogadores[&1].construcao_ticks,
+        TICKS_CONSTRUCAO_BARREIRA - 1
+    );
+    definir_materiais(&mut mundo, 1, insuficiente);
+    let seq = 3 + TICKS_CONSTRUCAO_BARREIRA;
+    mundo.agendar_comando(comando_barreira(1, seq, seq, ponto));
+    mundo.avancar_tick();
+
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.materiais, insuficiente);
+    assert_eq!(jogador.construcao_ticks, 0);
+    assert_eq!(jogador.construcao_ponto, None);
+    assert!(mundo.barreiras.is_empty());
+}
+
+#[test]
+fn construcao_fora_do_ponto_recusada() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.25, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    let fora = ValidacaoComandos::validar(&mundo, 1, "construir_barreira", 2, 2, Some((0.75, 0.0)));
+    assert_eq!(fora, Err(CodigoRecusa::DestinoInvalido));
+    let sem_destino = ValidacaoComandos::validar(&mundo, 1, "construir_barreira", 2, 2, None);
+    assert_eq!(sem_destino, Err(CodigoRecusa::DestinoInvalido));
+    let aceito = ValidacaoComandos::validar(&mundo, 1, "construir_barreira", 2, 2, Some(ponto));
+    assert!(aceito.is_ok());
+
+    for (seq, destino) in [(2_i64, None), (3_i64, Some((0.75_f64, 0.0)))] {
+        mundo.agendar_comando(Comando {
+            peer_id: 1,
+            acao: "construir_barreira".to_string(),
+            seq,
+            request_id: seq,
+            destino,
+        });
+        mundo.avancar_tick();
+    }
+
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.materiais, 100);
+    assert_eq!(jogador.construcao_ticks, 0);
+    assert_eq!(jogador.construcao_ponto, None);
+    assert!(mundo.barreiras.is_empty());
+}
+
+#[test]
+fn barricada_200_pv_destruida_ao_200_dano() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.5, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+    concluir_barreira(&mut mundo, 1, 2, ponto);
+
+    assert_eq!(mundo.barreiras[&1].pv, PV_BARREIRA);
+    assert!(!mundo.aplicar_dano_a_barreira(1, PV_BARREIRA - 1));
+    assert_eq!(mundo.barreiras[&1].pv, 1);
+    assert!(!mundo.aplicar_dano_a_barreira(1, 0));
+    assert!(!mundo.aplicar_dano_a_barreira(99, PV_BARREIRA));
+    assert!(mundo.aplicar_dano_a_barreira(1, 1));
+    assert!(mundo.barreiras.is_empty());
+    assert!(!mundo.aplicar_dano_a_barreira(1, 1));
+}
+
+#[test]
+fn barricada_expira_apos_360_ticks() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.5, 0.25);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+    concluir_barreira(&mut mundo, 1, 2, ponto);
+    assert_eq!(mundo.barreiras[&1].ticks_restantes, TICKS_DURACAO_BARREIRA);
+
+    for _ in 0..(TICKS_DURACAO_BARREIRA - 1) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.barreiras[&1].ticks_restantes, 1);
+    mundo.avancar_tick();
+    assert!(mundo.barreiras.is_empty());
+    assert_eq!(mundo.proxima_barreira_id, 2);
+}
+
+#[test]
+fn terceira_barricada_remove_a_mais_antiga() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.25, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    concluir_barreira(&mut mundo, 1, 2, ponto);
+    concluir_barreira(&mut mundo, 1, 2 + TICKS_CONSTRUCAO_BARREIRA, ponto);
+    assert_eq!(mundo.barreiras.len(), MAX_BARREIRAS_POR_JOGADOR);
+    assert!(mundo.barreiras.contains_key(&1));
+    assert!(mundo.barreiras.contains_key(&2));
+    assert_eq!(
+        mundo.jogadores[&1].materiais,
+        100 - 2 * CUSTO_BARREIRA_MATERIAIS
+    );
+
+    concluir_barreira(&mut mundo, 1, 2 + 2 * TICKS_CONSTRUCAO_BARREIRA, ponto);
+    assert_eq!(mundo.barreiras.len(), MAX_BARREIRAS_POR_JOGADOR);
+    assert!(!mundo.barreiras.contains_key(&1));
+    assert!(mundo.barreiras.contains_key(&2));
+    assert!(mundo.barreiras.contains_key(&3));
+    assert_eq!(
+        mundo.jogadores[&1].materiais,
+        100 - 3 * CUSTO_BARREIRA_MATERIAIS
+    );
+    assert_eq!(mundo.proxima_barreira_id, 4);
+}
+
+#[test]
+fn dupla_construcao_no_mesmo_tick_nao_acelera() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.25, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    let mut seq = 2_i64;
+    // Dois comandos válidos por tick não podem valer dois ticks de canalização.
+    for tick in 0..(TICKS_CONSTRUCAO_BARREIRA - 1) {
+        agendar_barreira(&mut mundo, 1, seq, seq, ponto);
+        seq += 1;
+        agendar_barreira(&mut mundo, 1, seq, seq, ponto);
+        seq += 1;
+        mundo.avancar_tick();
+        assert_eq!(
+            mundo.jogadores[&1].construcao_ticks,
+            1 + tick,
+            "tick {tick}"
+        );
+        assert_eq!(mundo.jogadores[&1].materiais, 100, "débito antecipado");
+        assert!(mundo.barreiras.is_empty());
+    }
+
+    agendar_barreira(&mut mundo, 1, seq, seq, ponto);
+    seq += 1;
+    agendar_barreira(&mut mundo, 1, seq, seq, ponto);
+    mundo.avancar_tick();
+
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.construcao_ticks, 0);
+    assert_eq!(jogador.materiais, 100 - CUSTO_BARREIRA_MATERIAIS);
+    assert_eq!(jogador.seq, seq);
+    assert_eq!(jogador.request_id, seq);
+    assert_eq!(mundo.barreiras.len(), 1);
+}
+
+#[test]
+fn movimento_cancela_construcao() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    definir_materiais(&mut mundo, 1, 100);
+    let ponto = (0.25, 0.0);
+    let fora = (0.25, 0.5);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    for seq in 2..(2 + 10) {
+        agendar_barreira(&mut mundo, 1, seq, seq, ponto);
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].construcao_ticks, 10);
+    assert_eq!(mundo.jogadores[&1].construcao_ponto, Some(ponto));
+
+    let seq = 2 + 10;
+    agendar_mover(&mut mundo, 1, seq, seq, fora);
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.posicao, fora);
+    assert_eq!(jogador.construcao_ticks, 0);
+    assert_eq!(jogador.construcao_ponto, None);
+    assert_eq!(jogador.materiais, 100);
+    assert!(mundo.barreiras.is_empty());
+
+    // O `mover` para o mesmo ponto apenas não cancela a canalização; o
+    // segundo tick de construção vem do novo `construir_barreira` deste tick.
+    let seq = 3 + 10;
+    agendar_barreira(&mut mundo, 1, seq, seq, fora);
+    mundo.avancar_tick();
+    let seq = 4 + 10;
+    agendar_mover(&mut mundo, 1, seq, seq, fora);
+    let seq = 5 + 10;
+    agendar_barreira(&mut mundo, 1, seq, seq, fora);
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.construcao_ticks, 2);
+    assert_eq!(jogador.construcao_ponto, Some(fora));
+    assert_eq!(jogador.materiais, 100);
+}
+
+#[test]
+fn hash_reflete_barreiras_e_construcao() {
+    let mut sem_construcao = Mundo::new();
+    let mut com_construcao = Mundo::new();
+    for mundo in [&mut sem_construcao, &mut com_construcao] {
+        mundo.adicionar_jogador(1);
+        if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+            jogador.seq = 7;
+            jogador.request_id = 9;
+            jogador.materiais = 100;
+        }
+    }
+    assert_eq!(sem_construcao.hash_estado(), com_construcao.hash_estado());
+
+    if let Some(jogador) = com_construcao.jogadores.get_mut(&1) {
+        jogador.construcao_ticks = 3;
+        jogador.construcao_ponto = Some((0.25, 0.0));
+    }
+    assert_ne!(sem_construcao.hash_estado(), com_construcao.hash_estado());
+
+    if let Some(jogador) = sem_construcao.jogadores.get_mut(&1) {
+        jogador.construcao_ticks = 3;
+        jogador.construcao_ponto = Some((0.25, 0.0));
+    }
+    assert_eq!(sem_construcao.hash_estado(), com_construcao.hash_estado());
+
+    if let Some(jogador) = sem_construcao.jogadores.get_mut(&1) {
+        jogador.construcao_ponto = Some((0.75, 0.0));
+    }
+    assert_ne!(sem_construcao.hash_estado(), com_construcao.hash_estado());
+
+    let mut primeira = Mundo::new();
+    let mut segunda = Mundo::new();
+    for mundo in [&mut primeira, &mut segunda] {
+        mundo.adicionar_jogador(1);
+    }
+    let sem_barreiras = primeira.hash_estado();
+    primeira
+        .barreiras
+        .insert(1, barreira_teste(1, 1, (0.5, 0.0), 200, 10));
+    primeira
+        .barreiras
+        .insert(2, barreira_teste(2, 1, (-0.5, 0.0), 100, 20));
+    // Ordem de inserção distinta: a iteração do BTreeMap é canônica.
+    segunda
+        .barreiras
+        .insert(2, barreira_teste(2, 1, (-0.5, 0.0), 100, 20));
+    segunda
+        .barreiras
+        .insert(1, barreira_teste(1, 1, (0.5, 0.0), 200, 10));
+    assert_ne!(primeira.hash_estado(), sem_barreiras);
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    if let Some(barreira) = primeira.barreiras.get_mut(&2) {
+        barreira.pv -= 1;
+    }
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+    if let Some(barreira) = primeira.barreiras.get_mut(&2) {
+        barreira.pv += 1;
+        barreira.ticks_restantes -= 1;
+    }
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+}
+
+#[test]
+fn determinismo_com_barreiras() {
+    let mut primeira = Mundo::new();
+    let mut segunda = Mundo::new();
+    for mundo in [&mut primeira, &mut segunda] {
+        mundo.adicionar_jogador(2);
+        mundo.adicionar_jogador(1);
+        definir_materiais(mundo, 1, 100);
+        definir_materiais(mundo, 2, 100);
+    }
+    let ponto_um = (0.25, 0.0);
+    let ponto_dois = (0.0, 0.25);
+
+    agendar_mover(&mut primeira, 1, 1, 1, ponto_um);
+    agendar_mover(&mut primeira, 2, 1, 1, ponto_dois);
+    agendar_mover(&mut segunda, 2, 1, 1, ponto_dois);
+    agendar_mover(&mut segunda, 1, 1, 1, ponto_um);
+    primeira.avancar_tick();
+    segunda.avancar_tick();
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    for seq in 2..(2 + TICKS_CONSTRUCAO_BARREIRA) {
+        for mundo in [&mut primeira, &mut segunda] {
+            agendar_barreira(mundo, 1, seq, seq, ponto_um);
+            agendar_barreira(mundo, 2, seq, seq, ponto_dois);
+        }
+        primeira.avancar_tick();
+        segunda.avancar_tick();
+        assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+    }
+    for peer_id in [1, 2] {
+        let jogador = &primeira.jogadores[&peer_id];
+        assert_eq!(jogador.materiais, 100 - CUSTO_BARREIRA_MATERIAIS);
+        assert_eq!(jogador.construcao_ticks, 0);
+        assert_eq!(jogador.construcao_ponto, None);
+    }
+    assert_eq!(primeira.barreiras.len(), 2);
+    assert_eq!(segunda.barreiras.len(), 2);
+
+    assert!(!primeira.aplicar_dano_a_barreira(1, PV_BARREIRA - 1));
+    assert!(!segunda.aplicar_dano_a_barreira(1, PV_BARREIRA - 1));
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+    for _ in 0..TICKS_DURACAO_BARREIRA {
+        primeira.avancar_tick();
+        segunda.avancar_tick();
+        assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+    }
+    assert!(primeira.barreiras.is_empty());
+    assert!(segunda.barreiras.is_empty());
 }
