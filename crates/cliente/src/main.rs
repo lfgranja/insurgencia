@@ -30,7 +30,7 @@ const PEER_ID: u64 = 1;
 /// Identificador do alvo de treino no espelho da simulação (scaffolding não-canônico).
 const PEER_ALVO_TREINO: u64 = 2;
 
-/// Posição fixa do alvo de treino no plano do mapa.
+/// Posição fixa do alvo de treino no plano do mapa (scaffolding não-canônico).
 const ALVO_TREINO_POSICAO: (f64, f64) = (2.0, 0.0);
 
 /// Quantidade de vértices no contorno irregular de cada ilha.
