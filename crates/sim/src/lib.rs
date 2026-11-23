@@ -139,6 +139,21 @@ pub const CUSTO_ATAQUE_FORTE: i64 = CUSTO_ATAQUE_FOLEGO;
 /// Nome alternativo do dano na spec 047 (`[HIPÓTESE]`/protótipo, não cânone).
 pub const DANO_ATAQUE_FORTE: i64 = DANO_ATAQUE;
 
+/// Custo de Fôlego de `analise_materialista` (`[HIPÓTESE]`/GDD §10.2:554-559, protótipo).
+pub const CUSTO_ANALISE_MATERIALISTA: i64 = 20;
+
+/// Alcance de `analise_materialista`, em metros (`[HIPÓTESE]`/protótipo, não cânone).
+pub const ALCANCE_ANALISE_MATERIALISTA_M: f64 = 12.0;
+
+/// Duração da marca em ticks (5 s × 30 Hz; `[HIPÓTESE]`/protótipo, não cânone).
+pub const TICKS_ANALISE_MATERIALISTA: i64 = 150;
+
+/// Recarga em ticks (15 s × 30 Hz; `[HIPÓTESE]`/protótipo, não cânone).
+pub const RECARGA_ANALISE_MATERIALISTA_TICKS: i64 = 450;
+
+/// Bônus percentual de dano à marca (`[HIPÓTESE]`/GDD §10.2:554-559, protótipo).
+pub const BONUS_DANO_ANALISE_PERCENT: i64 = 25;
+
 /// Nome alternativo da regeneração fora de combate na spec 047 (`[HIPÓTESE]`, não cânone).
 pub const FOLEGO_REGENERACAO_FORA: i64 = 10;
 
@@ -161,6 +176,7 @@ const ACOES_PERMITIDAS: &[&str] = &[
     "propaganda_no",
     "atacar_no",
     "atacar_pnj",
+    "analise_materialista",
 ];
 
 /// Compara dois pontos sem depender de tolerância de arredondamento.
@@ -174,7 +190,7 @@ fn ponto_igual(a: (f64, f64), b: (f64, f64)) -> bool {
 fn nivel_minimo_para_acao(acao: &str) -> u8 {
     match acao {
         "construir_barreira" | "construir_ponte" => 2,
-        "propaganda" | "propaganda_no" => 3,
+        "propaganda" | "propaganda_no" | "analise_materialista" => 3,
         "atacar_no" => 6,
         _ => 1,
     }
@@ -273,6 +289,8 @@ pub struct Jogador {
     pub folego_ticks: i64,
     /// Ticks restantes de combate; a taxa de regeneração muda enquanto for positivo.
     pub combate_ticks: i64,
+    /// Ticks restantes de recarga de `analise_materialista` (`[HIPÓTESE]`/protótipo).
+    pub analise_recarga_ticks: i64,
 }
 
 /// Barricada ativa no mundo, identificada por `id`.
@@ -367,6 +385,8 @@ pub struct Pnj {
     pub ativo: bool,
     /// Ticks acumulados até o próximo ataque, em `TICKS_ATAQUE_PNJ`.
     pub ataque_ticks: i64,
+    /// Ticks restantes da marca de `analise_materialista`; zero significa sem marca.
+    pub marca_ticks: i64,
 }
 
 /// Desfecho observável da partida (`[HIPÓTESE]`/protótipo, não cânone).
@@ -484,6 +504,7 @@ impl Mundo {
                 folego: FOLEGO_MAXIMO,
                 folego_ticks: 0,
                 combate_ticks: 0,
+                analise_recarga_ticks: 0,
                 seq: 0,
                 request_id: 0,
                 funcao: Funcao::Artesao,
@@ -534,6 +555,7 @@ impl Mundo {
                 pv: PV_PNJ,
                 ativo: true,
                 ataque_ticks: 0,
+                marca_ticks: 0,
             },
         );
     }
@@ -550,7 +572,13 @@ impl Mundo {
         let Some(pnj) = self.pnjs.get_mut(&id) else {
             return false;
         };
-        pnj.pv = pnj.pv.saturating_sub(dano).max(0);
+        // `[HIPÓTESE]`/GDD §10.2:554-559: +25% inteiro somente com marca ativa.
+        let dano_com_bonus = if pnj.marca_ticks > 0 {
+            dano.saturating_add(dano.saturating_mul(BONUS_DANO_ANALISE_PERCENT) / 100)
+        } else {
+            dano
+        };
+        pnj.pv = pnj.pv.saturating_sub(dano_com_bonus).max(0);
         if pnj.pv == 0 && pnj.ativo {
             pnj.ativo = false;
             return true;
@@ -671,6 +699,7 @@ impl Mundo {
     pub fn avancar_tick(&mut self) {
         let convertidos_no_inicio = self.nos.values().filter(|no| no.convertido).count();
         self.fase_prepare();
+        self.avancar_analises_materialistas();
         self.fase_skills();
         self.fase_defesa();
         self.fase_ataque_pnjs();
@@ -702,6 +731,7 @@ impl Mundo {
         let mut atacantes_pnj_avancado: BTreeSet<u64> = BTreeSet::new();
         let comandos = std::mem::take(&mut self.comandos_do_tick);
         let mut ataques_realizados: BTreeSet<u64> = BTreeSet::new();
+        let mut analises_realizadas: BTreeSet<u64> = BTreeSet::new();
 
         for comando in &comandos {
             let mut atualizar_monotonicos = true;
@@ -753,6 +783,9 @@ impl Mundo {
             } else if comando.acao == "atacar_pnj" {
                 atualizar_monotonicos =
                     self.aplicar_ataque_pnj(comando, &mut atacantes_pnj_avancado);
+            } else if comando.acao == "analise_materialista" {
+                atualizar_monotonicos =
+                    self.aplicar_analise_materialista(comando, &mut analises_realizadas);
             }
             if atualizar_monotonicos {
                 if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
@@ -834,6 +867,59 @@ impl Mundo {
         }
         self.aplicar_dano_a_pnj(id, DANO_ATAQUE);
         true
+    }
+
+    /// Aplica `analise_materialista` em um PNJ ativo, no máximo uma vez por atacante por tick.
+    ///
+    /// Exige `destino` na posição do PNJ, distância de até 12 m, Fôlego suficiente e
+    /// recarga zerada. A marca é atribuída, nunca acumulada, e a recarga reinicia.
+    /// Retorna `true` somente quando a marca foi aplicada, para que os monotônicos
+    /// avancem apenas em comando aceito.
+    fn aplicar_analise_materialista(
+        &mut self,
+        comando: &Comando,
+        analises: &mut BTreeSet<u64>,
+    ) -> bool {
+        let Some(destino) = comando.destino else {
+            return false;
+        };
+        let Some(jogador) = self.jogadores.get(&comando.peer_id) else {
+            return false;
+        };
+        let distancia = (destino.0 - jogador.posicao.0).hypot(destino.1 - jogador.posicao.1);
+        if distancia > ALCANCE_ANALISE_MATERIALISTA_M
+            || jogador.folego < CUSTO_ANALISE_MATERIALISTA
+            || jogador.analise_recarga_ticks > 0
+        {
+            return false;
+        }
+        let Some(id) = self.pnj_id_ativo_em_ponto(destino) else {
+            return false;
+        };
+        // A cota só é consumida depois de todas as guardas, como em `atacar_pnj`.
+        if !analises.insert(comando.peer_id) {
+            return false;
+        }
+        if let Some(atacante) = self.jogadores.get_mut(&comando.peer_id) {
+            atacante.folego -= CUSTO_ANALISE_MATERIALISTA;
+            atacante.analise_recarga_ticks = RECARGA_ANALISE_MATERIALISTA_TICKS;
+        }
+        if let Some(pnj) = self.pnjs.get_mut(&id) {
+            pnj.marca_ticks = TICKS_ANALISE_MATERIALISTA;
+        }
+        true
+    }
+
+    /// Decrementa uma vez por tick marcas e recargas, em ordem estável de
+    /// `id` dos PNJs e `peer_id` dos jogadores (`[HIPÓTESE]`/protótipo).
+    fn avancar_analises_materialistas(&mut self) {
+        for pnj in self.pnjs.values_mut() {
+            pnj.marca_ticks = pnj.marca_ticks.saturating_sub(1).max(0);
+        }
+        for jogador in self.jogadores.values_mut() {
+            let recarga = jogador.analise_recarga_ticks.saturating_sub(1).max(0);
+            jogador.analise_recarga_ticks = recarga;
+        }
     }
 
     /// Avança a defesa das barricadas intactas, creditando autogestão a cada 300 ticks.
@@ -1536,8 +1622,8 @@ impl Mundo {
                         "{suprimentos}:{coleta_ticks}:{coleta_ponto:?}:{construcao_ticks}:",
                         "{construcao_ponto:?}:{pontos_autogestao}:{ponte_ticks}:",
                         "{ponte_ponto:?}:{propaganda_alvo:?}:{folego}:{folego_ticks}:",
-                        "{combate_ticks}:{no_alvo:?}:{no_acao_no:?}:{funcao:?}:",
-                        "{nivel}:{nivel_ticks}"
+                        "{combate_ticks}:{analise_recarga_ticks}:{no_alvo:?}:{no_acao_no:?}:",
+                        "{funcao:?}:{nivel}:{nivel_ticks}"
                     ),
                     peer_id = peer_id,
                     x = x,
@@ -1558,6 +1644,7 @@ impl Mundo {
                     folego = jogador.folego,
                     folego_ticks = jogador.folego_ticks,
                     combate_ticks = jogador.combate_ticks,
+                    analise_recarga_ticks = jogador.analise_recarga_ticks,
                     no_alvo = jogador.no_alvo,
                     no_acao_no = jogador.no_acao_no,
                     funcao = jogador.funcao,
@@ -1624,7 +1711,8 @@ impl Mundo {
                 let pv = pnj.pv;
                 let ativo = pnj.ativo;
                 let ticks = pnj.ataque_ticks;
-                format!("{id}:{x}:{y}:{pv}:{ativo}:{ticks}")
+                let marca = pnj.marca_ticks;
+                format!("{id}:{x}:{y}:{pv}:{ativo}:{ticks}:{marca}")
             })
             .collect::<Vec<_>>()
             .join(";");
@@ -1717,13 +1805,17 @@ pub enum CodigoRecusa {
     /// `atacar_forte` sem alvo no destino ou além do alcance de contato.
     #[error("alvo invalido")]
     AlvoInvalido,
-    /// Fôlego abaixo do custo de `atacar_forte`.
+    /// Fôlego abaixo do custo de `atacar_forte` ou `analise_materialista`.
     #[error("folego insuficiente")]
     FolegoInsuficiente,
+    /// `analise_materialista` durante a recarga de 450 ticks.
+    #[error("analise materialista em recarga")]
+    AnaliseEmRecarga,
     /// Destino ausente ou fora do ponto para `mover`, `coletar_materiais`,
     /// `construir_barreira`, `construir_ponte`, `propaganda`, `propaganda_no` ou
     /// `atacar_no`; `atacar_pnj` recusa destino sem PNJ ativo ou além de 2 m do
-    /// jogador. Nó inativo também recusa `atacar_no`.
+    /// jogador. `analise_materialista` recusa destino sem PNJ ativo ou além de 12 m.
+    /// Nó inativo também recusa `atacar_no`.
     #[error("destino ausente ou fora do ponto")]
     DestinoInvalido,
     /// Deslocamento acima de `LIMITE_MOVIMENTO_M`.
@@ -1738,6 +1830,65 @@ pub enum CodigoRecusa {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ValidacaoComandos;
 
+/// Valida `atacar_forte` quanto a alvo, alcance de contato e Fôlego.
+fn validar_ataque_forte(
+    mundo: &Mundo,
+    peer_id: u64,
+    jogador: &Jogador,
+    destino: Option<(f64, f64)>,
+) -> Result<(), CodigoRecusa> {
+    let ponto = destino.ok_or(CodigoRecusa::AlvoInvalido)?;
+    let alvo_no_ponto = mundo
+        .jogadores
+        .iter()
+        .any(|(&peer, alvo)| peer != peer_id && ponto_igual(alvo.posicao, ponto));
+    if !alvo_no_ponto {
+        return Err(CodigoRecusa::AlvoInvalido);
+    }
+    let (origem_x, origem_y) = jogador.posicao;
+    if (ponto.0 - origem_x).hypot(ponto.1 - origem_y) > ALCANCE_CONTATO_M {
+        return Err(CodigoRecusa::AlvoInvalido);
+    }
+    if jogador.folego < CUSTO_ATAQUE_FOLEGO {
+        return Err(CodigoRecusa::FolegoInsuficiente);
+    }
+    Ok(())
+}
+
+/// Valida `analise_materialista` na ordem destino, Fôlego e recarga.
+fn validar_analise_materialista(
+    mundo: &Mundo,
+    jogador: &Jogador,
+    destino: Option<(f64, f64)>,
+) -> Result<(), CodigoRecusa> {
+    let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
+    let distancia = (ponto.0 - jogador.posicao.0).hypot(ponto.1 - jogador.posicao.1);
+    if distancia > ALCANCE_ANALISE_MATERIALISTA_M || mundo.pnj_id_ativo_em_ponto(ponto).is_none() {
+        return Err(CodigoRecusa::DestinoInvalido);
+    }
+    if jogador.folego < CUSTO_ANALISE_MATERIALISTA {
+        return Err(CodigoRecusa::FolegoInsuficiente);
+    }
+    if jogador.analise_recarga_ticks > 0 {
+        return Err(CodigoRecusa::AnaliseEmRecarga);
+    }
+    Ok(())
+}
+
+/// Valida `atacar_pnj` quanto ao PNJ ativo no destino e ao alcance de 2 m.
+fn validar_ataque_pnj(
+    mundo: &Mundo,
+    jogador: &Jogador,
+    destino: Option<(f64, f64)>,
+) -> Result<(), CodigoRecusa> {
+    let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
+    let distancia = (ponto.0 - jogador.posicao.0).hypot(ponto.1 - jogador.posicao.1);
+    if distancia > ALCANCE_CONTATO_M || mundo.pnj_id_ativo_em_ponto(ponto).is_none() {
+        return Err(CodigoRecusa::DestinoInvalido);
+    }
+    Ok(())
+}
+
 impl ValidacaoComandos {
     /// Valida um comando contra o estado autoritativo.
     ///
@@ -1748,7 +1899,8 @@ impl ValidacaoComandos {
     /// de distância de `mover`), alvo/alcance e Fôlego para `atacar_forte`,
     /// saldo para `construir_barreira` e `construir_ponte`; `propaganda` exige
     /// Súdito no ponto do jogador, e `atacar_pnj` exige PNJ ativo em `destino`
-    /// com o jogador a até 2 m desse ponto.
+    /// com o jogador a até 2 m desse ponto; `analise_materialista` exige PNJ ativo
+    /// em `destino`, até 12 m de distância, Fôlego e recarga zerada.
     /// `propaganda_no`/`atacar_no` exigem Nó no ponto do jogador e não exigem
     /// saldo ou Fôlego.
     pub fn validar(
@@ -1786,21 +1938,7 @@ impl ValidacaoComandos {
         }
 
         if acao == "atacar_forte" {
-            let ponto = destino.ok_or(CodigoRecusa::AlvoInvalido)?;
-            let alvo_no_ponto = mundo
-                .jogadores
-                .iter()
-                .any(|(&peer, alvo)| peer != peer_id && ponto_igual(alvo.posicao, ponto));
-            if !alvo_no_ponto {
-                return Err(CodigoRecusa::AlvoInvalido);
-            }
-            let (origem_x, origem_y) = jogador.posicao;
-            if (ponto.0 - origem_x).hypot(ponto.1 - origem_y) > ALCANCE_CONTATO_M {
-                return Err(CodigoRecusa::AlvoInvalido);
-            }
-            if jogador.folego < CUSTO_ATAQUE_FOLEGO {
-                return Err(CodigoRecusa::FolegoInsuficiente);
-            }
+            validar_ataque_forte(mundo, peer_id, jogador, destino)?;
         }
 
         if acao == "coletar_materiais" {
@@ -1851,12 +1989,12 @@ impl ValidacaoComandos {
             }
         }
 
+        if acao == "analise_materialista" {
+            validar_analise_materialista(mundo, jogador, destino)?;
+        }
+
         if acao == "atacar_pnj" {
-            let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
-            let distancia = (ponto.0 - jogador.posicao.0).hypot(ponto.1 - jogador.posicao.1);
-            if distancia > ALCANCE_CONTATO_M || mundo.pnj_id_ativo_em_ponto(ponto).is_none() {
-                return Err(CodigoRecusa::DestinoInvalido);
-            }
+            validar_ataque_pnj(mundo, jogador, destino)?;
         }
 
         Ok(())

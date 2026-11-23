@@ -23,8 +23,8 @@ use insurgencia_cliente::{
     VELOCIDADE,
 };
 use insurgencia_sim::{
-    Comando, Mundo, ResultadoPartida, MAX_RECONQUISTAS, NIVEL_MAXIMO, PASSO_SEGUNDOS, TICKS_COLETA,
-    TICKS_CONSTRUCAO_BARREIRA,
+    Comando, Mundo, ResultadoPartida, ALCANCE_ANALISE_MATERIALISTA_M, MAX_RECONQUISTAS,
+    NIVEL_MAXIMO, PASSO_SEGUNDOS, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA,
 };
 
 /// Identificador do jogador local no espelho da simulação.
@@ -117,6 +117,7 @@ fn main() {
                 solicitar_propaganda_no,
                 solicitar_atacar_no,
                 solicitar_atacar_pnj,
+                solicitar_analise_materialista,
                 sincronizar_sim,
                 avancar_simulacao,
                 atualizar_texto,
@@ -866,6 +867,30 @@ fn posicao_pnj_mais_proximo(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, 
         .map(|pnj| pnj.posicao)
 }
 
+/// Devolve a posição do PNJ ativo mais próximo dentro do alcance da Análise.
+///
+/// A distância ao quadrado preserva a ordem sem raiz e `total_cmp` mantém o
+/// desempate determinístico pelo menor `id`.
+#[must_use]
+fn posicao_analise_materialista(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, f64)> {
+    let (x, y) = (f64::from(jogador.0), f64::from(jogador.1));
+    let alcance2 = ALCANCE_ANALISE_MATERIALISTA_M.powi(2);
+    mundo
+        .pnjs
+        .values()
+        .filter(|pnj| {
+            let dx = pnj.posicao.0 - x;
+            let dy = pnj.posicao.1 - y;
+            pnj.ativo && dx.mul_add(dx, dy * dy) <= alcance2
+        })
+        .min_by(|a, b| {
+            let da = (a.posicao.0 - x).mul_add(a.posicao.0 - x, (a.posicao.1 - y).powi(2));
+            let db = (b.posicao.0 - x).mul_add(b.posicao.0 - x, (b.posicao.1 - y).powi(2));
+            da.total_cmp(&db).then_with(|| a.id.cmp(&b.id))
+        })
+        .map(|pnj| pnj.posicao)
+}
+
 /// Agenda `atacar_pnj` no guarda ativo mais próximo ao pressionar `T`.
 #[expect(
     clippy::needless_pass_by_value,
@@ -888,6 +913,37 @@ fn solicitar_atacar_pnj(
     simulacao.0.agendar_comando(Comando {
         peer_id: PEER_ID,
         acao: "atacar_pnj".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(destino),
+    });
+}
+
+/// Agenda `analise_materialista` no PNJ ativo mais próximo ao pressionar `E`.
+///
+/// Sem alvo dentro de 12 m, nenhum comando é agendado e os contadores locais
+/// permanecem intactos; o núcleo valida Fôlego, nível e recarga.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_analise_materialista(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyE) {
+        return;
+    }
+    let Some(destino) = posicao_analise_materialista(&simulacao.0, jogador.0.posicao) else {
+        return;
+    };
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "analise_materialista".to_owned(),
         seq: local.seq,
         request_id: local.request_id,
         destino: Some(destino),
@@ -974,6 +1030,17 @@ fn texto_progresso(simulacao: &Simulacao) -> (String, String) {
     (construindo, coletando)
 }
 
+/// Conta os PNJs ativos e marcados pelo espelho autoritativo para a HUD.
+#[must_use]
+fn contar_pnjs_analisados(simulacao: &Simulacao) -> usize {
+    simulacao
+        .0
+        .pnjs
+        .values()
+        .filter(|pnj| pnj.ativo && pnj.marca_ticks > 0)
+        .count()
+}
+
 /// Monta o texto do painel a partir do estado local e do espelho da simulação.
 #[must_use]
 fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
@@ -995,6 +1062,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
         0
     };
     let pnjs = simulacao.0.pnjs.values().filter(|pnj| pnj.ativo).count();
+    let analise = contar_pnjs_analisados(simulacao);
     let funcao = remoto.map_or("Artesão", |j| j.funcao.nome());
     let nivel = remoto.map_or(1, |j| j.nivel);
     let barreiras = simulacao
@@ -1033,7 +1101,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
             "Limites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\n",
             "Suprimentos: {suprimentos}\nMateriais: {materiais}\n",
             "Fôlego: {folego}\nVida: {vida}\nAlvo: {vida_alvo}\nPNJs: {pnjs}\n",
-            "Autogestão: {autogestao}\nBarreiras: {barreiras}\n",
+            "Análise: {analise}\nAutogestão: {autogestao}\nBarreiras: {barreiras}\n",
             "Pontes: {pontes}\nSúditos: {suditos}\n",
             "Resistência: {resistencia}\nNós: {nos_convertidos}/3\n",
             "Ilhas: {ilhas_controladas}\nSinais: {sinais}\nResultado: {resultado}\n",
@@ -1041,7 +1109,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
             "WASD ou setas para mover · B para construir barreira · P para construir ponte · ",
             "C para coletar materiais · G para propaganda · R para propaganda no Nó · ",
             "F para atacar o Nó · Aproxime-se do alvo e use Q para atacar · ",
-            "T para atacar o PNJ mais próximo"
+            "T para atacar o PNJ mais próximo · E para analisar o PNJ mais próximo"
         ),
         x = x,
         y = y,
@@ -1057,6 +1125,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
         vida = vida,
         vida_alvo = vida_alvo,
         pnjs = pnjs,
+        analise = analise,
         autogestao = autogestao,
         barreiras = barreiras,
         pontes = pontes,

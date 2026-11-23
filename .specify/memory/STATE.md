@@ -428,3 +428,19 @@
 ## 2026-11-23T16:11Z — fechamento do ciclo 053
 
 **Sessão**: `20261123T155300Z-pnj-defensores` · **Título**: `insurgencia - pnjs defensores`. Roteiro **10/10 PASS** (`.specify/validations/pnj-defensores/evidence.md`); `./verify.sh` **ALL STAGES OK**, **128 testes run: 128 passed, 0 skipped**, `VERIFY_EXIT=0`; cinco gates locais PASS após bootstrap do baseline de `specs/053-pnj-defensores/converge.md` (`files=35 baselined=35`). Implementação: `Pnj`/`Mundo.pnjs`/`adicionar_pnj`/`aplicar_dano_a_pnj` com piso zero/`atacar_pnj` nível 1/`fase_ataque_pnjs` 8 dmg a cada 90 ticks em 2 m/hash/HUD `PNJs: N`/tecla `T`. Três RED corrigidos na fonte (não em expectativa): `texto_hud` <100 linhas, piso zero do dano e asserção da transição letal. R4 PASS, R7 `1.0.0-local` pronto, R6 N/A. CI/merge/promoção pendentes nesta entrada; captura visual real **[NV]**.
+
+## 2026-11-23T16:55Z — decisão 80/20 do ciclo 054 (antes da implementação)
+
+**Sessão**: `20261123T165500Z-analise-materialista` · **Título**: `insurgencia - análise materialista`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Análise Materialista (E do Intelectual, marca em PNJ) | 4 | 2 | 2 | 3 | **48/625** |
+| Demais W/E/R (Escudo, Carga, Oficina, Fuga etc.) | 4 | 2 | 1 | 3 | 24/625 |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `analise-materialista`. GDD §10.2:554-559 fixa E do Intelectual com nível 3, 20 Fôlego, 12 m, -25% de resistência por 5 s e não-acumulação; o corte implementa apenas a marca determinística em PNJs vivos, reaproveitando `atacar_pnj`, `DANO_ATAQUE`, `BTreeMap` e o relógio por tick, sem magia, RNG, canalização, visibilidade, mapa, protocolo ou rede. Todos os números são `[HIPÓTESE]`/protótipo. Novas habilidades W/R e as demais E ficam para ciclos posteriores. R6 permanece **N/A**.
+
+## 2026-11-23T17:20Z — fechamento do ciclo 054
+
+**Sessão**: `20261123T165500Z-analise-materialista` · **Título**: `insurgencia - análise materialista`. Roteiro **10/10 PASS** (`.specify/validations/analise-materialista/evidence.md`); `./verify.sh` **ALL STAGES OK**, **136 testes run: 136 passed, 0 skipped**, `VERIFY_EXIT=0`; cinco gates locais PASS após bootstrap do baseline (`files=36 baselined=36`). Implementação: `marca_ticks`/`analise_recarga_ticks`, cinco constantes `[HIPÓTESE]`, ação nível 3 com 20 Fôlego/12 m/150 ticks/450 ticks, bônus 10→12, hash, HUD `Análise: N` e tecla `E`. Três RED corrigidos na fonte (hash, helpers de validação e gate R6). R4 PASS, R7 `1.0.0-local`, R6 N/A. CI/merge/promoção pendentes nesta entrada; captura visual real **[NV]**.
