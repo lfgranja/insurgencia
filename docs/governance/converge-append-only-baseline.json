@@ -101,6 +101,10 @@
     "specs/042-servidor-headless/converge.md": {
       "bytes": 7252,
       "sha256": "68875506e3506ffcd7142d5edf650f0279c1caa491ada93a553e694df1fcdd2d"
+    },
+    "specs/044-defesa-barricada/converge.md": {
+      "bytes": 7032,
+      "sha256": "8cb6ec5eb648cec919dd73d6c63189024b984f8fc68fc00e83fd5662d832cdf8"
     }
   },
   "_provenance": {

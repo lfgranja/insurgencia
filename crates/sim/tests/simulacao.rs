@@ -3,8 +3,8 @@
 
 use insurgencia_sim::{
     Barreira, CodigoRecusa, Comando, Mundo, ValidacaoComandos, CUSTO_BARREIRA_MATERIAIS,
-    MAX_BARREIRAS_POR_JOGADOR, PV_BARREIRA, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA,
-    TICKS_DURACAO_BARREIRA,
+    MAX_BARREIRAS_POR_JOGADOR, PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA,
+    TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA, TICKS_DURACAO_BARREIRA,
 };
 
 /// Monta um comando `mover` com os monotônicos já preenchidos.
@@ -557,6 +557,7 @@ fn barreira_teste(
         posicao,
         pv,
         ticks_restantes,
+        defesa_ticks: 0,
     }
 }
 
@@ -986,4 +987,162 @@ fn determinismo_com_barreiras() {
     }
     assert!(primeira.barreiras.is_empty());
     assert!(segunda.barreiras.is_empty());
+}
+
+#[test]
+fn defesa_gera_ponto_apos_300_ticks() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let ponto = (0.25, 0.0);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.posicao = ponto;
+    }
+    mundo.barreiras.insert(
+        1,
+        barreira_teste(1, 1, ponto, PV_BARREIRA, TICKS_DURACAO_BARREIRA),
+    );
+
+    for _ in 0..(TICKS_AUTOGESTAO_POR_PONTO - 1) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(
+        mundo.barreiras[&1].defesa_ticks,
+        TICKS_AUTOGESTAO_POR_PONTO - 1
+    );
+    assert_eq!(mundo.jogadores[&1].pontos_autogestao, 0);
+
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo.jogadores[&1].pontos_autogestao,
+        PONTOS_AUTOGESTAO_POR_DEFESA
+    );
+    assert_eq!(mundo.barreiras[&1].defesa_ticks, 0);
+    assert_eq!(
+        mundo.barreiras[&1].ticks_restantes,
+        TICKS_DURACAO_BARREIRA - TICKS_AUTOGESTAO_POR_PONTO
+    );
+
+    // A barricada ainda tem 60 ticks de vida: não credita uma segunda vez.
+    for _ in 0..(TICKS_DURACAO_BARREIRA - TICKS_AUTOGESTAO_POR_PONTO) {
+        mundo.avancar_tick();
+    }
+    assert!(mundo.barreiras.is_empty());
+    assert_eq!(
+        mundo.jogadores[&1].pontos_autogestao,
+        PONTOS_AUTOGESTAO_POR_DEFESA
+    );
+}
+
+#[test]
+fn dono_fora_do_ponto_nao_pontua() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let ponto = (0.25, 0.0);
+    let fora = (0.25, 0.25);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.posicao = ponto;
+    }
+    mundo.barreiras.insert(
+        1,
+        barreira_teste(1, 1, ponto, PV_BARREIRA, TICKS_DURACAO_BARREIRA),
+    );
+
+    for _ in 0..200 {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.barreiras[&1].defesa_ticks, 200);
+    assert_eq!(mundo.jogadores[&1].pontos_autogestao, 0);
+
+    agendar_mover(&mut mundo, 1, 1, 1, fora);
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].posicao, fora);
+    assert_eq!(mundo.barreiras[&1].defesa_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].pontos_autogestao, 0);
+
+    for _ in 0..10 {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.barreiras[&1].defesa_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].pontos_autogestao, 0);
+
+    agendar_mover(&mut mundo, 1, 2, 2, ponto);
+    mundo.avancar_tick();
+    assert_eq!(mundo.barreiras[&1].defesa_ticks, 1);
+
+    // `mover` para o próprio ponto não interrompe a defesa.
+    agendar_mover(&mut mundo, 1, 3, 3, ponto);
+    mundo.avancar_tick();
+    assert_eq!(mundo.barreiras[&1].defesa_ticks, 2);
+    assert_eq!(mundo.jogadores[&1].pontos_autogestao, 0);
+
+    // Dono ausente também descarta o progresso sem creditar.
+    if let Some(barreira) = mundo.barreiras.get_mut(&1) {
+        barreira.defesa_ticks = 7;
+    }
+    mundo.remover_jogador(1);
+    mundo.avancar_tick();
+    assert_eq!(mundo.barreiras[&1].defesa_ticks, 0);
+}
+
+#[test]
+fn barricada_destruida_nao_pontua() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let ponto = (0.25, 0.0);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.posicao = ponto;
+    }
+    mundo.barreiras.insert(
+        1,
+        barreira_teste(1, 1, ponto, PV_BARREIRA, TICKS_DURACAO_BARREIRA),
+    );
+    if let Some(barreira) = mundo.barreiras.get_mut(&1) {
+        barreira.defesa_ticks = TICKS_AUTOGESTAO_POR_PONTO - 1;
+    }
+
+    assert!(mundo.aplicar_dano_a_barreira(1, PV_BARREIRA));
+    assert!(mundo.barreiras.is_empty());
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].pontos_autogestao, 0);
+
+    // Uma barreira com `pv <= 0` que persista no mapa também não acumula.
+    mundo
+        .barreiras
+        .insert(2, barreira_teste(2, 1, ponto, 0, TICKS_DURACAO_BARREIRA));
+    mundo.avancar_tick();
+    assert_eq!(mundo.barreiras[&2].defesa_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].pontos_autogestao, 0);
+}
+
+#[test]
+fn hash_reflete_autogestao() {
+    let mut primeira = Mundo::new();
+    let mut segunda = Mundo::new();
+    for mundo in [&mut primeira, &mut segunda] {
+        mundo.adicionar_jogador(1);
+    }
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    if let Some(jogador) = primeira.jogadores.get_mut(&1) {
+        jogador.pontos_autogestao = PONTOS_AUTOGESTAO_POR_DEFESA;
+    }
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+
+    if let Some(jogador) = segunda.jogadores.get_mut(&1) {
+        jogador.pontos_autogestao = PONTOS_AUTOGESTAO_POR_DEFESA;
+    }
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    for mundo in [&mut primeira, &mut segunda] {
+        mundo.barreiras.insert(
+            1,
+            barreira_teste(1, 1, (0.25, 0.0), PV_BARREIRA, TICKS_DURACAO_BARREIRA),
+        );
+    }
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    if let Some(barreira) = primeira.barreiras.get_mut(&1) {
+        barreira.defesa_ticks = 7;
+    }
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
 }
