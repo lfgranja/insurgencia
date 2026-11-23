@@ -338,3 +338,14 @@
 | Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
 
 **Escolha**: `suditos`. A regra de aceitação GDD §9.2:464 (4 s de Propaganda interrompe ataque a estruturas; dano de jogador reverte em 3 s) é verificável mesmo com spawn/controle de ilha ainda `[HIPÓTESE]`. Valores de spawn, raio e função do Súdito ficam fora de escopo e registrados como hipóteses. R6 continua **N/A**.
+
+## 2026-11-23T07:35Z — decisão 80/20 do ciclo 047 (antes da implementação)
+
+**Sessão**: `20261123T073500Z-combate-folego` · **Título**: `insurgencia - combate e folego`. Critério `impacto × confiança × facilidade ÷ risco`, escala 1–5, denominador **625**.
+
+| Candidato | I | C | F | R | Pontuação |
+|:--|--:|--:|--:|--:|--:|
+| Combate/Fôlego (`atacar_forte`) | 4 | 2 | 2 | 3 | **48/625** |
+| Rede (bloqueada por ADR-004) | 5 | 2 | 1 | 1 | 10/625 |
+
+**Escolha**: `combate-folego`. Única frente de produto restante sem mudança de stack: GDD §10.1 define Fôlego 100, regeneração 10/s fora de combate e 5/s em combate, todos rotulados `[HIPÓTESE]`; a spec deve registrá-los como escolhas de protótipo, não dogmas canônicos. Dano e alcance também hipotéticos. R6 permanece **N/A**.

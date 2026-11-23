@@ -113,6 +113,10 @@
     "specs/046-suditos/converge.md": {
       "bytes": 7343,
       "sha256": "045531f6bbf1a47183a1f8bca8fa16ac772bd0e012ee4917435b5f075426498c"
+    },
+    "specs/047-combate-folego/converge.md": {
+      "bytes": 7545,
+      "sha256": "a784f2adff1f8881b187c5d09843855a36a97d9747e7e98b0b5231455ab7961c"
     }
   },
   "_provenance": {

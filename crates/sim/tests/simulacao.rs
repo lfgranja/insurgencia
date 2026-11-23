@@ -2,11 +2,12 @@
 #![deny(clippy::pedantic)]
 
 use insurgencia_sim::{
-    Barreira, CodigoRecusa, Comando, Mundo, Ponte, ValidacaoComandos, CUSTO_BARREIRA_MATERIAIS,
-    CUSTO_PONTE_MATERIAIS, MAX_BARREIRAS_POR_JOGADOR, PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA,
-    PV_PONTE, TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA,
+    Barreira, CodigoRecusa, Comando, Mundo, Ponte, ValidacaoComandos, CUSTO_ATAQUE_FOLEGO,
+    CUSTO_BARREIRA_MATERIAIS, CUSTO_PONTE_MATERIAIS, DANO_ATAQUE, FOLEGO_MAXIMO,
+    MAX_BARREIRAS_POR_JOGADOR, PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA, PV_PONTE,
+    TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA,
     TICKS_CONSTRUCAO_PONTE, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_PONTE, TICKS_PROPAGANDA,
-    TICKS_REVERSAO_SUDITO,
+    TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE, TICKS_REVERSAO_SUDITO,
 };
 
 /// Monta um comando `mover` com os monotônicos já preenchidos.
@@ -53,6 +54,32 @@ fn agendar_coleta(mundo: &mut Mundo, peer_id: u64, seq: i64, request_id: i64, po
     )
     .is_ok());
     mundo.agendar_comando(comando_coleta(peer_id, seq, request_id, ponto));
+}
+
+/// Monta um comando `atacar_forte` com os monotônicos já preenchidos.
+#[must_use]
+fn comando_ataque(peer_id: u64, seq: i64, request_id: i64, destino: (f64, f64)) -> Comando {
+    Comando {
+        peer_id,
+        acao: "atacar_forte".to_string(),
+        seq,
+        request_id,
+        destino: Some(destino),
+    }
+}
+
+/// Agenda um ataque somente após validá-lo contra o estado corrente.
+fn agendar_ataque(mundo: &mut Mundo, peer_id: u64, seq: i64, request_id: i64, destino: (f64, f64)) {
+    assert!(ValidacaoComandos::validar(
+        mundo,
+        peer_id,
+        "atacar_forte",
+        seq,
+        request_id,
+        Some(destino),
+    )
+    .is_ok());
+    mundo.agendar_comando(comando_ataque(peer_id, seq, request_id, destino));
 }
 
 #[test]
@@ -1784,4 +1811,274 @@ fn dois_jogadores_nao_aceleram_propaganda() {
     assert!(sudito.convertido);
     assert_eq!(mundo.jogadores[&1].propaganda_alvo, Some(7));
     assert_eq!(mundo.jogadores[&2].propaganda_alvo, Some(7));
+}
+
+#[test]
+fn ataque_custa_30_e_causa_10_dano() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    let ponto = (0.5, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    agendar_mover(&mut mundo, 2, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    agendar_ataque(&mut mundo, 1, 2, 2, ponto);
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo.jogadores[&1].folego,
+        FOLEGO_MAXIMO - CUSTO_ATAQUE_FOLEGO
+    );
+    assert_eq!(mundo.jogadores[&2].vida, 100 - DANO_ATAQUE);
+    assert_eq!(mundo.jogadores[&1].combate_ticks, TICKS_COMBATE);
+    assert_eq!(mundo.jogadores[&2].combate_ticks, TICKS_COMBATE);
+    // O tick de `mover` e o do ataque acumulam 2; em combate só regenera no 6.º tick.
+    assert_eq!(mundo.jogadores[&1].folego_ticks, 2);
+
+    if let Some(alvo) = mundo.jogadores.get_mut(&2) {
+        alvo.vida = 5;
+    }
+    if let Some(atacante) = mundo.jogadores.get_mut(&1) {
+        atacante.folego = FOLEGO_MAXIMO;
+    }
+    agendar_ataque(&mut mundo, 1, 3, 3, ponto);
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&2].vida, 0);
+    assert_eq!(
+        mundo.jogadores[&1].folego,
+        FOLEGO_MAXIMO - CUSTO_ATAQUE_FOLEGO
+    );
+}
+
+#[test]
+fn ataque_fora_de_alcance_recusado() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    let ponto = (3.0, 0.0);
+    for (seq, destino) in [(1, (1.0, 0.0)), (2, (2.0, 0.0)), (3, ponto)] {
+        agendar_mover(&mut mundo, 2, seq, seq, destino);
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&2].posicao, ponto);
+
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "atacar_forte", 1, 1, Some(ponto)),
+        Err(CodigoRecusa::AlvoInvalido),
+    );
+    // Comando forjado sem validação também não altera o estado.
+    mundo.agendar_comando(comando_ataque(1, 1, 1, ponto));
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].folego, FOLEGO_MAXIMO);
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+    assert_eq!(mundo.jogadores[&1].combate_ticks, 0);
+}
+
+#[test]
+fn folego_insuficiente_recusa() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.folego = CUSTO_ATAQUE_FOLEGO - 1;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "atacar_forte", 1, 1, Some((0.0, 0.0))),
+        Err(CodigoRecusa::FolegoInsuficiente),
+    );
+
+    mundo.agendar_comando(comando_ataque(1, 1, 1, (0.0, 0.0)));
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].folego, CUSTO_ATAQUE_FOLEGO - 1);
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+    assert_eq!(mundo.jogadores[&2].combate_ticks, 0);
+}
+
+#[test]
+fn regenera_10_por_segundo_fora_de_combate() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.folego = 50;
+    }
+
+    // A 30 Hz, +1 a cada 3 ticks equivale a 10 Fôlego por segundo.
+    for acumulado in 1..TICKS_REGENERACAO_FORA_COMBATE {
+        mundo.avancar_tick();
+        assert_eq!(mundo.jogadores[&1].folego, 50, "tick {acumulado}");
+        assert_eq!(mundo.jogadores[&1].folego_ticks, acumulado);
+    }
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].folego, 51);
+    assert_eq!(mundo.jogadores[&1].folego_ticks, 0);
+
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.folego = FOLEGO_MAXIMO;
+        jogador.folego_ticks = 0;
+    }
+    for _ in 0..(TICKS_REGENERACAO_FORA_COMBATE * 2) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].folego, FOLEGO_MAXIMO);
+    assert_eq!(mundo.jogadores[&1].folego_ticks, 0);
+}
+
+#[test]
+fn regenera_5_por_segundo_em_combate() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.folego = 50;
+        jogador.combate_ticks = TICKS_COMBATE;
+    }
+
+    // A 30 Hz, +1 a cada 6 ticks equivale a 5 Fôlego por segundo em combate.
+    for acumulado in 1..TICKS_REGENERACAO_COMBATE {
+        mundo.avancar_tick();
+        assert_eq!(mundo.jogadores[&1].folego, 50, "tick {acumulado}");
+        assert_eq!(mundo.jogadores[&1].folego_ticks, acumulado);
+        assert_eq!(mundo.jogadores[&1].combate_ticks, TICKS_COMBATE - acumulado);
+    }
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].folego, 51);
+    assert_eq!(mundo.jogadores[&1].folego_ticks, 0);
+    assert_eq!(
+        mundo.jogadores[&1].combate_ticks,
+        TICKS_COMBATE - TICKS_REGENERACAO_COMBATE,
+    );
+
+    let mut decay = Mundo::new();
+    decay.adicionar_jogador(1);
+    if let Some(jogador) = decay.jogadores.get_mut(&1) {
+        jogador.folego = 0;
+        jogador.combate_ticks = TICKS_COMBATE;
+    }
+    for _ in 0..TICKS_COMBATE {
+        decay.avancar_tick();
+    }
+    assert_eq!(decay.jogadores[&1].combate_ticks, 0);
+    assert_eq!(
+        decay.jogadores[&1].folego,
+        TICKS_COMBATE / TICKS_REGENERACAO_COMBATE,
+    );
+}
+
+#[test]
+fn hash_reflete_folego_e_vida() {
+    let mut primeira = Mundo::new();
+    let mut segunda = Mundo::new();
+    for mundo in [&mut primeira, &mut segunda] {
+        mundo.adicionar_jogador(1);
+        mundo.adicionar_jogador(2);
+    }
+    let mut anterior = primeira.hash_estado();
+    assert_eq!(anterior, segunda.hash_estado());
+
+    if let Some(jogador) = primeira.jogadores.get_mut(&1) {
+        jogador.folego = 70;
+    }
+    let proximo = primeira.hash_estado();
+    assert_ne!(proximo, anterior);
+    anterior = proximo;
+
+    if let Some(jogador) = primeira.jogadores.get_mut(&1) {
+        jogador.folego_ticks = 2;
+    }
+    let proximo = primeira.hash_estado();
+    assert_ne!(proximo, anterior);
+    anterior = proximo;
+
+    if let Some(jogador) = primeira.jogadores.get_mut(&2) {
+        jogador.combate_ticks = TICKS_COMBATE;
+    }
+    let proximo = primeira.hash_estado();
+    assert_ne!(proximo, anterior);
+    anterior = proximo;
+
+    if let Some(jogador) = primeira.jogadores.get_mut(&2) {
+        jogador.vida = 90;
+    }
+    assert_ne!(primeira.hash_estado(), anterior);
+
+    if let Some(jogador) = segunda.jogadores.get_mut(&1) {
+        jogador.folego = 70;
+        jogador.folego_ticks = 2;
+    }
+    if let Some(jogador) = segunda.jogadores.get_mut(&2) {
+        jogador.combate_ticks = TICKS_COMBATE;
+        jogador.vida = 90;
+    }
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+}
+
+#[test]
+fn um_ataque_por_jogador_por_tick() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    let ponto = (0.5, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    agendar_mover(&mut mundo, 2, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    agendar_ataque(&mut mundo, 1, 2, 2, ponto);
+    agendar_ataque(&mut mundo, 1, 3, 3, ponto);
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo.jogadores[&1].folego,
+        FOLEGO_MAXIMO - CUSTO_ATAQUE_FOLEGO
+    );
+    assert_eq!(mundo.jogadores[&2].vida, 100 - DANO_ATAQUE);
+
+    let outro_ponto = (1.5, 0.0);
+    let mut outro = Mundo::new();
+    for peer_id in 1..=3 {
+        outro.adicionar_jogador(peer_id);
+    }
+    agendar_mover(&mut outro, 1, 1, 1, ponto);
+    agendar_mover(&mut outro, 2, 1, 1, ponto);
+    agendar_mover(&mut outro, 3, 1, 1, (0.75, 0.0));
+    outro.avancar_tick();
+    agendar_mover(&mut outro, 3, 2, 2, outro_ponto);
+    outro.avancar_tick();
+
+    agendar_ataque(&mut outro, 1, 2, 2, outro_ponto);
+    agendar_ataque(&mut outro, 2, 2, 2, outro_ponto);
+    outro.avancar_tick();
+    assert_eq!(
+        outro.jogadores[&1].folego,
+        FOLEGO_MAXIMO - CUSTO_ATAQUE_FOLEGO
+    );
+    assert_eq!(
+        outro.jogadores[&2].folego,
+        FOLEGO_MAXIMO - CUSTO_ATAQUE_FOLEGO
+    );
+    assert_eq!(outro.jogadores[&3].vida, 100 - 2 * DANO_ATAQUE);
+    for peer_id in 1..=3 {
+        assert_eq!(outro.jogadores[&peer_id].combate_ticks, TICKS_COMBATE);
+    }
+}
+
+#[test]
+fn comando_invalido_nao_suprime_ataque_valido_no_mesmo_tick() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    let ponto = (0.5, 0.0);
+    agendar_mover(&mut mundo, 1, 1, 1, ponto);
+    agendar_mover(&mut mundo, 2, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    // Destino sem alvo: comando inválido, mas primeiro na fila do mesmo tick.
+    mundo.agendar_comando(comando_ataque(1, 2, 2, (9.0, 9.0)));
+    agendar_ataque(&mut mundo, 1, 3, 3, ponto);
+    mundo.avancar_tick();
+
+    assert_eq!(
+        mundo.jogadores[&1].folego,
+        FOLEGO_MAXIMO - CUSTO_ATAQUE_FOLEGO
+    );
+    assert_eq!(mundo.jogadores[&2].vida, 100 - DANO_ATAQUE);
+    assert_eq!(mundo.jogadores[&1].combate_ticks, TICKS_COMBATE);
+    assert_eq!(mundo.jogadores[&2].combate_ticks, TICKS_COMBATE);
 }
