@@ -533,12 +533,12 @@ impl Mundo {
         let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) else {
             return;
         };
+        if !ponto_igual(ponto, jogador.posicao) {
+            return;
+        }
         // Comando forjado com saldo insuficiente: não inicia a canalização.
         if jogador.materiais < CUSTO_PONTE_MATERIAIS {
             avancada.insert(comando.peer_id);
-            return;
-        }
-        if !ponto_igual(ponto, jogador.posicao) {
             return;
         }
         jogador.ponte_ticks = match jogador.ponte_ponto {

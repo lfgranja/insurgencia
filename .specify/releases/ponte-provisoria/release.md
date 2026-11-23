@@ -32,3 +32,9 @@ Implementação em `crates/sim/src/lib.rs`, `crates/sim/tests/simulacao.rs` e `c
 ## Execução pelo orquestrador — 2026-11-23T06:34Z
 
 R4 foi cumprido: roteiro **10/10 PASS**, `./verify.sh` **ALL STAGES OK** com **86/86 testes**, evidência em `.specify/validations/ponte-provisoria/evidence.md`. Ação `construir_ponte`, struct `Ponte`, custo 15, 60 PV, 1350 ticks, auto-avanço, hash e HUD passam a fazer parte do escopo entregue. Rollback segue documentado e não executado; promoção e merge em `main` dependem do SWE.
+
+## Notas de alinhamento (revisão PR #57) — 2026-11-23
+
+- **Duração serializada**: ao fim do tick 45 a ponte é serializada com `ticks_restantes = 1350`, não 1351; o valor 1351 é internamente usado na criação e a unidade extra é consumida no mesmo tick por `fase_finish`. Nenhum valor 1351 persiste entre ticks.
+- **Limitação do tick de conclusão**: o auto-avanço da ponte roda no início de `fase_skills`, antes do loop de comandos (ordem já documentada para a barricada no ciclo 040). Um `mover` enviado exatamente no tick de conclusão pode ser processado depois do auto-avanço: a ponte é criada no ponto original e o deslocamento é aplicado em seguida, sem cancelamento retroativo.
+- **Atributo de lint**: a vedação a `unwrap`/`expect`/`#[allow]` não atinge `#[expect(clippy::needless_pass_by_value, reason = "...")]`, atributo de lint permitido e distinto da chamada de método `.expect()`.

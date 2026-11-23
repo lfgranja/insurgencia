@@ -20,3 +20,5 @@
 **Gate agregado (06:33Z)**: `./verify.sh` **ALL STAGES OK**, **86 testes run: 86 passed** (77 anteriores + 9 novos), `VERIFY_EXIT=0`. Um RED determinístico de `clippy::similar_names` (`ponte` vs `ponto`) foi corrigido na fonte antes do verde. `cargo fmt --all` aplicado uma vez.
 
 **Limitação**: atalho de 8 s entre ilhas e tempo de construção canônico não foram implementados — o GDD não os fixa como valores de Núcleo; 45 ticks é escolha de protótipo registrada na spec.
+
+**Notas de alinhamento (revisão PR #57)**: o passo 5 (`ponte_expira_apos_1350_ticks`) confirma a duração canônica de **1350 ticks**: o valor serializado ao fim do tick de criação é **1350** (a ponte é criada internamente com 1351 e `fase_finish` consome a unidade extra no mesmo tick) e a remoção ocorre no tick 1350. A conclusão ocorre no auto-avanço, antes do processamento de comandos do mesmo tick. A vedação a `.expect()` (passo 9) refere-se a chamadas de método; o atributo de lint `#[expect(clippy::needless_pass_by_value, reason = "...")]` é permitido e não é uma chamada `.expect()`.
