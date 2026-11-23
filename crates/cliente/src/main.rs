@@ -90,6 +90,7 @@ fn main() {
                 sincronizar_avatar,
                 solicitar_barreira,
                 solicitar_coleta,
+                solicitar_ponte,
                 sincronizar_sim,
                 avancar_simulacao,
                 atualizar_texto,
@@ -623,6 +624,33 @@ fn solicitar_coleta(
     });
 }
 
+/// Agenda a construção de uma ponte provisória no ponto atual ao pressionar `P`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_ponte(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyP) {
+        return;
+    }
+
+    local.seq += 1;
+    local.request_id += 1;
+    let (x, y) = jogador.0.posicao;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "construir_ponte".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some((f64::from(x), f64::from(y))),
+    });
+}
+
 /// Copia a posição do estado para a transformação 3D do avatar no plano do mapa.
 #[expect(
     clippy::needless_pass_by_value,
@@ -671,7 +699,7 @@ fn avancar_simulacao(
     }
 }
 
-/// Atualiza o painel com recursos, barreiras e progresso de construção e coleta.
+/// Atualiza o painel com recursos, barreiras, pontes e progresso de construção e coleta.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
@@ -697,6 +725,12 @@ fn atualizar_texto(
         .values()
         .filter(|barreira| barreira.dono == PEER_ID)
         .count();
+    let pontes = simulacao
+        .0
+        .pontes
+        .values()
+        .filter(|ponte| ponte.dono == PEER_ID)
+        .count();
     let construindo = match remoto {
         Some(j) if j.construcao_ponto.is_some() => {
             format!("{}/{}", j.construcao_ticks, TICKS_CONSTRUCAO_BARREIRA)
@@ -710,7 +744,7 @@ fn atualizar_texto(
         _ => "nao".to_owned(),
     };
     let conteudo = format!(
-        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nSuprimentos: {suprimentos}\nMateriais: {materiais}\nAutogestão: {autogestao}\nBarreiras: {barreiras}\nConstruindo: {construindo}\nColeta: {coletando}\nWASD ou setas para mover · B para construir barreira · C para coletar materiais"
+        "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\nLimites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\nSuprimentos: {suprimentos}\nMateriais: {materiais}\nAutogestão: {autogestao}\nBarreiras: {barreiras}\nPontes: {pontes}\nConstruindo: {construindo}\nColeta: {coletando}\nWASD ou setas para mover · B para construir barreira · P para construir ponte · C para coletar materiais"
     );
 
     for mut texto in &mut textos {

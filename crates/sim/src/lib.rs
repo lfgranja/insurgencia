@@ -29,6 +29,18 @@ pub const PV_BARREIRA: i64 = 200;
 /// Duração de uma barricada em ticks (12 s a 30 Hz).
 pub const TICKS_DURACAO_BARREIRA: i64 = 360;
 
+/// Custo em materiais para construir uma ponte provisória.
+pub const CUSTO_PONTE_MATERIAIS: i64 = 15;
+
+/// Ticks de canalização necessários para concluir uma ponte provisória (1,5 s a 30 Hz).
+pub const TICKS_CONSTRUCAO_PONTE: i64 = 45;
+
+/// Pontos de vida de uma ponte recém-construída.
+pub const PV_PONTE: i64 = 60;
+
+/// Duração de uma ponte em ticks (45 s a 30 Hz).
+pub const TICKS_DURACAO_PONTE: i64 = 1350;
+
 /// Ticks de defesa ininterrupta necessários para um ponto de autogestão (10 s a 30 Hz).
 pub const TICKS_AUTOGESTAO_POR_PONTO: i64 = 300;
 
@@ -49,6 +61,7 @@ const ACOES_PERMITIDAS: &[&str] = &[
     "coletar_materiais",
     "construir_barreira",
     "atacar_forte",
+    "construir_ponte",
 ];
 
 /// Compara dois pontos sem depender de tolerância de arredondamento.
@@ -81,6 +94,10 @@ pub struct Jogador {
     pub construcao_ponto: Option<(f64, f64)>,
     /// Pontos de autogestão acumulados por defesas de barricada.
     pub pontos_autogestao: i64,
+    /// Ticks de construção de ponte acumulados no ponto corrente.
+    pub ponte_ticks: i64,
+    /// Ponto fixado pela construção de ponte corrente.
+    pub ponte_ponto: Option<(f64, f64)>,
 }
 
 /// Barricada ativa no mundo, identificada por `id`.
@@ -100,6 +117,21 @@ pub struct Barreira {
     pub defesa_ticks: i64,
 }
 
+/// Ponte provisória ativa no mundo, identificada por `id`.
+#[derive(Clone, Debug)]
+pub struct Ponte {
+    /// Identificador monotônico da ponte.
+    pub id: u64,
+    /// `peer_id` do jogador que construiu a ponte.
+    pub dono: u64,
+    /// Posição no plano `(x, y)`.
+    pub posicao: (f64, f64),
+    /// Pontos de vida restantes; zero ou menos destrói a ponte.
+    pub pv: i64,
+    /// Ticks restantes de duração; zero expira a ponte.
+    pub ticks_restantes: i64,
+}
+
 /// Comando enfileirado por um par para o próximo tick.
 #[derive(Clone, Debug)]
 pub struct Comando {
@@ -111,7 +143,8 @@ pub struct Comando {
     pub seq: i64,
     /// Identificador de requisição monotônico do comando.
     pub request_id: i64,
-    /// Destino opcional, usado por `mover`, `coletar_materiais` e `construir_barreira`.
+    /// Destino opcional, usado por `mover`, `coletar_materiais`,
+    /// `construir_barreira` e `construir_ponte`.
     pub destino: Option<(f64, f64)>,
 }
 
@@ -134,6 +167,10 @@ pub struct Mundo {
     pub barreiras: BTreeMap<u64, Barreira>,
     /// Próximo identificador de barricada, começando em um.
     pub proxima_barreira_id: u64,
+    /// Pontes provisórias ativas indexadas por `id`.
+    pub pontes: BTreeMap<u64, Ponte>,
+    /// Próximo identificador de ponte, começando em um.
+    pub proxima_ponte_id: u64,
 }
 
 impl Default for Mundo {
@@ -155,6 +192,8 @@ impl Mundo {
             comandos_do_tick: Vec::new(),
             barreiras: BTreeMap::new(),
             proxima_barreira_id: 1,
+            pontes: BTreeMap::new(),
+            proxima_ponte_id: 1,
         }
     }
 
@@ -174,6 +213,8 @@ impl Mundo {
                 construcao_ticks: 0,
                 construcao_ponto: None,
                 pontos_autogestao: 0,
+                ponte_ticks: 0,
+                ponte_ponto: None,
             },
         );
     }
@@ -202,6 +243,25 @@ impl Mundo {
         destruida
     }
 
+    /// Aplica dano a uma ponte, removendo-a se os PV chegam a zero ou menos.
+    ///
+    /// Retorna `true` quando a ponte foi removida e `false` quando o `id`
+    /// não existe ou a ponte permanece viva.
+    pub fn aplicar_dano_a_ponte(&mut self, id: u64, dano: i64) -> bool {
+        if dano <= 0 {
+            return false;
+        }
+        let mut destruida = false;
+        if let Some(ponte) = self.pontes.get_mut(&id) {
+            ponte.pv = ponte.pv.saturating_sub(dano);
+            destruida = ponte.pv <= 0;
+        }
+        if destruida {
+            self.pontes.remove(&id);
+        }
+        destruida
+    }
+
     /// Enfileira um comando para o próximo tick.
     pub fn agendar_comando(&mut self, comando: Comando) {
         self.comandos_pendentes.push_back(comando);
@@ -226,6 +286,8 @@ impl Mundo {
         let mut coleta_avancada: BTreeSet<u64> = BTreeSet::new();
         let mut construcao_avancada: BTreeSet<u64> = BTreeSet::new();
         self.avancar_construcoes_automaticas(&mut construcao_avancada);
+        let mut construcao_ponte_avancada: BTreeSet<u64> = BTreeSet::new();
+        self.avancar_construcoes_ponte_automaticas(&mut construcao_ponte_avancada);
         let comandos = std::mem::take(&mut self.comandos_do_tick);
 
         for comando in &comandos {
@@ -237,6 +299,8 @@ impl Mundo {
                             jogador.coleta_ponto = None;
                             jogador.construcao_ticks = 0;
                             jogador.construcao_ponto = None;
+                            jogador.ponte_ticks = 0;
+                            jogador.ponte_ponto = None;
                             jogador.posicao = destino;
                         }
                     }
@@ -245,6 +309,8 @@ impl Mundo {
                 self.aplicar_coleta(comando, &mut coleta_avancada);
             } else if comando.acao == "construir_barreira" {
                 self.aplicar_construcao(comando, &mut construcao_avancada);
+            } else if comando.acao == "construir_ponte" {
+                self.aplicar_construcao_ponte(comando, &mut construcao_ponte_avancada);
             }
             if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
                 jogador.seq = comando.seq;
@@ -456,7 +522,95 @@ impl Mundo {
         }
     }
 
-    /// Descarta os comandos já aplicados e expira as barricadas vencidas.
+    /// Aplica um comando de construção de ponte com guarda de saldo e débito atômico.
+    fn aplicar_construcao_ponte(&mut self, comando: &Comando, avancada: &mut BTreeSet<u64>) {
+        if avancada.contains(&comando.peer_id) {
+            return;
+        }
+        let Some(ponto) = comando.destino else {
+            return;
+        };
+        let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) else {
+            return;
+        };
+        if !ponto_igual(ponto, jogador.posicao) {
+            return;
+        }
+        // Comando forjado com saldo insuficiente: não inicia a canalização.
+        if jogador.materiais < CUSTO_PONTE_MATERIAIS {
+            avancada.insert(comando.peer_id);
+            return;
+        }
+        jogador.ponte_ticks = match jogador.ponte_ponto {
+            Some(anterior) if ponto_igual(anterior, ponto) => jogador.ponte_ticks,
+            _ => 0,
+        };
+        jogador.ponte_ponto = Some(ponto);
+        jogador.ponte_ticks += 1;
+        avancada.insert(comando.peer_id);
+        if jogador.ponte_ticks == TICKS_CONSTRUCAO_PONTE {
+            self.concluir_construcao_ponte(comando.peer_id, ponto);
+        }
+    }
+
+    /// Avança um tick as canalizações de ponte em curso, sem depender de comandos.
+    fn avancar_construcoes_ponte_automaticas(&mut self, avancada: &mut BTreeSet<u64>) {
+        let mut concluidas: Vec<(u64, (f64, f64))> = Vec::new();
+        for (&peer_id, jogador) in &mut self.jogadores {
+            let Some(ponto) = jogador.ponte_ponto else {
+                continue;
+            };
+            if jogador.materiais < CUSTO_PONTE_MATERIAIS || !ponto_igual(ponto, jogador.posicao) {
+                jogador.ponte_ticks = 0;
+                jogador.ponte_ponto = None;
+                continue;
+            }
+            jogador.ponte_ticks += 1;
+            avancada.insert(peer_id);
+            if jogador.ponte_ticks == TICKS_CONSTRUCAO_PONTE {
+                concluidas.push((peer_id, ponto));
+            }
+        }
+        for (peer_id, ponto) in concluidas {
+            self.concluir_construcao_ponte(peer_id, ponto);
+        }
+    }
+
+    /// Débito atômico, criação da ponte e limpeza da canalização.
+    fn concluir_construcao_ponte(&mut self, peer_id: u64, ponto: (f64, f64)) {
+        let Some(jogador) = self.jogadores.get_mut(&peer_id) else {
+            return;
+        };
+        let com_saldo = jogador.materiais >= CUSTO_PONTE_MATERIAIS;
+        if com_saldo {
+            jogador.materiais -= CUSTO_PONTE_MATERIAIS;
+        }
+        jogador.ponte_ticks = 0;
+        jogador.ponte_ponto = None;
+        if com_saldo {
+            self.criar_ponte(peer_id, ponto);
+        }
+    }
+
+    /// Cria a ponte com PV e duração cheios no tick da conclusão.
+    fn criar_ponte(&mut self, dono: u64, posicao: (f64, f64)) {
+        let id = self.proxima_ponte_id;
+        self.proxima_ponte_id += 1;
+        self.pontes.insert(
+            id,
+            Ponte {
+                id,
+                dono,
+                posicao,
+                pv: PV_PONTE,
+                // O tick de criação consome a unidade extra: o valor
+                // serializado ao fim dele é `TICKS_DURACAO_PONTE`.
+                ticks_restantes: TICKS_DURACAO_PONTE + 1,
+            },
+        );
+    }
+
+    /// Descarta os comandos já aplicados e expira barricadas e pontes vencidas.
     fn fase_finish(&mut self) {
         self.comandos_do_tick.clear();
         self.barreiras.retain(|_, barreira| {
@@ -466,6 +620,12 @@ impl Mundo {
                 barreira.ticks_restantes -= 1;
             }
             barreira.ticks_restantes > 0
+        });
+        self.pontes.retain(|_, ponte| {
+            if ponte.ticks_restantes > 0 {
+                ponte.ticks_restantes -= 1;
+            }
+            ponte.ticks_restantes > 0
         });
     }
 
@@ -478,7 +638,7 @@ impl Mundo {
             .map(|(&peer_id, jogador)| {
                 let (x, y) = jogador.posicao;
                 format!(
-                    "{0}:{1}:{2}:{3}:{4}:{5}:{6}:{7}:{8}:{9:?}:{10}:{11:?}:{12}",
+                    "{0}:{1}:{2}:{3}:{4}:{5}:{6}:{7}:{8}:{9:?}:{10}:{11:?}:{12}:{13}:{14:?}",
                     peer_id,
                     x,
                     y,
@@ -492,6 +652,8 @@ impl Mundo {
                     jogador.construcao_ticks,
                     jogador.construcao_ponto,
                     jogador.pontos_autogestao,
+                    jogador.ponte_ticks,
+                    jogador.ponte_ponto,
                 )
             })
             .collect::<Vec<_>>()
@@ -510,8 +672,21 @@ impl Mundo {
             })
             .collect::<Vec<_>>()
             .join(";");
+        let pontes: String = self
+            .pontes
+            .values()
+            .map(|ponte| {
+                let (x, y) = ponte.posicao;
+                let id = ponte.id;
+                let dono = ponte.dono;
+                let pv = ponte.pv;
+                let ticks = ponte.ticks_restantes;
+                format!("{id}:{dono}:{x}:{y}:{pv}:{ticks}")
+            })
+            .collect::<Vec<_>>()
+            .join(";");
         let entrada = format!(
-            "{tick}|{epoch}|{match_id}|{jogadores}|{barreiras}",
+            "{tick}|{epoch}|{match_id}|{jogadores}|{barreiras}|{pontes}",
             tick = self.tick,
             epoch = self.epoch,
             match_id = self.match_id,
@@ -533,14 +708,14 @@ pub enum CodigoRecusa {
     /// A ação não pertence ao contrato.
     #[error("acao desconhecida")]
     AcaoDesconhecida,
-    /// Destino ausente ou fora do ponto para `mover`, `coletar_materiais` ou
-    /// `construir_barreira`.
+    /// Destino ausente ou fora do ponto para `mover`, `coletar_materiais`,
+    /// `construir_barreira` ou `construir_ponte`.
     #[error("destino ausente ou fora do ponto")]
     DestinoInvalido,
     /// Deslocamento acima de `LIMITE_MOVIMENTO_M`.
     #[error("movimento fora do limite")]
     MovimentoForaDoLimite,
-    /// Materiais abaixo do custo de uma barricada.
+    /// Materiais abaixo do custo de uma barricada ou ponte.
     #[error("materiais insuficientes")]
     SaldoInsuficiente,
 }
@@ -556,7 +731,7 @@ impl ValidacaoComandos {
     ///
     /// Retorna o primeiro [`CodigoRecusa`] aplicável, na ordem do contrato:
     /// par, replay, ação, destino (incluindo o limite de distância de `mover`)
-    /// e saldo para `construir_barreira`.
+    /// e saldo para `construir_barreira` e `construir_ponte`.
     pub fn validar(
         mundo: &Mundo,
         peer_id: u64,
@@ -599,6 +774,16 @@ impl ValidacaoComandos {
                 return Err(CodigoRecusa::DestinoInvalido);
             }
             if jogador.materiais < CUSTO_BARREIRA_MATERIAIS {
+                return Err(CodigoRecusa::SaldoInsuficiente);
+            }
+        }
+
+        if acao == "construir_ponte" {
+            let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
+            if !ponto_igual(ponto, jogador.posicao) {
+                return Err(CodigoRecusa::DestinoInvalido);
+            }
+            if jogador.materiais < CUSTO_PONTE_MATERIAIS {
                 return Err(CodigoRecusa::SaldoInsuficiente);
             }
         }

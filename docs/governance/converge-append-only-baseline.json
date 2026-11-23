@@ -105,6 +105,10 @@
     "specs/044-defesa-barricada/converge.md": {
       "bytes": 7032,
       "sha256": "8cb6ec5eb648cec919dd73d6c63189024b984f8fc68fc00e83fd5662d832cdf8"
+    },
+    "specs/045-ponte-provisoria/converge.md": {
+      "bytes": 7031,
+      "sha256": "f9cd0ae562b72dda49106476317b72d39b5a942b69b10aba504f142b1d0b5988"
     }
   },
   "_provenance": {
