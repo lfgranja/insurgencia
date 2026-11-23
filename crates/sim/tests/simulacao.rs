@@ -3,14 +3,15 @@
 
 use insurgencia_sim::{
     Barreira, CodigoRecusa, Comando, Funcao, Mundo, Ponte, ResultadoPartida, ValidacaoComandos,
-    CONTRIBUICAO_NO, CUSTO_ATAQUE_FOLEGO, CUSTO_BARREIRA_MATERIAIS, CUSTO_PONTE_MATERIAIS,
-    DANO_ATAQUE, DANO_MAXIMO_NOS, FOLEGO_MAXIMO, MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS,
-    NIVEL_MAXIMO, PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA, PV_PONTE, RESISTENCIA_INICIAL,
+    ALCANCE_ATAQUE_PNJ_M, CONTRIBUICAO_NO, CUSTO_ATAQUE_FOLEGO, CUSTO_BARREIRA_MATERIAIS,
+    CUSTO_PONTE_MATERIAIS, DANO_ATAQUE, DANO_ATAQUE_PNJ, DANO_MAXIMO_NOS, FOLEGO_MAXIMO,
+    MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS, NIVEL_MAXIMO, PONTOS_AUTOGESTAO_POR_DEFESA,
+    PV_BARREIRA, PV_PNJ, PV_PONTE, RESISTENCIA_INICIAL, TICKS_ATAQUE_PNJ,
     TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA,
     TICKS_CONSTRUCAO_PONTE, TICKS_CONTROLE_ILHA, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_PONTE,
     TICKS_INATIVIDADE_NO, TICKS_LIMITE_PARTIDA, TICKS_POR_NIVEL, TICKS_PROPAGANDA,
     TICKS_PROPAGANDA_NO, TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE,
-    TICKS_REVERSAO_SUDITO,
+    TICKS_REVERSAO_SUDITO, TOTAL_PNJS_PADRAO,
 };
 
 /// Eleva o nível do jogador ao mínimo exigido por uma ação (protótipo).
@@ -94,6 +95,18 @@ fn agendar_ataque(mundo: &mut Mundo, peer_id: u64, seq: i64, request_id: i64, de
     )
     .is_ok());
     mundo.agendar_comando(comando_ataque(peer_id, seq, request_id, destino));
+}
+
+/// Monta um comando `atacar_pnj` com os monotônicos já preenchidos.
+#[must_use]
+fn comando_ataque_pnj(peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) -> Comando {
+    Comando {
+        peer_id,
+        acao: "atacar_pnj".to_string(),
+        seq,
+        request_id,
+        destino: Some(ponto),
+    }
 }
 
 #[test]
@@ -3095,4 +3108,218 @@ fn hash_reflete_funcao_e_nivel() {
         jogador.nivel_ticks = 17;
     }
     assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+}
+
+/// PNJs ativos atacam o jogador mais próximo em alcance a cada 90 ticks.
+#[test]
+fn pnj_ataca_jogador_em_alcance() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    mundo.adicionar_jogador(3);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.posicao = (1.0, 0.0);
+    }
+    if let Some(jogador) = mundo.jogadores.get_mut(&2) {
+        jogador.posicao = (1.5, 0.0);
+    }
+    if let Some(jogador) = mundo.jogadores.get_mut(&3) {
+        jogador.posicao = (9.0, 0.0);
+    }
+    assert!((ALCANCE_ATAQUE_PNJ_M - 2.0).abs() < 1e-12);
+    mundo.adicionar_pnj(1, (0.0, 0.0));
+    if let Some(pnj) = mundo.pnjs.get_mut(&1) {
+        pnj.ataque_ticks = TICKS_ATAQUE_PNJ - 1;
+    }
+
+    mundo.avancar_tick();
+
+    // O jogador mais próximo leva o dano; os demais permanecem intactos.
+    assert_eq!(mundo.jogadores[&1].vida, 100 - DANO_ATAQUE_PNJ);
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+    assert_eq!(mundo.jogadores[&3].vida, 100);
+    assert_eq!(mundo.pnjs[&1].ataque_ticks, 0);
+
+    // Empate de distância é decidido pelo menor `peer_id`.
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.posicao = (1.0, 0.0);
+        jogador.vida = 100;
+    }
+    if let Some(jogador) = mundo.jogadores.get_mut(&2) {
+        jogador.posicao = (-1.0, 0.0);
+        jogador.vida = 100;
+    }
+    if let Some(pnj) = mundo.pnjs.get_mut(&1) {
+        pnj.ataque_ticks = TICKS_ATAQUE_PNJ - 1;
+    }
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].vida, 100 - DANO_ATAQUE_PNJ);
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+
+    // Nenhum dano no tick anterior ao limiar.
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.vida = 100;
+    }
+    if let Some(pnj) = mundo.pnjs.get_mut(&1) {
+        pnj.ataque_ticks = TICKS_ATAQUE_PNJ - 2;
+    }
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].vida, 100);
+    assert_eq!(mundo.pnjs[&1].ataque_ticks, TICKS_ATAQUE_PNJ - 1);
+}
+
+/// Dano do jogador reduz os PV até zero, inativando sem remover a entrada.
+#[test]
+fn dano_mata_pnj() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_pnj(1, (0.0, 0.0));
+    assert_eq!(TOTAL_PNJS_PADRAO, 4);
+    assert_eq!(PV_PNJ, 24);
+    assert_eq!(DANO_ATAQUE, 10);
+    assert_eq!(mundo.pnjs[&1].pv, PV_PNJ);
+    assert!(mundo.pnjs[&1].ativo);
+
+    assert!(!mundo.aplicar_dano_a_pnj(1, 0));
+    assert!(!mundo.aplicar_dano_a_pnj(1, -1));
+    assert!(!mundo.aplicar_dano_a_pnj(99, DANO_ATAQUE));
+    assert_eq!(mundo.pnjs[&1].pv, PV_PNJ);
+
+    assert!(!mundo.aplicar_dano_a_pnj(1, DANO_ATAQUE));
+    assert_eq!(mundo.pnjs[&1].pv, 14);
+    assert!(mundo.pnjs[&1].ativo);
+    assert!(mundo.aplicar_dano_a_pnj(1, DANO_ATAQUE + 4));
+    assert_eq!(mundo.pnjs[&1].pv, 0);
+    assert!(!mundo.pnjs[&1].ativo);
+    assert!(mundo.pnjs.contains_key(&1));
+    assert!(!mundo.aplicar_dano_a_pnj(1, DANO_ATAQUE));
+    assert_eq!(mundo.pnjs[&1].pv, 0);
+
+    mundo.adicionar_pnj(1, (0.0, 0.0));
+    assert_eq!(mundo.pnjs[&1].pv, PV_PNJ);
+    assert!(mundo.pnjs[&1].ativo);
+    assert_eq!(mundo.pnjs[&1].ataque_ticks, 0);
+}
+
+/// `atacar_pnj` exige destino no ponto do jogador e PNJ ativo nesse ponto.
+#[test]
+fn atacar_pnj_respeita_alcance() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    let ponto = (5.0, 0.0);
+    mundo.adicionar_pnj(1, ponto);
+
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "atacar_pnj", 1, 1, Some(ponto)),
+        Err(CodigoRecusa::DestinoInvalido)
+    );
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "atacar_pnj", 1, 1, Some((0.0, 0.0))),
+        Err(CodigoRecusa::DestinoInvalido)
+    );
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "atacar_pnj", 1, 1, None),
+        Err(CodigoRecusa::DestinoInvalido)
+    );
+
+    // Comando recusado não atualiza os monotônicos.
+    mundo.agendar_comando(comando_ataque_pnj(1, 1, 1, ponto));
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(mundo.pnjs[&1].pv, PV_PNJ);
+
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.posicao = ponto;
+    }
+    assert!(ValidacaoComandos::validar(&mundo, 1, "atacar_pnj", 2, 2, Some(ponto)).is_ok());
+
+    // Dois comandos no mesmo PNJ e tick: apenas o primeiro é aceito.
+    mundo.agendar_comando(comando_ataque_pnj(1, 2, 2, ponto));
+    mundo.agendar_comando(comando_ataque_pnj(1, 3, 3, ponto));
+    mundo.avancar_tick();
+    assert_eq!(mundo.pnjs[&1].pv, PV_PNJ - DANO_ATAQUE);
+    assert_eq!(mundo.jogadores[&1].seq, 2);
+    assert_eq!(mundo.jogadores[&1].request_id, 2);
+
+    assert!(mundo.aplicar_dano_a_pnj(1, PV_PNJ));
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "atacar_pnj", 4, 4, Some(ponto)),
+        Err(CodigoRecusa::DestinoInvalido)
+    );
+}
+
+/// O hash cobre criação, dano, inatividade, cadência e ordem dos PNJs.
+#[test]
+fn hash_reflete_pnjs() {
+    let mut primeiro = Mundo::new();
+    let mut segundo = Mundo::new();
+    for mundo in [&mut primeiro, &mut segundo] {
+        mundo.adicionar_jogador(1);
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    primeiro.adicionar_pnj(1, (1.0, 0.0));
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    segundo.adicionar_pnj(1, (1.0, 0.0));
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(pnj) = primeiro.pnjs.get_mut(&1) {
+        pnj.pv = 14;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(pnj) = segundo.pnjs.get_mut(&1) {
+        pnj.pv = 14;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(pnj) = primeiro.pnjs.get_mut(&1) {
+        pnj.ativo = false;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(pnj) = segundo.pnjs.get_mut(&1) {
+        pnj.ativo = false;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(pnj) = primeiro.pnjs.get_mut(&1) {
+        pnj.ataque_ticks = 89;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(pnj) = segundo.pnjs.get_mut(&1) {
+        pnj.ataque_ticks = 89;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    primeiro.adicionar_pnj(2, (2.0, 0.0));
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    segundo.adicionar_pnj(2, (2.0, 0.0));
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+}
+
+/// PNJs inativos não atacam e, sem alvo em alcance, o contador zera sem dano.
+#[test]
+fn pnj_inativo_nao_ataca() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_pnj(1, (0.0, 0.0));
+    mundo.adicionar_pnj(2, (0.0, 0.0));
+    assert!(mundo.aplicar_dano_a_pnj(1, PV_PNJ));
+    for pnj in mundo.pnjs.values_mut() {
+        pnj.ataque_ticks = TICKS_ATAQUE_PNJ - 1;
+    }
+
+    mundo.avancar_tick();
+
+    assert!(!mundo.pnjs[&1].ativo);
+    assert_eq!(mundo.pnjs[&1].ataque_ticks, TICKS_ATAQUE_PNJ - 1);
+    assert_eq!(mundo.pnjs[&2].ataque_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].vida, 100 - DANO_ATAQUE_PNJ);
+
+    let mut sem_alvo = Mundo::new();
+    sem_alvo.adicionar_pnj(1, (10.0, 0.0));
+    if let Some(pnj) = sem_alvo.pnjs.get_mut(&1) {
+        pnj.ataque_ticks = TICKS_ATAQUE_PNJ - 1;
+    }
+    sem_alvo.avancar_tick();
+    assert_eq!(sem_alvo.pnjs[&1].ataque_ticks, 0);
 }

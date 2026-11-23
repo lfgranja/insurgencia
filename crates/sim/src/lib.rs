@@ -118,6 +118,21 @@ pub const ALCANCE_CONTATO_M: f64 = 2.0;
 /// Duração do estado de combate em ticks (3 s a 30 Hz): `[HIPÓTESE]`/protótipo, não cânone.
 pub const TICKS_COMBATE: i64 = 90;
 
+/// Pontos de vida de um PNJ defensor: `[HIPÓTESE]`/protótipo (8 dmg/s por 3 s).
+pub const PV_PNJ: i64 = 24;
+
+/// Dano do PNJ ao jogador: `[HIPÓTESE]`/protótipo, nunca cânone.
+pub const DANO_ATAQUE_PNJ: i64 = 8;
+
+/// Ticks entre ataques do PNJ (3 s a 30 Hz): `[HIPÓTESE]`/derivação de protótipo.
+pub const TICKS_ATAQUE_PNJ: i64 = 90;
+
+/// Alcance do ataque do PNJ, em metros: derivação de `ALCANCE_CONTATO_M`.
+pub const ALCANCE_ATAQUE_PNJ_M: f64 = ALCANCE_CONTATO_M;
+
+/// Efetivo padrão de PNJs do protótipo (`[HIPÓTESE]`/GDD §8.1, não cânone).
+pub const TOTAL_PNJS_PADRAO: usize = 4;
+
 /// Nome alternativo do custo na spec 047 (`[HIPÓTESE]`/protótipo, não cânone).
 pub const CUSTO_ATAQUE_FORTE: i64 = CUSTO_ATAQUE_FOLEGO;
 
@@ -145,6 +160,7 @@ const ACOES_PERMITIDAS: &[&str] = &[
     "propaganda",
     "propaganda_no",
     "atacar_no",
+    "atacar_pnj",
 ];
 
 /// Compara dois pontos sem depender de tolerância de arredondamento.
@@ -336,6 +352,23 @@ pub struct NoControle {
     pub inativo_ticks: i64,
 }
 
+/// Defensor PNJ na simulação, com cadência de ataque própria.
+///
+/// Todos os números associados são `[HIPÓTESE]`/derivação de protótipo, não cânone.
+#[derive(Clone, Copy, Debug)]
+pub struct Pnj {
+    /// Identificador determinístico fornecido na injeção.
+    pub id: u64,
+    /// Posição no plano `(x, y)`.
+    pub posicao: (f64, f64),
+    /// Pontos de vida restantes; zero inativa o PNJ sem remover a entrada.
+    pub pv: i64,
+    /// `false` quando os PV chegam a zero; PNJ inativo não ataca nem é alvo.
+    pub ativo: bool,
+    /// Ticks acumulados até o próximo ataque, em `TICKS_ATAQUE_PNJ`.
+    pub ataque_ticks: i64,
+}
+
 /// Desfecho observável da partida (`[HIPÓTESE]`/protótipo, não cânone).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ResultadoPartida {
@@ -388,6 +421,8 @@ pub struct Mundo {
     pub proxima_ponte_id: u64,
     /// Súditos indexados por `id`.
     pub suditos: BTreeMap<u64, Sudito>,
+    /// PNJs defensores indexados por `id`, em ordem determinística.
+    pub pnjs: BTreeMap<u64, Pnj>,
     /// Ilhas indexadas por `id`, em ordem determinística.
     pub ilhas: BTreeMap<u64, Ilha>,
     /// Ids das ilhas distintas que emitiram `ilha_perdida`, em ordem crescente.
@@ -428,6 +463,7 @@ impl Mundo {
             pontes: BTreeMap::new(),
             proxima_ponte_id: 1,
             suditos: BTreeMap::new(),
+            pnjs: BTreeMap::new(),
             ilhas: BTreeMap::new(),
             ilhas_reconquistadas: BTreeSet::new(),
             sinais: VecDeque::new(),
@@ -486,6 +522,40 @@ impl Mundo {
                 reversao_ticks: 0,
             },
         );
+    }
+
+    /// Injeta (ou reinicia) um PNJ com `id` e `posicao` determinísticos.
+    pub fn adicionar_pnj(&mut self, id: u64, posicao: (f64, f64)) {
+        self.pnjs.insert(
+            id,
+            Pnj {
+                id,
+                posicao,
+                pv: PV_PNJ,
+                ativo: true,
+                ataque_ticks: 0,
+            },
+        );
+    }
+
+    /// Aplica dano de jogador a um PNJ, inativando-o ao zerar os PV.
+    ///
+    /// Dano não positivo ou `id` inexistente não altera o estado. A entrada
+    /// permanece no mapa após a morte; o retorno é `true` somente na transição
+    /// para inativo nesta chamada.
+    pub fn aplicar_dano_a_pnj(&mut self, id: u64, dano: i64) -> bool {
+        if dano <= 0 {
+            return false;
+        }
+        let Some(pnj) = self.pnjs.get_mut(&id) else {
+            return false;
+        };
+        pnj.pv = pnj.pv.saturating_sub(dano).max(0);
+        if pnj.pv == 0 && pnj.ativo {
+            pnj.ativo = false;
+            return true;
+        }
+        false
     }
 
     /// Insere (ou reinicia) uma ilha com progresso de controle zerado.
@@ -596,13 +666,14 @@ impl Mundo {
         self.comandos_pendentes.push_back(comando);
     }
 
-    /// Avança um tick nas fases `prepare`, `skills`, `defesa`, `controle_ilhas`,
-    /// `vitoria` e `finish`; a derrota é avaliada após o incremento do tick.
+    /// Avança um tick nas fases `prepare`, `skills`, `defesa`, `ataque_pnjs`,
+    /// `controle_ilhas`, `vitoria` e `finish`; a derrota é avaliada após o incremento.
     pub fn avancar_tick(&mut self) {
         let convertidos_no_inicio = self.nos.values().filter(|no| no.convertido).count();
         self.fase_prepare();
         self.fase_skills();
         self.fase_defesa();
+        self.fase_ataque_pnjs();
         self.fase_controle_ilhas();
         self.fase_vitoria(convertidos_no_inicio);
         self.fase_finish();
@@ -628,10 +699,12 @@ impl Mundo {
         let mut propaganda_no_avancada: BTreeSet<u64> = BTreeSet::new();
         self.avancar_propagandas_no_automaticas(&mut propaganda_no_avancada);
         let mut ataque_no_avancado: BTreeSet<u64> = BTreeSet::new();
+        let mut ataque_pnj_avancado: BTreeSet<u64> = BTreeSet::new();
         let comandos = std::mem::take(&mut self.comandos_do_tick);
         let mut ataques_realizados: BTreeSet<u64> = BTreeSet::new();
 
         for comando in &comandos {
+            let mut atualizar_monotonicos = true;
             // O gate de nível também vale no núcleo: a validação isolada não
             // impede um chamador de enfileirar diretamente um comando acima do
             // nível do jogador. O comando recusado não executa e não atualiza
@@ -677,10 +750,14 @@ impl Mundo {
                 self.aplicar_propaganda_no(comando, &mut propaganda_no_avancada);
             } else if comando.acao == "atacar_no" {
                 self.aplicar_atacar_no(comando, &mut ataque_no_avancado);
+            } else if comando.acao == "atacar_pnj" {
+                atualizar_monotonicos = self.aplicar_ataque_pnj(comando, &mut ataque_pnj_avancado);
             }
-            if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
-                jogador.seq = comando.seq;
-                jogador.request_id = comando.request_id;
+            if atualizar_monotonicos {
+                if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
+                    jogador.seq = comando.seq;
+                    jogador.request_id = comando.request_id;
+                }
             }
         }
         self.avancar_coletas_automaticas(&mut coleta_avancada);
@@ -732,6 +809,30 @@ impl Mundo {
         }
     }
 
+    /// Aplica no máximo um `atacar_pnj` por PNJ a cada tick.
+    ///
+    /// Retorna `true` somente quando o dano foi aplicado, para que os
+    /// monotônicos avancem apenas com comandos aceitos.
+    fn aplicar_ataque_pnj(&mut self, comando: &Comando, avancado: &mut BTreeSet<u64>) -> bool {
+        let Some(destino) = comando.destino else {
+            return false;
+        };
+        let Some(jogador) = self.jogadores.get(&comando.peer_id) else {
+            return false;
+        };
+        if !ponto_igual(destino, jogador.posicao) {
+            return false;
+        }
+        let Some(id) = self.pnj_id_ativo_em_ponto(destino) else {
+            return false;
+        };
+        if !avancado.insert(id) {
+            return false;
+        }
+        self.aplicar_dano_a_pnj(id, DANO_ATAQUE);
+        true
+    }
+
     /// Avança a defesa das barricadas intactas, creditando autogestão a cada 300 ticks.
     fn fase_defesa(&mut self) {
         for barreira in self.barreiras.values_mut() {
@@ -759,6 +860,53 @@ impl Mundo {
                     .pontos_autogestao
                     .saturating_add(PONTOS_AUTOGESTAO_POR_DEFESA);
                 barreira.defesa_ticks = 0;
+            }
+        }
+    }
+
+    /// Avança a cadência dos PNJs ativos e resolve seus ataques em ordem de `id`.
+    ///
+    /// Ao atingir `TICKS_ATAQUE_PNJ`, o PNJ atinge o jogador mais próximo em até
+    /// `ALCANCE_ATAQUE_PNJ_M` (desempate por menor `peer_id`) e zera o contador.
+    /// Sem alvo em alcance, o contador também zera, sem dano.
+    fn fase_ataque_pnjs(&mut self) {
+        let ids: Vec<u64> = self
+            .pnjs
+            .values()
+            .filter(|pnj| pnj.ativo)
+            .map(|pnj| pnj.id)
+            .collect();
+        for id in ids {
+            let Some(pnj) = self.pnjs.get_mut(&id) else {
+                continue;
+            };
+            if !pnj.ativo {
+                continue;
+            }
+            pnj.ataque_ticks += 1;
+            if pnj.ataque_ticks < TICKS_ATAQUE_PNJ {
+                continue;
+            }
+            pnj.ataque_ticks = 0;
+            let origem = pnj.posicao;
+            let alvo = self
+                .jogadores
+                .iter()
+                .filter_map(|(&peer_id, jogador)| {
+                    let distancia =
+                        (jogador.posicao.0 - origem.0).hypot(jogador.posicao.1 - origem.1);
+                    (distancia <= ALCANCE_ATAQUE_PNJ_M).then_some((distancia, peer_id))
+                })
+                .min_by(|(distancia_a, peer_a), (distancia_b, peer_b)| {
+                    distancia_a
+                        .total_cmp(distancia_b)
+                        .then_with(|| peer_a.cmp(peer_b))
+                })
+                .map(|(_, peer_id)| peer_id);
+            if let Some(peer_id) = alvo {
+                if let Some(jogador) = self.jogadores.get_mut(&peer_id) {
+                    jogador.vida = jogador.vida.saturating_sub(DANO_ATAQUE_PNJ).max(0);
+                }
             }
         }
     }
@@ -1059,6 +1207,14 @@ impl Mundo {
         self.suditos
             .iter()
             .find(|(_, sudito)| ponto_igual(sudito.posicao, ponto))
+            .map(|(&id, _)| id)
+    }
+
+    /// Encontra o PNJ ativo em `ponto`, preferindo o menor `id` em caso de empate.
+    fn pnj_id_ativo_em_ponto(&self, ponto: (f64, f64)) -> Option<u64> {
+        self.pnjs
+            .iter()
+            .find(|(_, pnj)| pnj.ativo && ponto_igual(pnj.posicao, ponto))
             .map(|(&id, _)| id)
     }
 
@@ -1461,6 +1617,19 @@ impl Mundo {
             })
             .collect::<Vec<_>>()
             .join(";");
+        let pnjs: String = self
+            .pnjs
+            .values()
+            .map(|pnj| {
+                let (x, y) = pnj.posicao;
+                let id = pnj.id;
+                let pv = pnj.pv;
+                let ativo = pnj.ativo;
+                let ticks = pnj.ataque_ticks;
+                format!("{id}:{x}:{y}:{pv}:{ativo}:{ticks}")
+            })
+            .collect::<Vec<_>>()
+            .join(";");
         let ilhas: String = self
             .ilhas
             .values()
@@ -1479,7 +1648,7 @@ impl Mundo {
             .map(String::as_str)
             .collect::<Vec<_>>()
             .join(";");
-        format!("{barreiras}|{pontes}|{suditos}|{ilhas}|{ilhas_reconquistadas}|{sinais}")
+        format!("{barreiras}|{pontes}|{suditos}|{pnjs}|{ilhas}|{ilhas_reconquistadas}|{sinais}")
     }
 
     /// Calcula o hash SHA-256 canônico do estado corrente.
@@ -1554,8 +1723,8 @@ pub enum CodigoRecusa {
     #[error("folego insuficiente")]
     FolegoInsuficiente,
     /// Destino ausente ou fora do ponto para `mover`, `coletar_materiais`,
-    /// `construir_barreira`, `construir_ponte`, `propaganda`, `propaganda_no` ou
-    /// `atacar_no`; Nó inativo também recusa `atacar_no`.
+    /// `construir_barreira`, `construir_ponte`, `propaganda`, `propaganda_no`,
+    /// `atacar_no` ou `atacar_pnj`; Nó inativo também recusa `atacar_no`.
     #[error("destino ausente ou fora do ponto")]
     DestinoInvalido,
     /// Deslocamento acima de `LIMITE_MOVIMENTO_M`.
@@ -1579,8 +1748,9 @@ impl ValidacaoComandos {
     /// par, replay, ação, nível (`AcaoBloqueada`), destino (incluindo o limite
     /// de distância de `mover`), alvo/alcance e Fôlego para `atacar_forte`,
     /// saldo para `construir_barreira` e `construir_ponte`; `propaganda` exige
-    /// Súdito no ponto do jogador. `propaganda_no`/`atacar_no` exigem Nó no ponto
-    /// do jogador e não exigem saldo ou Fôlego.
+    /// Súdito no ponto do jogador, e `atacar_pnj` exige PNJ ativo nesse ponto.
+    /// `propaganda_no`/`atacar_no` exigem Nó no ponto do jogador e não exigem
+    /// saldo ou Fôlego.
     pub fn validar(
         mundo: &Mundo,
         peer_id: u64,
@@ -1677,6 +1847,14 @@ impl ValidacaoComandos {
                 return Err(CodigoRecusa::DestinoInvalido);
             };
             if acao == "atacar_no" && mundo.nos[&id].inativo_ticks > 0 {
+                return Err(CodigoRecusa::DestinoInvalido);
+            }
+        }
+
+        if acao == "atacar_pnj" {
+            let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
+            if !ponto_igual(ponto, jogador.posicao) || mundo.pnj_id_ativo_em_ponto(ponto).is_none()
+            {
                 return Err(CodigoRecusa::DestinoInvalido);
             }
         }

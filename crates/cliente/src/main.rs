@@ -36,6 +36,14 @@ const PEER_ALVO_TREINO: u64 = 2;
 /// Posição fixa do alvo de treino no plano do mapa (scaffolding não-canônico).
 const ALVO_TREINO_POSICAO: (f64, f64) = (2.0, 0.0);
 
+/// Posições fixas dos quatro guardas no protótipo (`[HIPÓTESE]`: sem mapa canônico).
+const PNJS_INICIAIS: [(u64, (f64, f64)); 4] = [
+    (1, (4.0, -236.0)),
+    (2, (-4.0, -236.0)),
+    (3, (0.0, -232.0)),
+    (4, (0.0, -240.0)),
+];
+
 /// Quantidade de vértices no contorno irregular de cada ilha.
 const LADOS_ILHA: u16 = 8;
 
@@ -108,6 +116,7 @@ fn main() {
                 solicitar_ataque,
                 solicitar_propaganda_no,
                 solicitar_atacar_no,
+                solicitar_atacar_pnj,
                 sincronizar_sim,
                 avancar_simulacao,
                 atualizar_texto,
@@ -578,6 +587,9 @@ fn configurar(
     let mut sim = Mundo::new();
     sim.adicionar_jogador(PEER_ID);
     sim.adicionar_jogador(PEER_ALVO_TREINO);
+    for (id, posicao) in PNJS_INICIAIS {
+        sim.adicionar_pnj(id, posicao);
+    }
     if let Some(alvo) = sim.jogadores.get_mut(&PEER_ALVO_TREINO) {
         alvo.posicao = ALVO_TREINO_POSICAO;
     }
@@ -836,6 +848,52 @@ fn solicitar_atacar_no(
     });
 }
 
+/// Devolve a posição do PNJ ativo mais próximo, com desempate pelo menor `id`.
+///
+/// A comparação usa distância ao quadrado e `total_cmp` para permanecer determinística.
+#[must_use]
+fn posicao_pnj_mais_proximo(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, f64)> {
+    let (x, y) = (f64::from(jogador.0), f64::from(jogador.1));
+    mundo
+        .pnjs
+        .values()
+        .filter(|pnj| pnj.ativo)
+        .min_by(|a, b| {
+            let da = (a.posicao.0 - x).mul_add(a.posicao.0 - x, (a.posicao.1 - y).powi(2));
+            let db = (b.posicao.0 - x).mul_add(b.posicao.0 - x, (b.posicao.1 - y).powi(2));
+            da.total_cmp(&db).then_with(|| a.id.cmp(&b.id))
+        })
+        .map(|pnj| pnj.posicao)
+}
+
+/// Agenda `atacar_pnj` no guarda ativo mais próximo ao pressionar `T`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_atacar_pnj(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyT) {
+        return;
+    }
+    let Some(destino) = posicao_pnj_mais_proximo(&simulacao.0, jogador.0.posicao) else {
+        return;
+    };
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "atacar_pnj".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(destino),
+    });
+}
+
 /// Copia a posição do estado para a transformação 3D do avatar no plano do mapa.
 #[expect(
     clippy::needless_pass_by_value,
@@ -897,6 +955,25 @@ fn texto_resultado(simulacao: &Simulacao) -> String {
     }
 }
 
+/// Textos de progresso de construção e coleta exibidos no painel.
+#[must_use]
+fn texto_progresso(simulacao: &Simulacao) -> (String, String) {
+    let remoto = simulacao.0.jogadores.get(&PEER_ID);
+    let construindo = match remoto {
+        Some(j) if j.construcao_ponto.is_some() => {
+            format!("{}/{}", j.construcao_ticks, TICKS_CONSTRUCAO_BARREIRA)
+        }
+        _ => "nao".to_owned(),
+    };
+    let coletando = match remoto {
+        Some(j) if j.coleta_ponto.is_some() => {
+            format!("{}/{}", j.coleta_ticks, TICKS_COLETA)
+        }
+        _ => "nao".to_owned(),
+    };
+    (construindo, coletando)
+}
+
 /// Monta o texto do painel a partir do estado local e do espelho da simulação.
 #[must_use]
 fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
@@ -917,6 +994,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
     } else {
         0
     };
+    let pnjs = simulacao.0.pnjs.values().filter(|pnj| pnj.ativo).count();
     let funcao = remoto.map_or("Artesão", |j| j.funcao.nome());
     let nivel = remoto.map_or(1, |j| j.nivel);
     let barreiras = simulacao
@@ -947,25 +1025,14 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
     let nos_convertidos = simulacao.0.nos.values().filter(|no| no.convertido).count();
     let resistencia = simulacao.0.resistencia_ideologica;
     let resultado = texto_resultado(simulacao);
-    let construindo = match remoto {
-        Some(j) if j.construcao_ponto.is_some() => {
-            format!("{}/{}", j.construcao_ticks, TICKS_CONSTRUCAO_BARREIRA)
-        }
-        _ => "nao".to_owned(),
-    };
-    let coletando = match remoto {
-        Some(j) if j.coleta_ponto.is_some() => {
-            format!("{}/{}", j.coleta_ticks, TICKS_COLETA)
-        }
-        _ => "nao".to_owned(),
-    };
+    let (construindo, coletando) = texto_progresso(simulacao);
     format!(
         concat!(
             "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\n",
             "Função: {funcao}\nNível: {nivel}/{NIVEL_MAXIMO}\n",
             "Limites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\n",
             "Suprimentos: {suprimentos}\nMateriais: {materiais}\n",
-            "Fôlego: {folego}\nVida: {vida}\nAlvo: {vida_alvo}\n",
+            "Fôlego: {folego}\nVida: {vida}\nAlvo: {vida_alvo}\nPNJs: {pnjs}\n",
             "Autogestão: {autogestao}\nBarreiras: {barreiras}\n",
             "Pontes: {pontes}\nSúditos: {suditos}\n",
             "Resistência: {resistencia}\nNós: {nos_convertidos}/3\n",
@@ -973,7 +1040,8 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
             "Construindo: {construindo}\nColeta: {coletando}\n",
             "WASD ou setas para mover · B para construir barreira · P para construir ponte · ",
             "C para coletar materiais · G para propaganda · R para propaganda no Nó · ",
-            "F para atacar o Nó · Aproxime-se do alvo e use Q para atacar"
+            "F para atacar o Nó · Aproxime-se do alvo e use Q para atacar · ",
+            "T para atacar o PNJ mais próximo"
         ),
         x = x,
         y = y,
@@ -988,6 +1056,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
         folego = folego,
         vida = vida,
         vida_alvo = vida_alvo,
+        pnjs = pnjs,
         autogestao = autogestao,
         barreiras = barreiras,
         pontes = pontes,

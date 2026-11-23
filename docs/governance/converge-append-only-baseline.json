@@ -137,6 +137,10 @@
     "specs/052-papeis-niveis/converge.md": {
       "bytes": 8956,
       "sha256": "566ba5635bcdcf5d8921003f329627a136254735b6ee9e3f50dfdbaa503b7bf0"
+    },
+    "specs/053-pnj-defensores/converge.md": {
+      "bytes": 8810,
+      "sha256": "b6c64356a9461f16874451b1aa203f38518b3be5eff0d83536d092d0ef2b9c90"
     }
   },
   "_provenance": {
