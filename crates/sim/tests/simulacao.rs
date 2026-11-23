@@ -3,15 +3,16 @@
 
 use insurgencia_sim::{
     Barreira, CodigoRecusa, Comando, Funcao, Mundo, Ponte, ResultadoPartida, ValidacaoComandos,
-    ALCANCE_ATAQUE_PNJ_M, CONTRIBUICAO_NO, CUSTO_ATAQUE_FOLEGO, CUSTO_BARREIRA_MATERIAIS,
+    ALCANCE_ANALISE_MATERIALISTA_M, ALCANCE_ATAQUE_PNJ_M, BONUS_DANO_ANALISE_PERCENT,
+    CONTRIBUICAO_NO, CUSTO_ANALISE_MATERIALISTA, CUSTO_ATAQUE_FOLEGO, CUSTO_BARREIRA_MATERIAIS,
     CUSTO_PONTE_MATERIAIS, DANO_ATAQUE, DANO_ATAQUE_PNJ, DANO_MAXIMO_NOS, FOLEGO_MAXIMO,
     MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS, NIVEL_MAXIMO, PONTOS_AUTOGESTAO_POR_DEFESA,
-    PV_BARREIRA, PV_PNJ, PV_PONTE, RESISTENCIA_INICIAL, TICKS_ATAQUE_PNJ,
-    TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA,
-    TICKS_CONSTRUCAO_PONTE, TICKS_CONTROLE_ILHA, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_PONTE,
-    TICKS_INATIVIDADE_NO, TICKS_LIMITE_PARTIDA, TICKS_POR_NIVEL, TICKS_PROPAGANDA,
-    TICKS_PROPAGANDA_NO, TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE,
-    TICKS_REVERSAO_SUDITO, TOTAL_PNJS_PADRAO,
+    PV_BARREIRA, PV_PNJ, PV_PONTE, RECARGA_ANALISE_MATERIALISTA_TICKS, RESISTENCIA_INICIAL,
+    TICKS_ANALISE_MATERIALISTA, TICKS_ATAQUE_PNJ, TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA,
+    TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA, TICKS_CONSTRUCAO_PONTE, TICKS_CONTROLE_ILHA,
+    TICKS_DURACAO_BARREIRA, TICKS_DURACAO_PONTE, TICKS_INATIVIDADE_NO, TICKS_LIMITE_PARTIDA,
+    TICKS_POR_NIVEL, TICKS_PROPAGANDA, TICKS_PROPAGANDA_NO, TICKS_REGENERACAO_COMBATE,
+    TICKS_REGENERACAO_FORA_COMBATE, TICKS_REVERSAO_SUDITO, TOTAL_PNJS_PADRAO,
 };
 
 /// Eleva o nível do jogador ao mínimo exigido por uma ação (protótipo).
@@ -107,6 +108,42 @@ fn comando_ataque_pnj(peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)
         request_id,
         destino: Some(ponto),
     }
+}
+
+/// Monta um mundo com jogador de nível 3 e um PNJ ativo na origem.
+#[must_use]
+fn mundo_para_analise() -> Mundo {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 3);
+    mundo.adicionar_pnj(1, (0.0, 0.0));
+    mundo
+}
+
+/// Monta um comando `analise_materialista` com os monotônicos preenchidos.
+#[must_use]
+fn comando_analise(peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) -> Comando {
+    Comando {
+        peer_id,
+        acao: "analise_materialista".to_string(),
+        seq,
+        request_id,
+        destino: Some(ponto),
+    }
+}
+
+/// Agenda uma análise somente após validá-la contra o estado corrente.
+fn agendar_analise(mundo: &mut Mundo, peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) {
+    assert!(ValidacaoComandos::validar(
+        mundo,
+        peer_id,
+        "analise_materialista",
+        seq,
+        request_id,
+        Some(ponto),
+    )
+    .is_ok());
+    mundo.agendar_comando(comando_analise(peer_id, seq, request_id, ponto));
 }
 
 #[test]
@@ -3410,4 +3447,192 @@ fn pnj_ataca_menor_peer_id_em_alcance() {
 
     assert_eq!(mundo.jogadores[&1].vida, 100 - DANO_ATAQUE_PNJ);
     assert_eq!(mundo.jogadores[&2].vida, 100);
+}
+
+/// A marca autoriza o bônus inteiro de 25%: 10 de dano passa a 12.
+#[test]
+fn analise_marca_e_bonus_de_dano() {
+    let mut mundo = mundo_para_analise();
+    let ponto = (0.0, 0.0);
+    mundo.adicionar_pnj(2, (10.0, 0.0));
+    assert_eq!(mundo.pnjs[&1].marca_ticks, 0);
+
+    agendar_analise(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.pnjs[&1].marca_ticks, TICKS_ANALISE_MATERIALISTA);
+    assert_eq!(
+        mundo.jogadores[&1].analise_recarga_ticks,
+        RECARGA_ANALISE_MATERIALISTA_TICKS
+    );
+    assert_eq!(
+        mundo.jogadores[&1].folego,
+        FOLEGO_MAXIMO - CUSTO_ANALISE_MATERIALISTA
+    );
+    assert_eq!(mundo.jogadores[&1].seq, 1);
+    assert_eq!(mundo.jogadores[&1].request_id, 1);
+
+    let dano_esperado = DANO_ATAQUE + DANO_ATAQUE * BONUS_DANO_ANALISE_PERCENT / 100;
+    assert_eq!(dano_esperado, 12);
+    assert!(!mundo.aplicar_dano_a_pnj(2, DANO_ATAQUE));
+    mundo.aplicar_dano_a_pnj(1, DANO_ATAQUE);
+    assert_eq!(mundo.pnjs[&1].pv, PV_PNJ - dano_esperado);
+    assert_eq!(mundo.pnjs[&2].pv, PV_PNJ - DANO_ATAQUE);
+
+    // O piso zero e a inativação permanecem com o bônus aplicado.
+    assert!(mundo.aplicar_dano_a_pnj(1, PV_PNJ));
+    assert_eq!(mundo.pnjs[&1].pv, 0);
+    assert!(!mundo.pnjs[&1].ativo);
+}
+
+/// Duas marcas no mesmo PNJ não somam: a reaplicação reinicia 150 ticks.
+#[test]
+fn analise_nao_acumula() {
+    let mut mundo = mundo_para_analise();
+    mundo.adicionar_jogador(2);
+    garantir_nivel(&mut mundo, 2, 3);
+    if let Some(jogador) = mundo.jogadores.get_mut(&2) {
+        jogador.posicao = (1.0, 0.0);
+    }
+    let ponto = (0.0, 0.0);
+
+    agendar_analise(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+    assert_eq!(mundo.pnjs[&1].marca_ticks, TICKS_ANALISE_MATERIALISTA);
+
+    for _ in 0..30 {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.pnjs[&1].marca_ticks, TICKS_ANALISE_MATERIALISTA - 30);
+
+    agendar_analise(&mut mundo, 2, 1, 1, ponto);
+    mundo.avancar_tick();
+    assert_eq!(mundo.pnjs[&1].marca_ticks, TICKS_ANALISE_MATERIALISTA);
+    assert_eq!(
+        mundo.jogadores[&2].analise_recarga_ticks,
+        RECARGA_ANALISE_MATERIALISTA_TICKS
+    );
+
+    // Após a recarga completa, o mesmo atacante também reinicia sem somar.
+    for _ in 0..(RECARGA_ANALISE_MATERIALISTA_TICKS - 1) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].analise_recarga_ticks, 0);
+    assert_eq!(mundo.pnjs[&1].marca_ticks, 0);
+    agendar_analise(&mut mundo, 1, 2, 2, ponto);
+    mundo.avancar_tick();
+    assert_eq!(mundo.pnjs[&1].marca_ticks, TICKS_ANALISE_MATERIALISTA);
+}
+
+/// A recarga de 450 ticks bloqueia nova análise sem debitar Fôlego.
+#[test]
+fn analise_respeita_recarga() {
+    let mut mundo = mundo_para_analise();
+    let ponto = (0.0, 0.0);
+    agendar_analise(&mut mundo, 1, 1, 1, ponto);
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo.jogadores[&1].analise_recarga_ticks,
+        RECARGA_ANALISE_MATERIALISTA_TICKS
+    );
+
+    let em_recarga =
+        ValidacaoComandos::validar(&mundo, 1, "analise_materialista", 2, 2, Some(ponto));
+    assert_eq!(em_recarga, Err(CodigoRecusa::AnaliseEmRecarga));
+
+    // Comando forjado durante a recarga: sem efeito e sem monotônicos.
+    mundo.agendar_comando(comando_analise(1, 2, 2, ponto));
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo.jogadores[&1].analise_recarga_ticks,
+        RECARGA_ANALISE_MATERIALISTA_TICKS - 1
+    );
+    assert_eq!(
+        mundo.jogadores[&1].folego,
+        FOLEGO_MAXIMO - CUSTO_ANALISE_MATERIALISTA
+    );
+    assert_eq!(mundo.jogadores[&1].seq, 1);
+    assert_eq!(mundo.jogadores[&1].request_id, 1);
+    assert_eq!(mundo.pnjs[&1].marca_ticks, TICKS_ANALISE_MATERIALISTA - 1);
+
+    for _ in 0..(RECARGA_ANALISE_MATERIALISTA_TICKS - 1) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].analise_recarga_ticks, 0);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.folego = 50;
+        jogador.folego_ticks = 0;
+    }
+    agendar_analise(&mut mundo, 1, 3, 3, ponto);
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].folego, 50 - CUSTO_ANALISE_MATERIALISTA);
+    assert_eq!(
+        mundo.jogadores[&1].analise_recarga_ticks,
+        RECARGA_ANALISE_MATERIALISTA_TICKS
+    );
+    assert_eq!(mundo.jogadores[&1].seq, 3);
+}
+
+/// O alcance é de 12 m, inclusive no limite; além dele nada é debitado.
+#[test]
+fn analise_respeita_alcance() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 3);
+    let no_limite = (ALCANCE_ANALISE_MATERIALISTA_M, 0.0);
+    mundo.adicionar_pnj(1, no_limite);
+    agendar_analise(&mut mundo, 1, 1, 1, no_limite);
+    mundo.avancar_tick();
+    assert_eq!(mundo.pnjs[&1].marca_ticks, TICKS_ANALISE_MATERIALISTA);
+    assert_eq!(
+        mundo.jogadores[&1].folego,
+        FOLEGO_MAXIMO - CUSTO_ANALISE_MATERIALISTA
+    );
+
+    let fora = (ALCANCE_ANALISE_MATERIALISTA_M + 0.5, 0.0);
+    let mut outro = Mundo::new();
+    outro.adicionar_jogador(1);
+    garantir_nivel(&mut outro, 1, 3);
+    outro.adicionar_pnj(1, fora);
+    let recusado = ValidacaoComandos::validar(&outro, 1, "analise_materialista", 1, 1, Some(fora));
+    assert_eq!(recusado, Err(CodigoRecusa::DestinoInvalido));
+    outro.agendar_comando(comando_analise(1, 1, 1, fora));
+    outro.avancar_tick();
+    assert_eq!(outro.pnjs[&1].marca_ticks, 0);
+    assert_eq!(outro.jogadores[&1].folego, FOLEGO_MAXIMO);
+    assert_eq!(outro.jogadores[&1].seq, 0);
+}
+
+/// Marca e recarga entram no hash canônico, em ordem estável de identificadores.
+#[test]
+fn hash_reflete_analise_materialista() {
+    let mut primeiro = mundo_para_analise();
+    let mut segundo = mundo_para_analise();
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    agendar_analise(&mut primeiro, 1, 1, 1, (0.0, 0.0));
+    primeiro.avancar_tick();
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+
+    agendar_analise(&mut segundo, 1, 1, 1, (0.0, 0.0));
+    segundo.avancar_tick();
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(pnj) = primeiro.pnjs.get_mut(&1) {
+        pnj.marca_ticks = 0;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.analise_recarga_ticks = 0;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(pnj) = primeiro.pnjs.get_mut(&1) {
+        pnj.marca_ticks = TICKS_ANALISE_MATERIALISTA;
+    }
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.analise_recarga_ticks = RECARGA_ANALISE_MATERIALISTA_TICKS;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
 }
