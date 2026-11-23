@@ -2,15 +2,27 @@
 #![deny(clippy::pedantic)]
 
 use insurgencia_sim::{
-    Barreira, CodigoRecusa, Comando, Mundo, Ponte, ResultadoPartida, ValidacaoComandos,
+    Barreira, CodigoRecusa, Comando, Funcao, Mundo, Ponte, ResultadoPartida, ValidacaoComandos,
     CONTRIBUICAO_NO, CUSTO_ATAQUE_FOLEGO, CUSTO_BARREIRA_MATERIAIS, CUSTO_PONTE_MATERIAIS,
     DANO_ATAQUE, DANO_MAXIMO_NOS, FOLEGO_MAXIMO, MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS,
-    PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA, PV_PONTE, RESISTENCIA_INICIAL,
+    NIVEL_MAXIMO, PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA, PV_PONTE, RESISTENCIA_INICIAL,
     TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA,
     TICKS_CONSTRUCAO_PONTE, TICKS_CONTROLE_ILHA, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_PONTE,
-    TICKS_INATIVIDADE_NO, TICKS_LIMITE_PARTIDA, TICKS_PROPAGANDA, TICKS_PROPAGANDA_NO,
-    TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE, TICKS_REVERSAO_SUDITO,
+    TICKS_INATIVIDADE_NO, TICKS_LIMITE_PARTIDA, TICKS_POR_NIVEL, TICKS_PROPAGANDA,
+    TICKS_PROPAGANDA_NO, TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE,
+    TICKS_REVERSAO_SUDITO,
 };
+
+/// Eleva o nível do jogador ao mínimo exigido por uma ação (protótipo).
+fn garantir_nivel(mundo: &mut Mundo, peer_id: u64, minimo: u8) {
+    let Some(jogador) = mundo.jogadores.get_mut(&peer_id) else {
+        return;
+    };
+    if jogador.nivel < minimo {
+        jogador.nivel = minimo;
+        jogador.nivel_ticks = 0;
+    }
+}
 
 /// Monta um comando `mover` com os monotônicos já preenchidos.
 #[must_use]
@@ -545,6 +557,7 @@ fn comando_barreira(peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) 
 
 /// Agenda uma construção somente após validá-la contra o estado corrente.
 fn agendar_barreira(mundo: &mut Mundo, peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) {
+    garantir_nivel(mundo, peer_id, 2);
     assert!(ValidacaoComandos::validar(
         mundo,
         peer_id,
@@ -606,6 +619,7 @@ fn comando_ponte(peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) -> 
 
 /// Agenda uma construção de ponte somente após validá-la contra o estado corrente.
 fn agendar_ponte(mundo: &mut Mundo, peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) {
+    garantir_nivel(mundo, peer_id, 2);
     assert!(ValidacaoComandos::validar(
         mundo,
         peer_id,
@@ -721,6 +735,7 @@ fn construcao_continua_apos_um_unico_comando() {
 fn saldo_insuficiente_recusa_sem_debito() {
     let mut mundo = Mundo::new();
     mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 2);
     let insuficiente = CUSTO_BARREIRA_MATERIAIS - 1;
     definir_materiais(&mut mundo, 1, insuficiente);
     let ponto = (0.25, 0.0);
@@ -767,6 +782,7 @@ fn saldo_insuficiente_recusa_sem_debito() {
 fn construcao_fora_do_ponto_recusada() {
     let mut mundo = Mundo::new();
     mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 2);
     definir_materiais(&mut mundo, 1, 100);
     let ponto = (0.25, 0.0);
     agendar_mover(&mut mundo, 1, 1, 1, ponto);
@@ -1297,6 +1313,7 @@ fn ponte_apos_45_ticks_debita_15() {
 fn saldo_14_nao_construi_ponte() {
     let mut mundo = Mundo::new();
     mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 2);
     let insuficiente = CUSTO_PONTE_MATERIAIS - 1;
     definir_materiais(&mut mundo, 1, insuficiente);
     let ponto = (0.25, 0.0);
@@ -1462,6 +1479,7 @@ fn hash_reflete_pontes() {
 fn ponte_fora_do_ponto_recusada() {
     let mut mundo = Mundo::new();
     mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 2);
     definir_materiais(&mut mundo, 1, 100);
     let ponto = (0.25, 0.0);
     agendar_mover(&mut mundo, 1, 1, 1, ponto);
@@ -1550,6 +1568,7 @@ fn agendar_propaganda(
     request_id: i64,
     ponto: (f64, f64),
 ) {
+    garantir_nivel(mundo, peer_id, 3);
     assert!(
         ValidacaoComandos::validar(mundo, peer_id, "propaganda", seq, request_id, Some(ponto),)
             .is_ok()
@@ -2330,6 +2349,7 @@ fn agendar_no(
     request_id: i64,
     ponto: (f64, f64),
 ) {
+    garantir_nivel(mundo, peer_id, 6);
     assert!(ValidacaoComandos::validar(mundo, peer_id, acao, seq, request_id, Some(ponto)).is_ok());
     mundo.agendar_comando(comando_no(peer_id, acao, seq, request_id, ponto));
 }
@@ -2839,4 +2859,180 @@ fn reconquista_duplicada_nao_conta() {
         vec![5]
     );
     assert!(mundo.resultado.is_none());
+}
+
+/// A progressão usa somente o acumulador determinístico de cada jogador.
+#[test]
+fn nivel_sobe_apos_900_ticks() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    assert_eq!(mundo.jogadores[&1].funcao, Funcao::Artesao);
+    assert_eq!(mundo.jogadores[&1].nivel, 1);
+    assert_eq!(mundo.jogadores[&1].nivel_ticks, 0);
+
+    for _ in 0..(TICKS_POR_NIVEL - 1) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].nivel, 1);
+    assert_eq!(mundo.jogadores[&1].nivel_ticks, TICKS_POR_NIVEL - 1);
+
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].nivel, 2);
+    assert_eq!(mundo.jogadores[&1].nivel_ticks, 0);
+
+    for _ in 0..TICKS_POR_NIVEL {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].nivel, 3);
+    assert_eq!(mundo.jogadores[&1].nivel_ticks, 0);
+}
+
+/// O teto satura e congela o acumulador.
+#[test]
+fn nivel_teto_12() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    for _ in 0..(TICKS_POR_NIVEL * i64::from(NIVEL_MAXIMO - 1)) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].nivel, NIVEL_MAXIMO);
+    assert_eq!(mundo.jogadores[&1].nivel_ticks, 0);
+
+    for _ in 0..(3 * TICKS_POR_NIVEL) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].nivel, NIVEL_MAXIMO);
+    assert_eq!(mundo.jogadores[&1].nivel_ticks, 0);
+}
+
+/// `AcaoBloqueada` precede as recusas específicas, mas não as guardas iniciais.
+#[test]
+fn acao_bloqueada_por_nivel() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_sudito(7, (0.0, 0.0));
+    mundo.adicionar_no(1, (0.0, 0.0));
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.materiais = 100;
+        jogador.folego = FOLEGO_MAXIMO;
+    }
+    let ponto = (0.0, 0.0);
+
+    for acao in [
+        "construir_barreira",
+        "construir_ponte",
+        "propaganda",
+        "propaganda_no",
+        "atacar_no",
+    ] {
+        let bloqueado = ValidacaoComandos::validar(&mundo, 1, acao, 1, 1, Some(ponto));
+        assert_eq!(bloqueado, Err(CodigoRecusa::AcaoBloqueada), "{acao}");
+        let sem_destino = ValidacaoComandos::validar(&mundo, 1, acao, 1, 1, None);
+        assert_eq!(sem_destino, Err(CodigoRecusa::AcaoBloqueada), "{acao}");
+    }
+
+    let sem_peer = ValidacaoComandos::validar(&mundo, 99, "atacar_no", 1, 1, None);
+    assert_eq!(sem_peer, Err(CodigoRecusa::PeerNaoAutorizado));
+    let replay = ValidacaoComandos::validar(&mundo, 1, "mover", 0, 0, Some((0.25, 0.0)));
+    assert_eq!(replay, Err(CodigoRecusa::SeqOuRequestReplay));
+    let desconhecida = ValidacaoComandos::validar(&mundo, 1, "voar", 1, 1, None);
+    assert_eq!(desconhecida, Err(CodigoRecusa::AcaoDesconhecida));
+
+    // Q e as ações sem slot nunca são bloqueadas por nível.
+    let alvo = ValidacaoComandos::validar(&mundo, 1, "atacar_forte", 1, 1, None);
+    assert_eq!(alvo, Err(CodigoRecusa::AlvoInvalido));
+    let mover = ValidacaoComandos::validar(&mundo, 1, "mover", 1, 1, Some((0.25, 0.0)));
+    assert!(mover.is_ok());
+
+    garantir_nivel(&mut mundo, 1, 2);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.materiais = 0;
+    }
+    let saldo = ValidacaoComandos::validar(&mundo, 1, "construir_barreira", 1, 1, Some(ponto));
+    assert_eq!(saldo, Err(CodigoRecusa::SaldoInsuficiente));
+    let destino = ValidacaoComandos::validar(&mundo, 1, "construir_ponte", 1, 1, Some((0.75, 0.0)));
+    assert_eq!(destino, Err(CodigoRecusa::DestinoInvalido));
+}
+
+/// Mapa Q1/W2/E3/R6 sobre ações existentes, sem novas teclas ou habilidades.
+#[test]
+fn desbloqueio_q_w_e_r() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    if let Some(alvo) = mundo.jogadores.get_mut(&2) {
+        alvo.posicao = (0.0, 0.0);
+    }
+    mundo.adicionar_sudito(7, (0.0, 0.0));
+    mundo.adicionar_no(1, (0.0, 0.0));
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.materiais = 100;
+        jogador.folego = FOLEGO_MAXIMO;
+    }
+    let ponto = (0.0, 0.0);
+
+    // Q (atacar_forte) e as ações livres já valem no nível 1.
+    for acao in ["sinalizar_sincronia", "sinalizar_alavanca"] {
+        assert!(ValidacaoComandos::validar(&mundo, 1, acao, 1, 1, None).is_ok());
+    }
+    for acao in ["atacar_forte", "coletar_materiais"] {
+        assert!(ValidacaoComandos::validar(&mundo, 1, acao, 1, 1, Some(ponto)).is_ok());
+    }
+    assert!(ValidacaoComandos::validar(&mundo, 1, "mover", 1, 1, Some((0.25, 0.0))).is_ok());
+
+    for (acao, nivel) in [
+        ("construir_barreira", 2_u8),
+        ("construir_ponte", 2),
+        ("propaganda", 3),
+        ("propaganda_no", 3),
+        ("atacar_no", 6),
+    ] {
+        if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+            jogador.nivel = nivel - 1;
+            jogador.nivel_ticks = 0;
+        }
+        let bloqueado = ValidacaoComandos::validar(&mundo, 1, acao, 1, 1, Some(ponto));
+        assert_eq!(bloqueado, Err(CodigoRecusa::AcaoBloqueada), "{acao}");
+        garantir_nivel(&mut mundo, 1, nivel);
+        let liberado = ValidacaoComandos::validar(&mundo, 1, acao, 1, 1, Some(ponto));
+        assert!(liberado.is_ok(), "{acao} no nivel {nivel}");
+    }
+}
+
+/// Papel, nível e acumulador entram no hash em ordem estável.
+#[test]
+fn hash_reflete_funcao_e_nivel() {
+    let mut primeiro = Mundo::new();
+    let mut segundo = Mundo::new();
+    for mundo in [&mut primeiro, &mut segundo] {
+        mundo.adicionar_jogador(1);
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.funcao = Funcao::Agitador;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.funcao = Funcao::Agitador;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.nivel = 6;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.nivel = 6;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.nivel_ticks = 17;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.nivel_ticks = 17;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
 }
