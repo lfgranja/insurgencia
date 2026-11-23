@@ -6,11 +6,11 @@
 |:--|:--|:--|:--|:--|
 | 1 | Inventário/âncora | HEAD `5d2919`, branch correto, **14 artefatos** na fronteira; scorecard 48/625 | PASS | `carimbo.txt`, `inventario.txt` |
 | 2 | Estado/constantes | `marca_ticks`, `analise_recarga_ticks`, `analise_materialista`, `BONUS_DANO_ANALISE_PERCENT` presentes | PASS | `estado-analise.txt` |
-| 3 | Marca e bônus | `analise_marca_e_bonus_de_dano`: `exit=0`, 1 passed; 10 → 12 com marca | PASS | `analise_marca_e_bonus_de_dano.txt` |
-| 4 | Não acumulação | `analise_nao_acumula`: `exit=0`, 1 passed; re-aplicação reinicia 150 ticks | PASS | `analise_nao_acumula.txt` |
-| 5 | Recarga | `analise_respeita_recarga`: `exit=0`, 1 passed; 450 ticks e `AnaliseEmRecarga` | PASS | `analise_respeita_recarga.txt` |
-| 6 | Alcance | `analise_respeita_alcance`: `exit=0`, 1 passed; 12 m | PASS | `analise_respeita_alcance.txt` |
-| 7 | Hash | `hash_reflete_analise_materialista`: `exit=0`, 1 passed; campos novos serializados sem remover segmentos antigos | PASS | `hash_reflete_analise_materialista.txt` |
+| 3 | Marca e bônus | `analise_materialista_marca_e_bonus_de_dano`: `exit=0`, 1 passed; 10 → 12 com marca | PASS | `analise_materialista_marca_e_bonus_de_dano.txt` |
+| 4 | Não acumulação | `analise_materialista_nao_acumula_marca`: `exit=0`, 1 passed; re-aplicação reinicia 150 ticks | PASS | `analise_materialista_nao_acumula_marca.txt` |
+| 5 | Recarga | `analise_materialista_recarga_450_ticks`: `exit=0`, 1 passed; 450 ticks e `AnaliseEmRecarga` | PASS | `analise_materialista_recarga_450_ticks.txt` |
+| 6 | Alcance | `analise_materialista_alcance_12_m`: `exit=0`, 1 passed; 12 m | PASS | `analise_materialista_alcance_12_m.txt` |
+| 7 | Hash | `hash_estado_cobre_analise_materialista`: `exit=0`, 1 passed; campos novos serializados sem remover segmentos antigos | PASS | `hash_estado_cobre_analise_materialista.txt` |
 | 8 | HUD/tecla | `KeyCode::KeyE`, `Análise: N` e `ALCANCE_ANALISE_MATERIALISTA_M` presentes; captura visual real **[NV]** | PASS | `hud-analise.txt` |
 | 9 | Fronteira/Rust | contratos/protocolo/Cargo `0`; `allow`/`unwrap`/`expect`/rede `0` nos dois arquivos | PASS | `fronteira.txt` |
 | 10 | Governança | v1.2.2, R1/R4/R7, R6 N/A; scorecard **48/625** em **26 arquivos**; rollback documentado e não executado | PASS | `governanca.txt` |

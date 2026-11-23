@@ -3451,7 +3451,7 @@ fn pnj_ataca_menor_peer_id_em_alcance() {
 
 /// A marca autoriza o bônus inteiro de 25%: 10 de dano passa a 12.
 #[test]
-fn analise_marca_e_bonus_de_dano() {
+fn analise_materialista_marca_e_bonus_de_dano() {
     let mut mundo = mundo_para_analise();
     let ponto = (0.0, 0.0);
     mundo.adicionar_pnj(2, (10.0, 0.0));
@@ -3487,7 +3487,7 @@ fn analise_marca_e_bonus_de_dano() {
 
 /// Duas marcas no mesmo PNJ não somam: a reaplicação reinicia 150 ticks.
 #[test]
-fn analise_nao_acumula() {
+fn analise_materialista_nao_acumula_marca() {
     let mut mundo = mundo_para_analise();
     mundo.adicionar_jogador(2);
     garantir_nivel(&mut mundo, 2, 3);
@@ -3526,7 +3526,7 @@ fn analise_nao_acumula() {
 
 /// A recarga de 450 ticks bloqueia nova análise sem debitar Fôlego.
 #[test]
-fn analise_respeita_recarga() {
+fn analise_materialista_recarga_450_ticks() {
     let mut mundo = mundo_para_analise();
     let ponto = (0.0, 0.0);
     agendar_analise(&mut mundo, 1, 1, 1, ponto);
@@ -3575,7 +3575,7 @@ fn analise_respeita_recarga() {
 
 /// O alcance é de 12 m, inclusive no limite; além dele nada é debitado.
 #[test]
-fn analise_respeita_alcance() {
+fn analise_materialista_alcance_12_m() {
     let mut mundo = Mundo::new();
     mundo.adicionar_jogador(1);
     garantir_nivel(&mut mundo, 1, 3);
@@ -3605,7 +3605,7 @@ fn analise_respeita_alcance() {
 
 /// Marca e recarga entram no hash canônico, em ordem estável de identificadores.
 #[test]
-fn hash_reflete_analise_materialista() {
+fn hash_estado_cobre_analise_materialista() {
     let mut primeiro = mundo_para_analise();
     let mut segundo = mundo_para_analise();
     assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
