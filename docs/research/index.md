@@ -1,9 +1,17 @@
 # Índice de pesquisa e avaliação — Insurgência
 
-> Escopo: artefatos de pesquisa/avaliação presentes em `docs/` e `.specify/assessments/` no
-> alvo. Contagens verificadas em 2026-11-19 (comandos e saídas em `docs/PROGRESSO.md`).
-> Afirmações remotas, de CI, merge ou publicação são **[NV]** até confirmação ao vivo.
-> Este índice é descritivo; não substitui os artefatos e não registra conclusões novas.
+> **Nota datada (2026-11-23T22:00Z) — vigente.** Baseline do ciclo 055: ALVO `origin/dev=3f3b01c`,
+> FONTE `b1deab1`, 0 PRs abertos, 53 specs no head, 136 testes, 5 gates locais PASS, decisão
+> 055 **960/3125** (**BF-002a** escolhido), **R6** fora da sequência executável e promoção
+> `dev→main`/deploy **exclusivos do SWE** (**[EV]**). CI/deploy remoto **[NV]**; os inventários
+> abaixo (2026-11-19 e atualizações seguintes) são **histórico**. Detalhes em `docs/PROGRESSO.md`
+> e `.specify/memory/STATE.md`.
+>
+> Escopo (histórico — 2026-11-19): artefatos de pesquisa/avaliação presentes em `docs/` e
+> `.specify/assessments/` no alvo. Contagens verificadas em 2026-11-19 (comandos e saídas em
+> `docs/PROGRESSO.md`). Afirmações remotas, de CI, merge ou publicação são **[NV]** até
+> confirmação ao vivo. Este índice é descritivo; não substitui os artefatos e não registra
+> conclusões novas.
 
 ## Contagens verificadas
 

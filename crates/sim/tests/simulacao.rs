@@ -3,16 +3,18 @@
 
 use insurgencia_sim::{
     Barreira, CodigoRecusa, Comando, Funcao, Mundo, Ponte, ResultadoPartida, ValidacaoComandos,
-    ALCANCE_ANALISE_MATERIALISTA_M, ALCANCE_ATAQUE_PNJ_M, BONUS_DANO_ANALISE_PERCENT,
-    CONTRIBUICAO_NO, CUSTO_ANALISE_MATERIALISTA, CUSTO_ATAQUE_FOLEGO, CUSTO_BARREIRA_MATERIAIS,
-    CUSTO_PONTE_MATERIAIS, DANO_ATAQUE, DANO_ATAQUE_PNJ, DANO_MAXIMO_NOS, FOLEGO_MAXIMO,
-    MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS, NIVEL_MAXIMO, PONTOS_AUTOGESTAO_POR_DEFESA,
-    PV_BARREIRA, PV_PNJ, PV_PONTE, RECARGA_ANALISE_MATERIALISTA_TICKS, RESISTENCIA_INICIAL,
-    TICKS_ANALISE_MATERIALISTA, TICKS_ATAQUE_PNJ, TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA,
-    TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA, TICKS_CONSTRUCAO_PONTE, TICKS_CONTROLE_ILHA,
-    TICKS_DURACAO_BARREIRA, TICKS_DURACAO_PONTE, TICKS_INATIVIDADE_NO, TICKS_LIMITE_PARTIDA,
-    TICKS_POR_NIVEL, TICKS_PROPAGANDA, TICKS_PROPAGANDA_NO, TICKS_REGENERACAO_COMBATE,
-    TICKS_REGENERACAO_FORA_COMBATE, TICKS_REVERSAO_SUDITO, TOTAL_PNJS_PADRAO,
+    ABSORCAO_ESCUDO, ALCANCE_ANALISE_MATERIALISTA_M, ALCANCE_ATAQUE_PNJ_M, ALCANCE_ESCUDO_M,
+    BONUS_DANO_ANALISE_PERCENT, CONTRIBUICAO_NO, CUSTO_ANALISE_MATERIALISTA, CUSTO_ATAQUE_FOLEGO,
+    CUSTO_BARREIRA_MATERIAIS, CUSTO_ESCUDO_FOLEGO, CUSTO_PONTE_MATERIAIS, DANO_ATAQUE,
+    DANO_ATAQUE_PNJ, DANO_MAXIMO_NOS, FOLEGO_MAXIMO, MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS,
+    NIVEL_MAXIMO, PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA, PV_PNJ, PV_PONTE,
+    RECARGA_ANALISE_MATERIALISTA_TICKS, RECARGA_ESCUDO_TICKS, RESISTENCIA_CONTINUA_ESCUDO_PERCENT,
+    RESISTENCIA_INICIAL, TICKS_ANALISE_MATERIALISTA, TICKS_ATAQUE_PNJ, TICKS_AUTOGESTAO_POR_PONTO,
+    TICKS_COLETA, TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA, TICKS_CONSTRUCAO_PONTE,
+    TICKS_CONTROLE_ILHA, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_ESCUDO, TICKS_DURACAO_PONTE,
+    TICKS_INATIVIDADE_NO, TICKS_LIMITE_PARTIDA, TICKS_POR_NIVEL, TICKS_PROPAGANDA,
+    TICKS_PROPAGANDA_NO, TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE,
+    TICKS_REVERSAO_SUDITO, TOTAL_PNJS_PADRAO,
 };
 
 /// Eleva o nível do jogador ao mínimo exigido por uma ação (protótipo).
@@ -144,6 +146,26 @@ fn agendar_analise(mundo: &mut Mundo, peer_id: u64, seq: i64, request_id: i64, p
     )
     .is_ok());
     mundo.agendar_comando(comando_analise(peer_id, seq, request_id, ponto));
+}
+
+/// Monta um comando `escudo` com os monotônicos preenchidos.
+#[must_use]
+fn comando_escudo(peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) -> Comando {
+    Comando {
+        peer_id,
+        acao: "escudo".to_string(),
+        seq,
+        request_id,
+        destino: Some(ponto),
+    }
+}
+
+/// Agenda um escudo somente após validá-lo contra o estado corrente.
+fn agendar_escudo(mundo: &mut Mundo, peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) {
+    assert!(
+        ValidacaoComandos::validar(mundo, peer_id, "escudo", seq, request_id, Some(ponto),).is_ok()
+    );
+    mundo.agendar_comando(comando_escudo(peer_id, seq, request_id, ponto));
 }
 
 #[test]
@@ -3633,6 +3655,231 @@ fn hash_estado_cobre_analise_materialista() {
     }
     if let Some(jogador) = segundo.jogadores.get_mut(&1) {
         jogador.analise_recarga_ticks = RECARGA_ANALISE_MATERIALISTA_TICKS;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+}
+
+/// O escudo absorve dano direto e de `PvP` até esgotar os 250 pontos.
+#[test]
+fn escudo_absorve_ate_250_dano() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 2);
+    agendar_escudo(&mut mundo, 1, 1, 1, (0.0, 0.0));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.jogadores[&1].escudo_pv, ABSORCAO_ESCUDO);
+    assert_eq!(mundo.jogadores[&1].escudo_ticks, TICKS_DURACAO_ESCUDO);
+    assert_eq!(mundo.jogadores[&1].escudo_alvo, Some(1));
+    assert_eq!(
+        mundo.jogadores[&1].folego,
+        FOLEGO_MAXIMO - CUSTO_ESCUDO_FOLEGO
+    );
+    assert_eq!(RESISTENCIA_CONTINUA_ESCUDO_PERCENT, 15);
+
+    mundo.aplicar_dano_a_jogador(1, 100);
+    assert_eq!(mundo.jogadores[&1].escudo_pv, ABSORCAO_ESCUDO - 100);
+    assert_eq!(mundo.jogadores[&1].vida, 100);
+
+    // Os 50 excedentes de 200 chegam à vida, que satura em zero.
+    mundo.aplicar_dano_a_jogador(1, 200);
+    assert_eq!(mundo.jogadores[&1].escudo_pv, 0);
+    assert_eq!(mundo.jogadores[&1].vida, 50);
+    mundo.aplicar_dano_a_jogador(1, 80);
+    assert_eq!(mundo.jogadores[&1].vida, 0);
+    mundo.aplicar_dano_a_jogador(1, 0);
+    assert_eq!(mundo.jogadores[&1].vida, 0);
+
+    // O ataque PvP também passa pela rota única de dano ao jogador.
+    let mut pvp = Mundo::new();
+    pvp.adicionar_jogador(1);
+    pvp.adicionar_jogador(2);
+    garantir_nivel(&mut pvp, 1, 2);
+    agendar_escudo(&mut pvp, 1, 1, 1, (0.0, 0.0));
+    pvp.avancar_tick();
+    agendar_ataque(&mut pvp, 2, 1, 1, (0.0, 0.0));
+    pvp.avancar_tick();
+    assert_eq!(pvp.jogadores[&1].escudo_pv, ABSORCAO_ESCUDO - DANO_ATAQUE);
+    assert_eq!(pvp.jogadores[&1].vida, 100);
+    assert_eq!(pvp.jogadores[&1].combate_ticks, TICKS_COMBATE);
+}
+
+/// O dano do PNJ passa pela mesma rota e é absorvido pelo escudo ativo.
+#[test]
+fn escudo_absorve_dano_de_pnj() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 2);
+    agendar_escudo(&mut mundo, 1, 1, 1, (0.0, 0.0));
+    mundo.avancar_tick();
+    mundo.adicionar_pnj(1, (1.0, 0.0));
+    if let Some(pnj) = mundo.pnjs.get_mut(&1) {
+        pnj.ataque_ticks = TICKS_ATAQUE_PNJ - 1;
+    }
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].vida, 100);
+    assert_eq!(
+        mundo.jogadores[&1].escudo_pv,
+        ABSORCAO_ESCUDO - DANO_ATAQUE_PNJ
+    );
+    assert_eq!(mundo.jogadores[&1].combate_ticks, 0);
+
+    let mut sem_escudo = Mundo::new();
+    sem_escudo.adicionar_jogador(1);
+    sem_escudo.adicionar_pnj(1, (1.0, 0.0));
+    if let Some(pnj) = sem_escudo.pnjs.get_mut(&1) {
+        pnj.ataque_ticks = TICKS_ATAQUE_PNJ - 1;
+    }
+    sem_escudo.avancar_tick();
+    assert_eq!(sem_escudo.jogadores[&1].vida, 100 - DANO_ATAQUE_PNJ);
+}
+
+/// A recarga de 420 ticks bloqueia nova aplicação sem debitar Fôlego.
+#[test]
+fn escudo_recarga_420_ticks() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    if let Some(jogador) = mundo.jogadores.get_mut(&2) {
+        jogador.posicao = (ALCANCE_ESCUDO_M, 0.0);
+    }
+    garantir_nivel(&mut mundo, 1, 2);
+    agendar_escudo(&mut mundo, 1, 1, 1, (ALCANCE_ESCUDO_M, 0.0));
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo.jogadores[&1].escudo_recarga_ticks,
+        RECARGA_ESCUDO_TICKS
+    );
+    // Conjurando em um aliado, o alvo permanece registrado durante a recarga.
+    assert_eq!(mundo.jogadores[&1].escudo_alvo, Some(2));
+
+    let em_recarga = ValidacaoComandos::validar(&mundo, 1, "escudo", 2, 2, Some((0.0, 0.0)));
+    assert_eq!(em_recarga, Err(CodigoRecusa::EscudoEmRecarga));
+
+    // Comando forjado durante a recarga: sem efeito e sem monotônicos.
+    mundo.agendar_comando(comando_escudo(1, 2, 2, (0.0, 0.0)));
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo.jogadores[&1].escudo_recarga_ticks,
+        RECARGA_ESCUDO_TICKS - 1
+    );
+    assert_eq!(
+        mundo.jogadores[&1].folego,
+        FOLEGO_MAXIMO - CUSTO_ESCUDO_FOLEGO
+    );
+    assert_eq!(mundo.jogadores[&1].seq, 1);
+    assert_eq!(mundo.jogadores[&1].request_id, 1);
+
+    for _ in 0..(RECARGA_ESCUDO_TICKS - 1) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].escudo_recarga_ticks, 0);
+    // Em T+420 a recarga zera e o alvo registrado é limpo.
+    assert_eq!(mundo.jogadores[&1].escudo_alvo, None);
+
+    agendar_escudo(&mut mundo, 1, 3, 3, (0.0, 0.0));
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo.jogadores[&1].escudo_recarga_ticks,
+        RECARGA_ESCUDO_TICKS
+    );
+    assert_eq!(mundo.jogadores[&1].escudo_pv, ABSORCAO_ESCUDO);
+    assert_eq!(mundo.jogadores[&1].seq, 3);
+}
+
+/// A absorção expira no tick T+150 e cada aplicação atribui, nunca acumula.
+#[test]
+fn escudo_expira_apos_150_ticks() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 2);
+    agendar_escudo(&mut mundo, 1, 1, 1, (0.0, 0.0));
+    mundo.avancar_tick();
+    for _ in 0..(TICKS_DURACAO_ESCUDO - 1) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].escudo_ticks, 1);
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].escudo_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].escudo_pv, 0);
+    assert_eq!(mundo.jogadores[&1].escudo_alvo, None);
+    assert_eq!(
+        mundo.jogadores[&1].escudo_recarga_ticks,
+        RECARGA_ESCUDO_TICKS - TICKS_DURACAO_ESCUDO
+    );
+    assert_eq!(mundo.aplicar_dano_a_jogador(1, DANO_ATAQUE_PNJ), 0);
+    assert_eq!(mundo.jogadores[&1].vida, 100 - DANO_ATAQUE_PNJ);
+
+    // Com a recarga zerada, um aliado a 3 m recebe um escudo novo (não somado).
+    for _ in 0..(RECARGA_ESCUDO_TICKS - TICKS_DURACAO_ESCUDO) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].escudo_recarga_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].escudo_alvo, None);
+    mundo.adicionar_jogador(2);
+    if let Some(jogador) = mundo.jogadores.get_mut(&2) {
+        jogador.posicao = (ALCANCE_ESCUDO_M, 0.0);
+    }
+    agendar_escudo(&mut mundo, 1, 2, 2, (ALCANCE_ESCUDO_M, 0.0));
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&2].escudo_pv, ABSORCAO_ESCUDO);
+    assert_eq!(mundo.jogadores[&2].escudo_alvo, Some(2));
+    assert_eq!(mundo.jogadores[&1].escudo_pv, 0);
+    assert_eq!(mundo.jogadores[&1].escudo_alvo, Some(2));
+}
+
+/// Os quatro campos do escudo entram no hash canônico, em ordem estável.
+#[test]
+fn hash_estado_cobre_escudo() {
+    let mut primeiro = Mundo::new();
+    primeiro.adicionar_jogador(1);
+    garantir_nivel(&mut primeiro, 1, 2);
+    let mut segundo = Mundo::new();
+    segundo.adicionar_jogador(1);
+    garantir_nivel(&mut segundo, 1, 2);
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    agendar_escudo(&mut primeiro, 1, 1, 1, (0.0, 0.0));
+    primeiro.avancar_tick();
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+
+    agendar_escudo(&mut segundo, 1, 1, 1, (0.0, 0.0));
+    segundo.avancar_tick();
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.escudo_pv = 100;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.escudo_pv = 100;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.escudo_ticks = 10;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.escudo_ticks = 10;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.escudo_recarga_ticks = 10;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.escudo_recarga_ticks = 10;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.escudo_alvo = Some(2);
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.escudo_alvo = Some(2);
     }
     assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
 }
