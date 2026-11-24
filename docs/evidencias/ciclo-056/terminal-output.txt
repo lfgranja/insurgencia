@@ -1,0 +1,17 @@
+=== 2026-11-24T11:37:21Z ===
+$ cargo test -q -p insurgencia-servidor --test cli
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.04s
+
+EXIT=0
+
+$ printf '1 mover 1 1 0.5 0.0' | cargo run ... --ticks 1
+0	7b134fe279280969e46739d2e370f8447902de8cb9c0f388f0e198ab1e09710d
+EXIT=0
+
+$ printf '1 voar 1 1' | cargo run ... --ticks 1
+EXIT=2
+stdout_bytes=0
+linha 1: ação desconhecida: voar
