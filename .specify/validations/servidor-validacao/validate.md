@@ -1,55 +1,29 @@
-# Validação (R4) — 009-servidor-validacao
+# Validação (R4) — 056-servidor-validacao
 
-**Data:** 2026-11-20T03:08:32Z · **Branch:** `feature/009-servidor-validacao` · **HEAD de trabalho:** `0e26179` · **Veredito:** aprovado
+**Data:** 2026-11-24T10:33Z · **Resultado:** **PASS (documental) — aprovado para R7, CONDICIONADO à execução do roteiro** · R4 precede R7 · **Nada executado nesta validação** · Nenhum build, gate, formatador, teste, captura, commit, push, PR, merge, deploy, issue ou promoção de versão foi executado por este agente; todo resultado de execução permanece **[NV]**. Este arquivo substitui integralmente o residual do ciclo 009 com o mesmo slug; as afirmações de execução ali registradas **não** são evidência deste ciclo.
 
-## Comandos executados e saídas
+| Verificação | Saída |
+|---|---|
+| Âncora | Worktree `/home/luis/development/MDMV/projetos/insurgencia/.specify/queue/worktrees/servidor-056/`, branch `feature/056-servidor-validacao`, base `0bc2c25`; sessão `20261124T102734Z-servidor-validacao`, título `insurgencia - validacao do servidor headless`. Decisão 80/20 em `.specify/memory/STATE.md` (2026-11-24T10:29Z): `servidor-validacao` (BF-011) **1280/3125** (`4×5×4×4×4`) contra HUD `hash_estado` **1125/3125**, cliente `mover` **240/3125**, contratos **100/3125** e rede **50/3125** (inelegível por ADR-004), denominador 3125, R1 `go`. DoD 0.9: whitelist única derivada de `ACOES_PERMITIDAS`, `acao_exige_destino` pública, validação antes do agendamento, recusa `linha N: <CodigoRecusa>` com exit 2/stdout vazia, formato `<tick>\t<sha256>` e hash inicial preservados; consumidores — usuário/automação do CLI `insurgencia-servidor` e `crates/servidor/tests/cli.rs`; provas — `cargo test -p insurgencia-servidor --test cli`, sondas `printf … \| cargo run -p insurgencia-servidor -- --ticks N`, `./verify.sh` remoto `gates`+`rust`; backlog — BF-011 `fechado`. |
+| Escopo do código | Nenhuma alteração de código **por este agente**: os 5 artefatos são documentais. A implementação de referência em `crates/sim/src/lib.rs` (`pub const ACOES_PERMITIDAS` com 13 ações e `pub fn acao_exige_destino` com 11/2, regras de validação e `ultima_recusa` intactas), em `crates/servidor/src/main.rs` (whitelist local removida, parser com aridade/coordenadas finitas derivadas do Núcleo, validação de cada comando antes de `agendar_comando` com visão local de `seq`/`request_id`, recusa exit 2/stdout vazia/stderr `linha N: <CodigoRecusa>`) e em `crates/servidor/tests/cli.rs` (fixture `cli.rs:19` com `0 0`, 5 testes nomeados, 141 preservados → 146) é **handoff ao SWE**; toda execução **[NV]**. |
+| Evidência local | Causa e plano confirmados por leitura: `sim:188-202` traz as 13 ações em constante privada no baseline; `sim:212-220` fixa níveis 2/3/6 com `_ => 1`; `sim:2087+` documenta a ordem de `ValidacaoComandos::validar` e não tem chamador; `servidor:16-24` replica apenas 6 ações; `servidor:60-116` fixa aridade 4/6 e `exige_destino` para 3 ações; `servidor:137-175` agenda diretamente e emite `<tick>\t<hash>` antes de avançar; `cli.rs:19` usa `coletar_materiais 1 1 0.5 0.5` (inválido para o Núcleo, limite 1 m), enquanto `analisar_linha("7 mover 1 2 3.5 -4", 1)` é teste de parser e permanece; `ultima_recusa` entra no hash, logo a recusa não pode mutar estado. Os resíduos do ciclo 009 em `assessments/` e nos arquivos antigos de validação/release foram lidos e não editados fora da fronteira. |
+| Roteiro de testes | `.specify/validations/servidor-validacao/test-roadmap.md` escrito antes do PR: **exatamente 10 passos**, superfície CLI/headless (sem browser-use) e coluna `automatizável?`, capturas planejadas em `$TMP/saidas`, rollback e os casos: âncora 1280/3125 e resíduos do ciclo 009 (1), `pub const ACOES_PERMITIDAS` e `acao_exige_destino` 11/2 sem mudar regras (2), parser sem whitelist local e aridade/coordenadas finitas derivadas do Núcleo (3), validação antes de `agendar_comando` com visão local de `seq`/`request_id` (4), recusa exit 2/stdout vazia/`linha N: <CodigoRecusa>` (5), formato `<tick>\t<sha256>`/determinismo/hash inicial (6), fixture `cli.rs:19` com `0 0` e testes de parser `mover (3.5,-4)` preservados (7), 5 testes nomeados com 141→146 e convenções Rust (8), fronteira sem contrato/protocolo/Cargo/CI/stack/rede (9), governança R1/R4/**R6 N/A**/[NV] com rollback e BF-011 (10). |
+| Cobertura determinística | Os testes nomeados `todas_as_treze_acoes_do_sim_sao_aceitas_pela_whitelist_do_cli`, `acoes_com_destino_exigem_coordenadas_finitas_e_rejeitam_coordenadas_extras`, `comando_recusado_pela_validacao_retorna_exit_2_sem_stdout_e_com_codigo_na_stderr`, `comandos_validados_preservam_formato_tick_hash_e_determinismo` e `hash_inicial_com_stdin_vazia_permanece_igual_ao_estado_inicial`, assim como os 141 testes existentes (total esperado **146**), `cargo test -p insurgencia-servidor --test cli` e as sondas `printf … \| cargo run -p insurgencia-servidor -- --ticks N`, são executados somente pelo orquestrador. Nenhum resultado, contagem de testes ou `VERIFY_EXIT` é afirmado por este agente: toda execução está **[NV]**. |
+| Baseline de converge | **[NV]** — `specs/056-servidor-validacao/converge.md` é arquivo novo com a 1ª entrada append-only e seção **[NV]**; bootstrap do baseline pelo orquestrador, fora da fronteira deste agente. Nenhum `converge.md` existente editado. |
+| Governança | 5 artefatos na fronteira exata, na ordem da constituição v1.2.2: `… 09 checklist → revisão → 10 tasks (T009) → 11 analyze (T010, READ-ONLY) → 12 implement → 13 converge → 27 validate (T011, R4) → 26 release (T012, R7 `1.0.0-local`)`; R1 `go` registrado na decisão 80/20, R4 **condicionado** e antes de R7, `converge` append-only com **[NV]**; **R6 N/A/bloqueado** — fora da sequência executável em v1.2.2 até existir `resolve-tasks.sh`/adaptador (BF-007), PARE se invocada, nenhuma issue simulada, nenhum `gh` improvisado, dívida de automação registrada; promoção `dev→main` e deploy são SWE-exclusivos; paths alheios (inclusive `AGENTS.md` e os assessment legados) preservados; rollback documentado em `release.md`, nunca executado. |
 
-```text
-$ G=/home/luis/.local/bin/Godot_v4.7.2-stable_linux.x86_64
-$ $G --headless --version
-4.7.2.stable.official.ed1daf0bf
+## R4
 
-$ timeout 25s $G --headless --path . --script res://tests/test_contrato.gd
-PASS=16 FAIL=0 OK=1 exit=0
+Aprovado para R7, **condicionado à execução do roteiro de 10 passos** pelo orquestrador/SWE. A aprovação é documental: baseia-se na decisão 80/20 de **1280/3125** (`4×5×4×4×4`), na DoD 0.9 (`STATE.md`, 10:29Z), na regra registrada no GDD/AGENTS (13 ações canônicas e validação antes do agendamento) e no contrato técnico lido no baseline `0bc2c25`. A fronteira foi confirmada: a API pública da sim é `pub const ACOES_PERMITIDAS` e `pub fn acao_exige_destino` (11 com destino, 2 sem); o servidor não mantém whitelist própria, deriva aridade/coordenadas finitas do Núcleo, valida antes de agendar preservando o replay do lote e recusa sem efeito nem mutação de `ultima_recusa`; o formato `<tick>\t<sha256>` e o hash inicial permanecem. Os 5 testes nomeados cobrem whitelist, aridade/coordenadas, recusa, determinismo e hash inicial. Nenhum build, gate, teste, captura, commit, push, PR, merge, deploy, issue ou promoção foi executado por este agente; o verde dependerá da execução observada pelo orquestrador.
 
-$ timeout 25s $G --headless --path . --script res://tests/test_servidor.gd
-PASS=6 FAIL=0 OK=1 exit=0
+## Execução pendente — **[NV]**
 
-$ timeout 25s $G --headless --path . --script res://tests/test_loopback.gd
-PASS=8 FAIL=0 OK=1 exit=0   (inclui 20_snapshots_em_1s e os 5 campos do snapshot)
+- **Gates e testes**: **[NV]** — `cargo test -p insurgencia-servidor --test cli` com 141 testes existentes preservados e 5 novos (**146**), sondas CLI, `./verify.sh` e os gates locais a executar pelo orquestrador; nenhum resultado afirmado nesta validação.
+- **Roteiro 10 passos**: **[NV]** — a executar pelo orquestrador/SWE, com capturas em `$TMP/saidas` conforme o `test-roadmap.md`; nenhuma captura produzida por este agente.
+- **Implementação**: **[NV]** — API no sim, parser, validação, recusa, fixture e testes são handoff ao SWE; nenhuma linha de código escrita nesta etapa.
+- **Correção na fonte**: se a execução revelar divergência, corrigir a fonte (código/artefato), nunca a expectativa do teste; registrar data/fonte em `converge.md` por nova entrada append-only, sem reescrever o histórico.
+- **Fronteira**: CI `gates`+`rust`, merge em `dev`, acionamento de R6, promoção de `1.0.0-local` a `1.0.0`, deploy e decisão do SWE sobre PRs permanecem **[NV]** até verificação ao vivo; R6 continua **N/A/bloqueado** (BF-007).
 
-$ timeout 25s $G --headless --path . --script res://tests/test_validacao.gd
-PASS=9 FAIL=0 OK=1 exit=0
+## Execução observada (2026-11-24T10:49Z)
 
-$ timeout 4s $G --headless --path . --script res://nucleo/main_server.gd -- --porta=7777
-SERVIDOR_PRONTO porta=7777
-```
-
-## Correções descobertas pela verificação (convergência)
-1. `Mundo.hash_estado()` — o plano prescreve `String.sha256_string()`, que **não existe** no Godot 4.7 (`Parse Error: Cannot find member "sha256_string" in base "String"`). Substituído por `HashingContext.HASH_SHA256` + `to_utf8_buffer()` + `hex_encode()`.
-2. `avancar_com_snapshots()` — deriva de ponto flutuante no acumulador 30→20 Hz produzia 19 snapshots; acrescentada tolerância `+0.0000001` na comparação com `1/20`. Agora 20/20.
-3. `abrir()` — `multiplayer` do Node e `get_tree()` são nulos durante `SceneTree._initialize()`; acesso via `Engine.get_main_loop()` e `get_multiplayer()` (método, não propriedade), com guardas. `SERVIDOR_PRONTO` observado.
-
-## Conformidade
-| SC | Evidência | Resultado |
-|:--|:--|:--|
-| SC-001 | 6 PASS + `OK test_servidor`, exit 0 | PASS |
-| SC-002 | 8 PASS + `OK test_loopback`, 20 snapshots | PASS |
-| SC-003 | 9 PASS + `OK test_validacao`, exit 0 | PASS |
-| SC-004 | `SERVIDOR_PRONTO porta=7777` | PASS |
-| SC-005 | 5 gates do alvo — saída no final deste arquivo | PASS |
-
-## Ressalva
-Os testes exercitam `handle_join`/`handle_command` diretamente; **conexão UDP real de dois clientes distintos** e handshake pela rede não foram observados neste ciclo — **[NV]**. Nenhum deploy, CI remoto adicional ou merge é afirmado aqui.
-
-## Gates finais (2026-11-20T03:08:52Z, após R4/R7)
-
-```text
-sdd-completeness:  PASS (spec_dirs=9 gaps=0 baselined=0 strict_from=88)  exit=0
-work-order-dag:    PASS (files=9 tasks=222 edges=0 cycles=0)              exit=0
-task-id-uniqueness:PASS (tasks_files=9 duplicates=0 baselined=0)         exit=0
-converge-append-only: PASS (files=0 baselined=0)                          exit=0
-hub-docs-gate:     PASS (0 errors, 0 warnings)                           exit=0
-```
-
-Nota: `check_sdd_completeness` esteve RED (`gaps=1: release, validate`) entre a abertura do ciclo e a criação destes artefatos; a saída acima é a reexecução após materializá-los.
+Roteiro **10/10 PASS**; capturas em `/tmp/tmp-servidor-056-saidas/roadmap.txt` e detalhamento em `evidence.md`. `cargo fmt --all` OK; `cargo check -p insurgencia-sim --tests` EXIT 0; `cargo test -p insurgencia-sim --test simulacao` **97/97**; `cargo check -p insurgencia-servidor --tests` EXIT 0; `cargo test -p insurgencia-servidor --test cli` **10/10**; inventário **146**. Sondas CLI: lote válido imprime `0\t7b134fe2...`; ações desconhecidas e replay recusados com exit 2, stdout vazia e `linha N: <CodigoRecusa>` na stderr. Cinco gates locais PASS. Correção de dois placeholders inválidos e restauração byte a byte de `concept.md`/`problem.md` preservaram o histórico. CI remoto/merge/promoção ainda **[NV]**; R4 PASS sobre o estado local verificado; R7 `1.0.0-local`; R6 N/A/bloqueado; promoção/deploy SWE-exclusivos.

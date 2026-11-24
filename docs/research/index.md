@@ -1,6 +1,16 @@
 # Índice de pesquisa e avaliação — Insurgência
 
-> **Nota datada (2026-11-23T22:00Z) — vigente.** Baseline do ciclo 055: ALVO `origin/dev=3f3b01c`,
+> **Nota datada (2026-11-24T10:29Z) — vigente.** Baseline do ciclo 056: ALVO `origin/dev=0bc2c25`
+> (`origin/main=2acf9e5`), FONTE `b1deab1` (fonte, não autoridade), fila 0.0 com apenas PR #72
+> `dev→main` GREEN em `gates`/`rust`, escalado ao SWE e não mesclado, 54 specs no head, 141 testes,
+> 5 gates locais PASS, decisão 056 **1280/3125** (**BF-011** — paridade de whitelist/validação do
+> servidor headless — escolhido), **R6** N/A/bloqueado (BF-007; PARE e escale ao SWE se invocada) e
+> promoção `dev→main`/deploy **exclusivos do SWE** (**[EV]**). CI/deploy remoto **[NV]**; os inventários
+> abaixo (2026-11-19, 2026-11-23 e atualizações seguintes) são **histórico**. Detalhes em
+> `docs/PROGRESSO.md` e `.specify/memory/STATE.md`.
+
+> **Nota datada (2026-11-23T22:00Z) — histórica** (superada pela nota vigente de 2026-11-24T10:29Z).
+> Baseline do ciclo 055: ALVO `origin/dev=3f3b01c`,
 > FONTE `b1deab1`, 0 PRs abertos, 53 specs no head, 136 testes, 5 gates locais PASS, decisão
 > 055 **960/3125** (**BF-002a** escolhido), **R6** fora da sequência executável e promoção
 > `dev→main`/deploy **exclusivos do SWE** (**[EV]**). CI/deploy remoto **[NV]**; os inventários

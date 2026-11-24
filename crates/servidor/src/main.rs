@@ -6,22 +6,14 @@
 //! Lê comandos da `stdin`, alimenta o `insurgencia-sim` e emite o hash canônico
 //! do estado a cada tick, sem relógio, rede, aleatoriedade ou janela.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::io::{self, BufRead, BufWriter, Write};
 use std::process::ExitCode;
 
-use insurgencia_sim::{Comando, Mundo};
-
-/// Ações conhecidas do contrato, espelhando `ACOES_PERMITIDAS` do núcleo.
-const ACOES_PERMITIDAS: &[&str] = &[
-    "mover",
-    "sinalizar_sincronia",
-    "sinalizar_alavanca",
-    "coletar_materiais",
-    "construir_barreira",
-    "atacar_forte",
-];
+use insurgencia_sim::{
+    acao_exige_destino, CodigoRecusa, Comando, Mundo, ValidacaoComandos, ACOES_PERMITIDAS,
+};
 
 /// Comando validado na fronteira da `stdin`, antes do agendamento no `Mundo`.
 #[derive(Clone, Debug, PartialEq)]
@@ -96,7 +88,7 @@ fn analisar_linha(linha: &str, numero: usize) -> Result<Option<LinhaComando>, St
     }
     let seq: i64 = partes[2].parse().map_err(|_| erro("seq inválido"))?;
     let request_id: i64 = partes[3].parse().map_err(|_| erro("request_id inválido"))?;
-    let exige_destino = matches!(acao, "mover" | "coletar_materiais" | "construir_barreira");
+    let exige_destino = acao_exige_destino(acao);
     let destino = match (exige_destino, partes.len()) {
         (true, 6) => {
             let x = analisar_coordenada(partes[4], "x", numero)?;
@@ -121,24 +113,68 @@ fn analisar_linha(linha: &str, numero: usize) -> Result<Option<LinhaComando>, St
 /// # Errors
 ///
 /// Retorna uma mensagem estável se a leitura falhar ou se alguma linha for
-/// inválida; nenhum comando é entregue ao `Mundo` nesse caso.
-fn ler_comandos() -> Result<Vec<LinhaComando>, String> {
+/// inválida; nenhum comando é entregue ao `Mundo` nesse caso. Cada comando
+/// conserva o número da linha, 1-based, para a recusa da validação.
+fn ler_comandos() -> Result<Vec<(usize, LinhaComando)>, String> {
     let entrada = io::stdin();
     let mut comandos = Vec::new();
     for (indice, linha) in entrada.lock().lines().enumerate() {
         let linha = linha.map_err(|erro| format!("falha ao ler stdin: {erro}"))?;
         if let Some(comando) = analisar_linha(&linha, indice + 1)? {
-            comandos.push(comando);
+            comandos.push((indice + 1, comando));
         }
     }
     Ok(comandos)
+}
+
+/// Valida um comando com o núcleo antes do agendamento, usando a visão local
+/// de `seq`/`request_id` do lote para detectar replays entre comandos da mesma
+/// linha do tempo. O estado do `Mundo` é restaurado antes de retornar.
+///
+/// # Errors
+///
+/// Retorna `linha N: <CodigoRecusa>` quando o núcleo recusa o comando ou o par
+/// não está presente no mundo; nenhum comando é agendado nesse caso.
+fn validar_comando(
+    mundo: &mut Mundo,
+    monotonicos: &BTreeMap<u64, (i64, i64)>,
+    numero: usize,
+    comando: &LinhaComando,
+) -> Result<(), String> {
+    let original = mundo
+        .jogadores
+        .get(&comando.peer_id)
+        .map(|jogador| (jogador.seq, jogador.request_id))
+        .ok_or_else(|| format!("linha {numero}: {}", CodigoRecusa::PeerNaoAutorizado))?;
+    let base = match monotonicos.get(&comando.peer_id) {
+        Some(&valores) => valores,
+        None => original,
+    };
+    if let Some(jogador) = mundo.jogadores.get_mut(&comando.peer_id) {
+        jogador.seq = base.0;
+        jogador.request_id = base.1;
+    }
+    let resultado = ValidacaoComandos::validar(
+        mundo,
+        comando.peer_id,
+        &comando.acao,
+        comando.seq,
+        comando.request_id,
+        comando.destino,
+    );
+    if let Some(jogador) = mundo.jogadores.get_mut(&comando.peer_id) {
+        jogador.seq = original.0;
+        jogador.request_id = original.1;
+    }
+    resultado.map_err(|codigo| format!("linha {numero}: {codigo}"))
 }
 
 /// Executa o ciclo headless completo, da argumentação ao hash final.
 ///
 /// # Errors
 ///
-/// Propaga falhas de argumentos, de leitura da `stdin` e de escrita na `stdout`.
+/// Propaga falhas de argumentos, de leitura da `stdin`, de validação e de
+/// escrita na `stdout`.
 fn executar() -> Result<(), String> {
     let args = env::args_os()
         .skip(1)
@@ -151,11 +187,17 @@ fn executar() -> Result<(), String> {
     let comandos = ler_comandos()?;
     let mut mundo = Mundo::new();
 
-    let peers: BTreeSet<u64> = comandos.iter().map(|comando| comando.peer_id).collect();
+    let peers: BTreeSet<u64> = comandos
+        .iter()
+        .map(|(_, comando)| comando.peer_id)
+        .collect();
     for peer_id in peers {
         mundo.adicionar_jogador(peer_id);
     }
-    for comando in comandos {
+    let mut monotonicos: BTreeMap<u64, (i64, i64)> = BTreeMap::new();
+    for (numero, comando) in comandos {
+        validar_comando(&mut mundo, &monotonicos, numero, &comando)?;
+        monotonicos.insert(comando.peer_id, (comando.seq, comando.request_id));
         mundo.agendar_comando(Comando {
             peer_id: comando.peer_id,
             acao: comando.acao,
@@ -230,12 +272,12 @@ mod testes {
     fn linha_valida_sem_coordenadas() {
         let esperado = Ok(Some(LinhaComando {
             peer_id: 8,
-            acao: "atacar_forte".to_string(),
+            acao: "sinalizar_sincronia".to_string(),
             seq: 4,
             request_id: 5,
             destino: None,
         }));
-        assert_eq!(analisar_linha("8 atacar_forte 4 5", 2), esperado);
+        assert_eq!(analisar_linha("8 sinalizar_sincronia 4 5", 2), esperado);
     }
 
     #[test]
