@@ -408,3 +408,13 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - **Dívidas/gaps em aberto**: (1) deploy em `main` sem configuração de job no workflow, diferido pelo SWE; (2) R6 não é executável na sequência do alvo até existir adaptador (constituição v1.2.2).
 - **[NV] remanescentes**: decisão do SWE sobre o PR #48, estado remoto após esta nota, deploy/publicação, efeitos em produção e assinatura GPG.
 - **Superação**: as notas anteriores ancoradas em `efb4d4b`/PR #45 (23:01Z e 23:05Z de 22-11) ficam **superadas**, não apagadas — preservadas como histórico. Nota append-only; nenhum gate/build/format/commit/push/PR/deploy executado; 0 linhas removidas.
+
+## 2026-11-23T22:00Z — Ciclo 055 (escudo de milícia): baseline e decisão 960/3125
+
+- **Sessão/escopo**: `insurgencia - escudo de milicia` (`20261123T215500Z-escudo-milicia`), worktree `.specify/queue/worktrees/escudo-055`, branch `feature/055-escudo-milicia`. Nota didática append-only; nada executado nesta edição.
+- **Âncora (Bloco 0.a, [EV])**: ALVO `origin/dev=3f3b01c` = HEAD do worktree; FONTE `mdmv-dark-factory` `b1deab1` (fonte, não autoridade; nada transplantado). 0 PRs abertos. 53 specs no head. 136 testes no baseline. 5 gates locais PASS.
+- **Decisão 80/20 do ciclo 055 ([EV])**: **960/3125** (critério impacto × confiança × fechamento × esforço⁻¹ × risco⁻¹, escala 1–5, denominador 3125); opção **BF-002a** (Escudo de Milícia — absorção determinística de 250 por 5 s, custo 25, alcance 3 m, nível 2; GDD §10.6:687-692) escolhida frente a BF-003 e BF-001.
+- **Governança ([EV])**: **R6** permanece fora da sequência executável (sem adaptador no alvo; se invocada, PARE e escale ao SWE, nunca simular issue); promoção `dev→main` e deploy são competência **exclusiva do SWE**. Nenhum merge/deploy por agente.
+- **[NV]**: CI/deploy remoto e qualquer estado externo não confirmado ao vivo nesta sessão.
+- **[INF]**: a meta de 141 testes decorre de 136 + 5 novos testes do escudo; a implementação segue a rota única `aplicar_dano_a_jogador` e os campos de escudo no hash (conforme DoD em `.specify/memory/STATE.md`). Inferência, não verificação.
+- **Histórico**: notas anteriores (inclusive 2026-11-23T01:31Z, ciclo 038, `e010363`/PR #48) permanecem imutáveis; esta é a vigente. Correção append-only; nenhum gate/build/formatter/commit/push/PR/deploy executado; 0 linhas removidas.

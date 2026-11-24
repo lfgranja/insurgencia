@@ -1,6 +1,16 @@
 # ROADMAP.md — Insurgência
 
-> **Nota datada (2026-11-20T01:48Z).** Baseline: HEAD local `2af7537`; `origin` público, 12 PRs
+> **Nota datada (2026-11-23T22:00Z) — vigente.** Ciclo 055, worktree
+> `feature/055-escudo-milicia`. Fatos **[EV]** do baseline: ALVO `origin/dev=3f3b01c`; FONTE
+> `b1deab1` (fonte, não autoridade); 0 PRs abertos; 53 specs no head; 136 testes; 5 gates locais
+> PASS; decisão 055 **960/3125**; opção **BF-002a** (Escudo de Milícia) escolhida; **R6** fora da
+> sequência executável e promoção `dev→main`/deploy **exclusivos do SWE**. **[NV]**: CI/deploy
+> remoto. **[INF]**: as fases 80/20 e o horizonte GDD §16.6 abaixo seguem como plano; a nota de
+> 2026-11-20T01:48Z e as seções seguintes são **histórico**. "80/20" ordena a fila, nunca percentual
+> de conclusão.
+>
+> **Nota datada (2026-11-20T01:48Z) — histórica** (superada pela nota vigente de
+> 2026-11-23T22:00Z). Baseline: HEAD local `2af7537`; `origin` público, 12 PRs
 > `MERGED`, 10 execuções CI `success`, proteção de `dev` com `gates`; 7 specs, 222 tarefas `[X]`,
 > 5/5 gates PASS. **Nenhum código do ciclo 80/20 existe.** "80/20" ordena a fila; nunca percentual
 > de conclusão. Evidências: `docs/PROGRESSO.md`, `.specify/memory/STATE.md`, `docs/research/`.
