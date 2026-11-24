@@ -968,11 +968,13 @@ fn solicitar_armadilha(
     });
 }
 
-/// Agenda `analise_materialista` no PNJ ativo mais próximo ao pressionar `E`.
+/// Agenda `analise_materialista` no PNJ ativo mais próximo ao pressionar `Y`,
+/// ou `E` quando o jogador não é Artesão.
 ///
-/// Vale para papéis que não sejam Artesão, pois `E` arma a armadilha do Artesão.
-/// Sem alvo dentro de 12 m, nenhum comando é agendado e os contadores locais
-/// permanecem intactos; o núcleo valida Fôlego, nível e recarga.
+/// `E` permanece contextual — Artesão arma armadilha — enquanto `Y` força a
+/// análise em qualquer papel, inclusive no simulador, onde todos começam como
+/// Artesão. Sem alvo dentro de 12 m, nenhum comando é agendado e os contadores
+/// locais permanecem intactos; o núcleo valida Fôlego, nível e recarga.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
@@ -983,7 +985,8 @@ fn solicitar_analise_materialista(
     mut local: ResMut<ComandoLocal>,
     mut simulacao: ResMut<Simulacao>,
 ) {
-    if !teclado.just_pressed(KeyCode::KeyE) || jogador_e_artesao(&simulacao.0) {
+    let contextual = teclado.just_pressed(KeyCode::KeyE) && !jogador_e_artesao(&simulacao.0);
+    if !contextual && !teclado.just_pressed(KeyCode::KeyY) {
         return;
     }
     let Some(destino) = posicao_analise_materialista(&simulacao.0, jogador.0.posicao) else {
@@ -1162,75 +1165,114 @@ fn contar_pnjs_analisados(simulacao: &Simulacao) -> usize {
         .count()
 }
 
-/// Dica de teclas exibida no rodapé da HUD; `V` ergue o escudo.
+/// Valores exibidos no painel, coletados do espelho autoritativo e do jogador.
+struct DadosHud {
+    x: f32,
+    y: f32,
+    ilha: &'static str,
+    funcao: &'static str,
+    nivel: u8,
+    suprimentos: i64,
+    materiais: i64,
+    folego: i64,
+    escudo_pv: i64,
+    escudo_ticks: i64,
+    vida: i64,
+    vida_alvo: i64,
+    pnjs: usize,
+    analise: usize,
+    autogestao: i64,
+    barreiras: usize,
+    pontes: usize,
+    armadilhas: usize,
+    suditos: usize,
+    resistencia: i64,
+    nos_convertidos: usize,
+    ilhas_controladas: usize,
+    sinais: usize,
+    resultado: String,
+    construindo: String,
+    coletando: String,
+}
+
+/// Reúne em uma passagem os dados exibidos pela HUD, sem efeitos colaterais.
+#[must_use]
+fn coletar_dados_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> DadosHud {
+    let (x, y) = jogador.0.posicao;
+    let remoto = simulacao.0.jogadores.get(&PEER_ID);
+    let (construindo, coletando) = texto_progresso(simulacao);
+    DadosHud {
+        x,
+        y,
+        ilha: ilha_em((x, y)).map_or("nenhuma", |atual| atual.nome),
+        funcao: remoto.map_or("Artesão", |j| j.funcao.nome()),
+        nivel: remoto.map_or(1, |j| j.nivel),
+        suprimentos: remoto.map_or(0, |j| j.suprimentos),
+        materiais: remoto.map_or(0, |j| j.materiais),
+        folego: remoto.map_or(0, |j| j.folego),
+        escudo_pv: remoto.map_or(0, |j| j.escudo_pv),
+        escudo_ticks: remoto.map_or(0, |j| j.escudo_ticks),
+        vida: remoto.map_or(0, |j| j.vida),
+        vida_alvo: simulacao
+            .0
+            .jogadores
+            .get(&PEER_ALVO_TREINO)
+            .map_or(0, |alvo| alvo.vida),
+        pnjs: simulacao.0.pnjs.values().filter(|pnj| pnj.ativo).count(),
+        analise: contar_pnjs_analisados(simulacao),
+        autogestao: remoto.map_or(0, |j| j.pontos_autogestao),
+        barreiras: simulacao
+            .0
+            .barreiras
+            .values()
+            .filter(|barreira| barreira.dono == PEER_ID)
+            .count(),
+        pontes: simulacao
+            .0
+            .pontes
+            .values()
+            .filter(|ponte| ponte.dono == PEER_ID)
+            .count(),
+        armadilhas: simulacao
+            .0
+            .armadilhas
+            .values()
+            .filter(|armadilha| armadilha.dono == PEER_ID)
+            .count(),
+        suditos: simulacao
+            .0
+            .suditos
+            .values()
+            .filter(|sudito| sudito.convertido)
+            .count(),
+        ilhas_controladas: simulacao
+            .0
+            .ilhas
+            .values()
+            .filter(|ilha| ilha.controlada)
+            .count(),
+        resistencia: simulacao.0.resistencia_ideologica,
+        nos_convertidos: simulacao.0.nos.values().filter(|no| no.convertido).count(),
+        sinais: simulacao.0.sinais.len(),
+        resultado: texto_resultado(simulacao),
+        construindo,
+        coletando,
+    }
+}
+
+/// Dica de teclas exibida no rodapé da HUD; `Y` força análise e `V` ergue o escudo.
 const DICA_TECLAS: &str = concat!(
     "WASD ou setas para mover · B para construir barreira · P para construir ponte · ",
     "C para coletar materiais · G para propaganda · R para propaganda no Nó · ",
     "F para atacar o Nó · Aproxime-se do alvo e use Q para atacar · ",
     "T para atacar o PNJ mais próximo · E para armadilha (Artesão) ou analisar o PNJ ",
-    "mais próximo · V para erguer escudo"
+    "mais próximo · Y para analisar em qualquer papel · V para erguer escudo"
 );
 
 /// Monta o texto do painel a partir do estado local e do espelho da simulação.
 #[must_use]
 fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
-    let (x, y) = jogador.0.posicao;
-    let ilha = if let Some(atual) = ilha_em((x, y)) {
-        atual.nome
-    } else {
-        "nenhuma"
-    };
-    let remoto = simulacao.0.jogadores.get(&PEER_ID);
-    let materiais = remoto.map_or(0, |j| j.materiais);
-    let suprimentos = remoto.map_or(0, |j| j.suprimentos);
-    let autogestao = remoto.map_or(0, |j| j.pontos_autogestao);
-    let folego = remoto.map_or(0, |j| j.folego);
-    let (escudo_pv, escudo_ticks) = remoto.map_or((0, 0), |j| (j.escudo_pv, j.escudo_ticks));
-    let vida = remoto.map_or(0, |j| j.vida);
-    let vida_alvo = if let Some(alvo) = simulacao.0.jogadores.get(&PEER_ALVO_TREINO) {
-        alvo.vida
-    } else {
-        0
-    };
-    let pnjs = simulacao.0.pnjs.values().filter(|pnj| pnj.ativo).count();
-    let analise = contar_pnjs_analisados(simulacao);
-    let funcao = remoto.map_or("Artesão", |j| j.funcao.nome());
-    let nivel = remoto.map_or(1, |j| j.nivel);
-    let barreiras = simulacao
-        .0
-        .barreiras
-        .values()
-        .filter(|barreira| barreira.dono == PEER_ID)
-        .count();
-    let pontes = simulacao
-        .0
-        .pontes
-        .values()
-        .filter(|ponte| ponte.dono == PEER_ID)
-        .count();
-    let armadilhas = simulacao
-        .0
-        .armadilhas
-        .values()
-        .filter(|armadilha| armadilha.dono == PEER_ID)
-        .count();
-    let suditos = simulacao
-        .0
-        .suditos
-        .values()
-        .filter(|sudito| sudito.convertido)
-        .count();
-    let ilhas_controladas = simulacao
-        .0
-        .ilhas
-        .values()
-        .filter(|ilha| ilha.controlada)
-        .count();
-    let sinais = simulacao.0.sinais.len();
-    let nos_convertidos = simulacao.0.nos.values().filter(|no| no.convertido).count();
-    let resistencia = simulacao.0.resistencia_ideologica;
-    let resultado = texto_resultado(simulacao);
-    let (construindo, coletando) = texto_progresso(simulacao);
+    let dados = coletar_dados_hud(jogador, simulacao);
     format!(
         concat!(
             "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\n",
@@ -1246,35 +1288,35 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
             "Construindo: {construindo}\nColeta: {coletando}\n",
             "{dica}"
         ),
-        x = x,
-        y = y,
-        ilha = ilha,
-        funcao = funcao,
-        nivel = nivel,
+        x = dados.x,
+        y = dados.y,
+        ilha = dados.ilha,
+        funcao = dados.funcao,
+        nivel = dados.nivel,
         NIVEL_MAXIMO = NIVEL_MAXIMO,
         LIMITE_X = LIMITE_X,
         LIMITE_Y = LIMITE_Y,
-        suprimentos = suprimentos,
-        materiais = materiais,
-        folego = folego,
-        escudo_pv = escudo_pv,
-        escudo_ticks = escudo_ticks,
-        vida = vida,
-        vida_alvo = vida_alvo,
-        pnjs = pnjs,
-        analise = analise,
-        autogestao = autogestao,
-        barreiras = barreiras,
-        pontes = pontes,
-        armadilhas = armadilhas,
-        suditos = suditos,
-        resistencia = resistencia,
-        nos_convertidos = nos_convertidos,
-        ilhas_controladas = ilhas_controladas,
-        sinais = sinais,
-        resultado = resultado,
-        construindo = construindo,
-        coletando = coletando,
+        suprimentos = dados.suprimentos,
+        materiais = dados.materiais,
+        folego = dados.folego,
+        escudo_pv = dados.escudo_pv,
+        escudo_ticks = dados.escudo_ticks,
+        vida = dados.vida,
+        vida_alvo = dados.vida_alvo,
+        pnjs = dados.pnjs,
+        analise = dados.analise,
+        autogestao = dados.autogestao,
+        barreiras = dados.barreiras,
+        pontes = dados.pontes,
+        armadilhas = dados.armadilhas,
+        suditos = dados.suditos,
+        resistencia = dados.resistencia,
+        nos_convertidos = dados.nos_convertidos,
+        ilhas_controladas = dados.ilhas_controladas,
+        sinais = dados.sinais,
+        resultado = dados.resultado,
+        construindo = dados.construindo,
+        coletando = dados.coletando,
         dica = DICA_TECLAS,
     )
 }

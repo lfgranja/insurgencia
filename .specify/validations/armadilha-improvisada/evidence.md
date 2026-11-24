@@ -25,4 +25,16 @@ Correções durante a execução:
 
 Todas corrigidas na fonte; nenhuma expectativa afrouxada.
 
+## Correções ACR aplicadas na fonte (pós-revisão)
+
+A tabela acima registra a execução original (12:13–12:55Z). Após a revisão ACR, três correções foram aplicadas na fonte por agentes de implementação; **nenhum** build, gate, teste, formatador ou captura foi executado por este agente de documentação (resultados permanecem **[NV]** até o orquestrador):
+
+| Correção ACR | Mudança na fonte | Evidência observável por inspeção |
+|:--|:--|:--|
+| Hash helpers | `serializar_estruturas` (`crates/sim/src/lib.rs`) decomposto em `serializar_barreiras`, `serializar_pontes`, `serializar_armadilhas`, `serializar_suditos`, `serializar_pnjs`, `serializar_ilhas`, `serializar_ilhas_reconquistadas` e `serializar_sinais`, todos puros (`#[must_use]`, `///`) | Segmentos e ordem preservados: jogadores por `peer_id`, armadilhas por `id`; `hash_estado`/`serializar_jogadores` seguem cobrindo os campos e cada armadilha |
+| Contagens CLI | `crates/servidor/tests/cli.rs` renomeou o teste para `todas_as_quatorze_acoes_do_sim_sao_aceitas_pela_whitelist_do_cli` e atualizou `ACOES_PERMITIDAS.len()` de 13 para **14** e o total de ações com destino de 11 para **12** | Coerente com a inclusão do token `armadilha` desde o ciclo 056; whitelist permanece derivada de `ACOES_PERMITIDAS`, sem expectativa afrouxada |
+| HUD/Y | `crates/cliente/src/main.rs`: `solicitar_analise_materialista` despacha com `KeyCode::KeyY` (E contextual: Artesão → armadilha, demais → análise; `Y` força a análise em qualquer papel, inclusive no simulador); `texto_hud` delega a coleta a `coletar_dados_hud`/`DadosHud` (puro, `#[must_use]`) e ficou com **49 linhas** | `Armadilhas: N` preservada, `DICA_TECLAS` registra `E` contextual e `Y`, `texto_hud` com 49 linhas (< 100) |
+
+Escopo, scorecard **720/3125**, rótulos `[HIPÓTESE]`, R6 **N/A/bloqueado**, o resultado 10/10 PASS acima e a lista de correções originais permanecem inalterados.
+
 **[NV]**: CI remoto, merge em `dev`, promoção/deploy, captura visual da janela Bevy. A superfície é CLI/headless; nenhuma janela foi aberta na área de trabalho do usuário.

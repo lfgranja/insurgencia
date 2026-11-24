@@ -2005,10 +2005,10 @@ impl Mundo {
             .join(";")
     }
 
-    /// Serializa barricadas, pontes, armadilhas, súditos, ilhas, reconquistas e sinais.
-    fn serializar_estruturas(&self) -> String {
-        let barreiras: String = self
-            .barreiras
+    /// Serializa as barricadas para o hash canônico.
+    #[must_use]
+    fn serializar_barreiras(&self) -> String {
+        self.barreiras
             .values()
             .map(|barreira| {
                 let (x, y) = barreira.posicao;
@@ -2020,9 +2020,13 @@ impl Mundo {
                 format!("{id}:{dono}:{x}:{y}:{pv}:{ticks}:{defesa}")
             })
             .collect::<Vec<_>>()
-            .join(";");
-        let pontes: String = self
-            .pontes
+            .join(";")
+    }
+
+    /// Serializa as pontes para o hash canônico.
+    #[must_use]
+    fn serializar_pontes(&self) -> String {
+        self.pontes
             .values()
             .map(|ponte| {
                 let (x, y) = ponte.posicao;
@@ -2033,9 +2037,13 @@ impl Mundo {
                 format!("{id}:{dono}:{x}:{y}:{pv}:{ticks}")
             })
             .collect::<Vec<_>>()
-            .join(";");
-        let armadilhas: String = self
-            .armadilhas
+            .join(";")
+    }
+
+    /// Serializa as armadilhas para o hash canônico.
+    #[must_use]
+    fn serializar_armadilhas(&self) -> String {
+        self.armadilhas
             .values()
             .map(|armadilha| {
                 let (x, y) = armadilha.posicao;
@@ -2046,9 +2054,13 @@ impl Mundo {
                 format!("{id}:{dono}:{x}:{y}:{arme}:{ticks}")
             })
             .collect::<Vec<_>>()
-            .join(";");
-        let suditos: String = self
-            .suditos
+            .join(";")
+    }
+
+    /// Serializa os súditos para o hash canônico.
+    #[must_use]
+    fn serializar_suditos(&self) -> String {
+        self.suditos
             .values()
             .map(|sudito| {
                 let (x, y) = sudito.posicao;
@@ -2063,9 +2075,13 @@ impl Mundo {
                 )
             })
             .collect::<Vec<_>>()
-            .join(";");
-        let pnjs: String = self
-            .pnjs
+            .join(";")
+    }
+
+    /// Serializa os PNJs para o hash canônico.
+    #[must_use]
+    fn serializar_pnjs(&self) -> String {
+        self.pnjs
             .values()
             .map(|pnj| {
                 let (x, y) = pnj.posicao;
@@ -2077,25 +2093,50 @@ impl Mundo {
                 format!("{id}:{x}:{y}:{pv}:{ativo}:{ticks}:{marca}")
             })
             .collect::<Vec<_>>()
-            .join(";");
-        let ilhas: String = self
-            .ilhas
+            .join(";")
+    }
+
+    /// Serializa as ilhas para o hash canônico.
+    #[must_use]
+    fn serializar_ilhas(&self) -> String {
+        self.ilhas
             .values()
             .map(|ilha| format!("{}:{}:{}", ilha.id, ilha.controlada, ilha.controle_ticks))
             .collect::<Vec<_>>()
-            .join(";");
-        let ilhas_reconquistadas: String = self
-            .ilhas_reconquistadas
+            .join(";")
+    }
+
+    /// Serializa as ilhas reconquistadas para o hash canônico.
+    #[must_use]
+    fn serializar_ilhas_reconquistadas(&self) -> String {
+        self.ilhas_reconquistadas
             .iter()
             .map(std::string::ToString::to_string)
             .collect::<Vec<_>>()
-            .join(";");
-        let sinais: String = self
-            .sinais
+            .join(";")
+    }
+
+    /// Serializa os sinais para o hash canônico.
+    #[must_use]
+    fn serializar_sinais(&self) -> String {
+        self.sinais
             .iter()
             .map(String::as_str)
             .collect::<Vec<_>>()
-            .join(";");
+            .join(";")
+    }
+
+    /// Serializa barricadas, pontes, armadilhas, súditos, ilhas, reconquistas e sinais.
+    fn serializar_estruturas(&self) -> String {
+        let barreiras = self.serializar_barreiras();
+        let pontes = self.serializar_pontes();
+        let armadilhas = self.serializar_armadilhas();
+        let suditos = self.serializar_suditos();
+        let pnjs = self.serializar_pnjs();
+        let ilhas = self.serializar_ilhas();
+        let ilhas_reconquistadas = self.serializar_ilhas_reconquistadas();
+        let sinais = self.serializar_sinais();
+
         format!(
             concat!(
                 "{barreiras}|{pontes}|{armadilhas}|{suditos}|{pnjs}|",

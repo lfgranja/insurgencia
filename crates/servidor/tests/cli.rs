@@ -192,7 +192,7 @@ fn primeira_linha_com_stdin_vazia_e_o_estado_inicial() {
 }
 
 #[test]
-fn todas_as_treze_acoes_do_sim_sao_aceitas_pela_whitelist_do_cli() {
+fn todas_as_quatorze_acoes_do_sim_sao_aceitas_pela_whitelist_do_cli() {
     const RECUSAS: &[CodigoRecusa] = &[
         CodigoRecusa::SeqOuRequestReplay,
         CodigoRecusa::AcaoBloqueada,
@@ -205,7 +205,7 @@ fn todas_as_treze_acoes_do_sim_sao_aceitas_pela_whitelist_do_cli() {
         CodigoRecusa::SaldoInsuficiente,
     ];
 
-    assert_eq!(ACOES_PERMITIDAS.len(), 13);
+    assert_eq!(ACOES_PERMITIDAS.len(), 14);
     for acao in ACOES_PERMITIDAS {
         let linha = if acao_exige_destino(acao) {
             format!("7 {acao} 1 1 0.0 0.0\n")
@@ -231,12 +231,12 @@ fn todas_as_treze_acoes_do_sim_sao_aceitas_pela_whitelist_do_cli() {
 
 #[test]
 fn acoes_com_destino_exigem_coordenadas_finitas_e_rejeitam_coordenadas_extras() {
-    assert_eq!(ACOES_PERMITIDAS.len(), 13);
+    assert_eq!(ACOES_PERMITIDAS.len(), 14);
     let com_destino = ACOES_PERMITIDAS
         .iter()
         .filter(|acao| acao_exige_destino(acao))
         .count();
-    assert_eq!(com_destino, 11);
+    assert_eq!(com_destino, 12);
     assert!(!acao_exige_destino("sinalizar_sincronia"));
     assert!(!acao_exige_destino("sinalizar_alavanca"));
 
