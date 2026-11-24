@@ -444,3 +444,97 @@
 ## 2026-11-23T17:20Z — fechamento do ciclo 054
 
 **Sessão**: `20261123T165500Z-analise-materialista` · **Título**: `insurgencia - análise materialista`. Roteiro **10/10 PASS** (`.specify/validations/analise-materialista/evidence.md`); `./verify.sh` **ALL STAGES OK**, **136 testes run: 136 passed, 0 skipped**, `VERIFY_EXIT=0`; cinco gates locais PASS após bootstrap do baseline (`files=36 baselined=36`). Implementação: `marca_ticks`/`analise_recarga_ticks`, cinco constantes `[HIPÓTESE]`, ação nível 3 com 20 Fôlego/12 m/150 ticks/450 ticks, bônus 10→12, hash, HUD `Análise: N` e tecla `E`. Três RED corrigidos na fonte (hash, helpers de validação e gate R6). R4 PASS, R7 `1.0.0-local`, R6 N/A. CI/merge/promoção pendentes nesta entrada; captura visual real **[NV]**.
+
+## 2026-11-23T21:58Z — auditoria da realidade e backlog de fechamento (ciclo 055)
+
+**Sessão**: `20261123T215500Z-escudo-milicia` · **Título**: `insurgencia - escudo de milicia`. **FONTE_FACTORY** `b1deab1` (`origin/dev` `1791705` [NV] capturado via `.git`; 31 paths sujos na factory — nada transplantado). **ALVO** `origin/dev=3f3b01c`, `origin/main=2acf9e5`, `HEAD` local sujo `990ab06` preservado. Worktree nova `feature/055-escudo-milicia` a partir de `origin/dev`.
+
+**[EV] Autoridade**: `AGENTS.md:42,60,71` e constituição v1.2.2 `:66-68` fixam `./verify.sh` como gate, GitHub Actions (`gates`/`rust`, `strict=true`) como CI, `gh` como CLI e merge autônomo apenas em `dev`; promoção `dev→main` e deploy são SWE-exclusivos. Sem job de deploy em `.github/workflows/ci-gates.yml`. Superfície CLI/headless; UI Bevy sempre `--minimizado`. `check_production_gate.py`/Forgejo/`fj` da factory são N/A no ALVO.
+
+**[EV] Fila 0.0**: `gh pr list --state open` → 0 PRs abertos; nenhum PR para `dev`/`main` a drenar ou babysitar. Worktrees/branches dos ciclos 053/054 estavam mergeados (PRs #65/#66/#68/#69 MERGED via `gh pr view`) e foram removidos com manifesto no ledger às 21:56Z. Stashes: 0. Ledger sem `active` alheio; único trabalho preservado é o checkout compartilhado sujo (31 paths não versionados/alterados), intocável.
+
+**[EV] Gates locais no baseline** (21:58Z, HEAD `3f3b01c`): SDD completeness PASS (`spec_dirs=53 gaps=0`), DAG PASS (`files=53 tasks=576 edges=260 cycles=0`), task-id PASS (`tasks_files=53 duplicates=0`), converge PASS (`files=36 baselined=36`), hub docs PASS (`0 errors, 0 warnings`). Matriz SDD: 53 specs, 38/38 spec/plan/tasks/checklist no checkout antigo; 53 validations no head vigente; `analyze` 13, `converge` 21; `evidence.md` só nos ciclos finais. `feature.json` corrente aponta `specs/055-escudo-milicia`.
+
+### backlog_de_fechamento (baseline único do ciclo 055)
+
+| ID | Descrição | Tipo | Evidência | Próximo passo |
+|:--|:--|:--|:--|:--|
+| BF-001 | Rede autoritativa real (Lightyear ou emenda de ADR-004); sem isso não há partida entre clientes | autorização | ADR-004; sem `lightyear` em Cargo; ledger ciclo 043 `blocked` | SWE decide stack; este agente não implementa |
+| BF-002a | Escudo de Milícia (W do Guerreiro): absorção determinística de 250 por 5 s, custo 25, alcance 3 m, nível 2 | implementação | GDD §10.6:687-692; nenhuma ação `escudo_milicia` em `ACOES_PERMITIDAS` | Implementar no Núcleo + cliente + 5 testes neste ciclo |
+| BF-002b..v | Demais habilidades Q/W/E/R ainda não nomeadas (21 restantes) | implementação | GDD §10.2–§10.8; apenas Q, Propaganda e E da Intelectual existem | Ciclos dedicados sequenciais |
+| BF-003 | PVE com mapa/rotas e spawn por ilha (hoje 4 PNJs em posições fixas) | implementação | specs/053 `Out of scope` | Módulo de mapa/rotas determinístico |
+| BF-004 | Duas partidas consecutivas na stack Rust, uma com cliente modificado | capacidade | GDD §16.6; evidência só Godot legada [NV] | Orquestrador/SWE executar roteiro ao vivo |
+| BF-005 | Recalibrar métricas com 20 partidas reais (as atuais são sintéticas) | implementação | `docs/evidencias/metricas-20-partidas-2026-11-21.md` | Coletar eventos reais e revisar metas |
+| BF-006 | Deploy/publicação configurado e disparado por `main` | capacidade+autorização | CI sem job de deploy; SWE-exclusivo | SWE configura infra e dispara |
+| BF-007 | R6 executável (adaptador/resolve-tasks) | capacidade | constituição v1.2.2 R6 fora da sequência | Criar adaptador e ratificar emenda; PARE se invocada antes |
+| BF-008 | Rastreabilidade 053/054 fechada (tasks marcadas, release promovida) | implementação | ledger PRs #65/#66/#69/#70 merged | Já corrigido em `d7f4103`; manter como fechado |
+| BF-009 | Infra remota/federação (Postgres/Coolify/IAM/pgmq) | autorização | OBJETIVO/ROADMAP; credenciais [NV] | SWE fornece topologia e credenciais |
+| BF-010 | Assinatura GPG e Fase 5 pós-MVP | autorização+implementação | PROGRESSO; GDD §16.6 | SWE autoriza chave; ciclo documental depois |
+
+**[NV]**: CI remoto em tempo real, deploy, credenciais, partidas jogadas, captura visual real. **[INF]**: consequências de 5v5/lobby/NAT e contagem exata das 21 habilidades restantes deduzidas do GDD.
+
+## 2026-11-23T22:00Z — decisão 80/20 e DoD do ciclo 055 (antes da implementação)
+
+**Sessão**: `20261123T215500Z-escudo-milicia` · **Título**: `insurgencia - escudo de milicia`. Critério normativo: `impacto × confiança × fechamento × esforço⁻¹ × risco⁻¹`, escala 1–5, denominador **3125**. Filtro eliminatório: comportamento observável + consumidor fora dos artefatos do ciclo.
+
+| Candidato | I | C | Fch | E⁻¹ | R⁻¹ | Pontuação | Consumidor |
+|:--|--:|--:|--:|--:|--:|--:|:--|
+| `escudo-milicia` (BF-002a) | 4 | 4 | 5 | 3 | 4 | **960/3125** | jogador humano no cliente + sim determinístico |
+| Mapa/rotas de PVE (BF-003) | 4 | 3 | 3 | 2 | 3 | 216/3125 | jogador/servidor |
+| Rede real (BF-001) | 5 | 2 | 5 | 1 | 1 | 50/3125 — **inelegível** (autorização ADR-004) | SWE decide |
+| Rastreabilidade 053/054 (BF-008) | 2 | 5 | 0 | 5 | 5 | 0 — **inelegível** (já fechado; governança) | nenhum |
+
+**Escolha**: `escudo-milicia`. Âncora GDD §10.6:687-692 (W do Guerreiro, `[HIPÓTESE]`): 25 Fôlego, 3 m, 250 de absorção por 5 s (150 ticks), recarga 14 s (420 ticks), um alvo. O consumidor é o jogador do cliente standalone, que passa a ver `Escudo: N` e a sobreviver ao dano de PNJ/PvP de forma observável; o segundo consumidor é o próprio Núcleo determinístico, que passa a ter uma rota única de dano ao jogador com absorção. Nenhuma mudança de stack, protocolo, CI ou rede.
+
+**DoD (0.9)**: (1) comportamento final — ação `escudo` nível 2, custo 25 Fôlego, alcance 3 m, absorção de até 250 em PvP e dano de PNJ por 150 ticks, recarga 420 ticks, sem acumulação em dois alvos, campos no hash e linha `Escudo:` no HUD; (2) consumidores nomeados — cliente Bevy (`--minimizado`) e testes de integração da sim; (3) comandos que provam — `./verify.sh` (esperado **141 testes**), cinco gates locais, roteiro 10/10 em `.specify/validations/escudo-milicia/`, CI `gates`+`rust` no head do PR; (4) backlog — **BF-002a passa a `fechado`** com evidência, sem reabrir sem regressão provada.
+
+**R6**: `taskstoissues` permanece **N/A/bloqueado** pela constituição v1.2.2 (sem `resolve-tasks.sh`/adaptador). Não será invocado, simulado nem improvisado com `gh`; registrado como BF-007 e entregue ao SWE. **Promoção `dev→main` e deploy também são SWE-exclusivos**; este ciclo termina no escalonamento, não em merge em `main`.
+
+## 2026-11-24T10:29Z — auditoria, backlog e decisão 80/20 do ciclo 056
+
+**Sessão**: `20261124T102734Z-servidor-validacao` · **Título**: `insurgencia - validacao do servidor headless`. **FONTE_FACTORY** `b1deab1` (`origin/dev` `6bd3978` [EV]); ALVO `origin/dev=0bc2c25`, `origin/main=2acf9e5`. Fila 0.0: apenas PR #72 → `main`, GREEN em `gates`/`rust` no head `0bc2c25`, **não mesclado**; babysitter marcado `orphaned` por TTL vencido, escalonamento já entregue ao SWE. Worktrees 2 (compartilhada suja + esta), stashes 0; trabalho alheio untracked preservado. Gate autoritativo `./verify.sh`; CI GitHub Actions `gates`+`rust`/`strict=true`; CLI `gh`; superfície CLI/headless, sem browser-use.
+
+**[EV] Auditoria**: 6 crates, 141 testes ancorados em `0bc2c25`. Núcleo com 13 ações em `ACOES_PERMITIDAS` (`sim:188-202`, constante privada), `ValidacaoComandos::validar` em `sim:2087` não chamada por nenhum binário, mapa de níveis em `sim:212-220`. Servidor headless (`servidor/src/main.rs:16-24`) com whitelist própria de 6 ações, parser aridade 4/6 e `exige_destino` hardcoded para 3 ações (`:83-116`), sem `ValidacaoComandos`; emite `<tick>\t<sha256>` antes de avançar (`:169-175`). `ACOES_PERMITIDAS` privada impede reuso direto. Riscos de compatibilidade mapeados: fixture `cli.rs:19` usa `coletar_materiais 1 1 0.5 0.5` inválido para o Núcleo; `mover` para `(3.5,-4)` excede 1 m; `ultima_recusa` entra no hash, então validação na fronteira não pode mutar estado.
+
+### backlog_de_fechamento (baseline único do ciclo 056)
+
+| ID | Descrição | Tipo | Evidência | Próximo passo |
+|:--|:--|:--|:--|:--|
+| BF-001 | Rede autoritativa real (ADR-004/Lightyear ausente) | autorização | ADR-004; sem `lightyear` em Cargo | SWE decide stack |
+| BF-002a | Escudo de Milícia | implementação | PR #71 merged em `dev` | **fechado** |
+| BF-002b..v | Demais habilidades Q/W/E/R | implementação | GDD §10.2–§10.8 | ciclos dedicados |
+| BF-003 | Mapa/rotas e spawn por ilha | implementação | specs/053 `Out of scope` | módulo determinístico |
+| BF-004 | Duas partidas consecutivas na stack Rust | capacidade | GDD §16.6 | executar roteiro ao vivo |
+| BF-005 | Calibração com 20 partidas reais | implementação | métricas sintéticas atuais | coletar eventos reais |
+| BF-006 | Deploy/publicação | capacidade+autorização | CI sem job de deploy | SWE configura |
+| BF-007 | R6 executável | capacidade | constituição v1.2.2 | adaptador + emenda |
+| BF-008 | Rastreabilidade 053/054 | implementação | PRs #65/#66/#69/#70 | **fechado** |
+| BF-009 | Infra remota/federação | autorização | OBJETIVO/ROADMAP | SWE fornece topologia |
+| BF-010 | GPG e Fase 5 | autorização+implementação | PROGRESSO/GDD §16.6 | SWE autoriza |
+| **BF-011** | **Paridade de whitelist/validação do servidor headless** | **implementação/correção** | whitelist 6 vs 13; validador não chamado | **escolhido neste ciclo** |
+| BF-012 | Cliente agenda `mover` em vez de injetar posição | implementação/correção | `sincronizar_sim` bypass | ciclo posterior (unit mismatch) |
+| BF-013 | `contratos` consumido por binários | implementação | módulo desconectado | ciclo posterior |
+| BF-014 | HUD republica `hash_estado` | implementação | cliente não chama hash | ciclo posterior |
+| BF-015 | `sinalizar_*` com efeito em `fase_skills` | implementação | aceitos sem ramo | ciclo posterior |
+
+### Decisão 80/20 — 2026-11-24T10:29Z
+
+Critério `impacto × confiança × fechamento × esforço⁻¹ × risco⁻¹`, denominador **3125**. Filtro eliminatório: comportamento observável + consumidor fora dos artefatos do ciclo.
+
+| Candidato | I | C | Fch | E⁻¹ | R⁻¹ | Pontuação | Consumidor |
+|:--|--:|--:|--:|--:|--:|--:|:--|
+| `servidor-validacao` (BF-011) | 4 | 5 | 4 | 4 | 4 | **1280/3125** | usuário/automação do CLI headless |
+| HUD `hash_estado` (BF-014) | 3 | 5 | 3 | 5 | 5 | 1125/3125 | jogador no cliente |
+| Cliente `mover` (BF-012) | 5 | 3 | 4 | 2 | 2 | 240/3125 | jogador no cliente |
+| Contratos consumidos (BF-013) | 5 | 2 | 5 | 1 | 2 | 100/3125 | protocolo/servidor |
+| Rede (BF-001) | 5 | 2 | 5 | 1 | 1 | 50/3125 — **inelegível** (autorização) | SWE decide |
+
+**Escolha**: `servidor-validacao`. O CLI headless passa a aceitar as 13 ações canônicas, deriva a exigência de `destino` do Núcleo e chama `ValidacaoComandos::validar` antes de agendar, com recusa determinística sem mutar `ultima_recusa`. Nenhuma mudança de protocolo, Cargo, CI, stack ou rede.
+
+**DoD (0.9)**: (1) comportamento final — whitelist única derivada de `ACOES_PERMITIDAS`, `acao_exige_destino` pública no sim, validação no servidor antes do agendamento, recusa `linha N: <CodigoRecusa>` com exit 2/stdout vazia, formato `<tick>\t<sha256>` e hash inicial preservados; (2) consumidores nomeados — usuário/automação do CLI `insurgencia-servidor` e testes `crates/servidor/tests/cli.rs`; (3) comandos que provam — `cargo test -p insurgencia-servidor --test cli`, sondas `printf ... | cargo run -p insurgencia-servidor -- --ticks N`, `./verify.sh` remoto `gates`+`rust`; (4) backlog — **BF-011 passa a `fechado`**.
+
+**R6**: N/A/bloqueado (BF-007); não será invocada, simulada nem improvisada com `gh`. Promoção `dev→main` e deploy permanecem SWE-exclusivos.
+
+## 2026-11-24T10:49Z — fechamento do ciclo 056
+
+**Sessão**: `20261124T102734Z-servidor-validacao` · **Título**: `insurgencia - validacao do servidor headless`. Roteiro **10/10 PASS** (`.specify/validations/servidor-validacao/evidence.md`); `cargo fmt --all` OK, `cargo check -p insurgencia-sim --tests` EXIT 0, `cargo test -p insurgencia-sim --test simulacao` **97/97**, `cargo check -p insurgencia-servidor --tests` EXIT 0, `cargo test -p insurgencia-servidor --test cli` **10/10**, inventário **146**. Cinco gates locais PASS; converge `files=38 baselined=38`. Implementação: `ACOES_PERMITIDAS` pública e `acao_exige_destino` no sim; servidor com whitelist derivada, parser por 11/2, validação antes de agendar, recusa `linha N: <CodigoRecusa>` exit 2/stdout vazia, formato tick/hash preservado. Dois placeholders corrigidos e dois artefatos históricos restaurados byte a byte. R4 PASS, R7 `1.0.0-local`, R6 N/A/bloqueado. CI/merge em `dev` e promoção/deploy **[NV]**; promoção/deploy SWE-exclusivos.

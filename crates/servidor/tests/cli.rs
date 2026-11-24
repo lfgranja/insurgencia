@@ -6,6 +6,7 @@
 //! Cada caso executa o binário real com stdin controlada, sem arquivos
 //! temporários, estado compartilhado ou dependência de ordem entre testes.
 
+use insurgencia_sim::{acao_exige_destino, CodigoRecusa, ACOES_PERMITIDAS};
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
@@ -16,7 +17,7 @@ const TICKS: usize = 4;
 const ENTRADA_VALIDA: &str = concat!(
     "\n7 mover 1 1 0.25 0.0\n",
     "8 sinalizar_sincronia 1 1\n",
-    "9 coletar_materiais 1 1 0.5 0.5\n",
+    "9 coletar_materiais 1 1 0 0\n",
     "\n",
 );
 
@@ -187,5 +188,200 @@ fn primeira_linha_com_stdin_vazia_e_o_estado_inicial() {
     assert_eq!(
         linhas[0], esperado,
         "linha 0 deveria retratar o estado inicial: {stdout}"
+    );
+}
+
+#[test]
+fn todas_as_treze_acoes_do_sim_sao_aceitas_pela_whitelist_do_cli() {
+    const RECUSAS: &[CodigoRecusa] = &[
+        CodigoRecusa::SeqOuRequestReplay,
+        CodigoRecusa::AcaoBloqueada,
+        CodigoRecusa::AlvoInvalido,
+        CodigoRecusa::FolegoInsuficiente,
+        CodigoRecusa::AnaliseEmRecarga,
+        CodigoRecusa::EscudoEmRecarga,
+        CodigoRecusa::DestinoInvalido,
+        CodigoRecusa::MovimentoForaDoLimite,
+        CodigoRecusa::SaldoInsuficiente,
+    ];
+
+    assert_eq!(ACOES_PERMITIDAS.len(), 13);
+    for acao in ACOES_PERMITIDAS {
+        let linha = if acao_exige_destino(acao) {
+            format!("7 {acao} 1 1 0.0 0.0\n")
+        } else {
+            format!("7 {acao} 1 1\n")
+        };
+        let saida = executar_ou_falhar(&["--ticks", "1"], &linha);
+        if saida.status.success() {
+            assert!(saida.stderr.is_empty(), "ação {acao}: stderr inesperada");
+            continue;
+        }
+        assert_eq!(saida.status.code(), Some(2), "ação {acao}: exit inesperado");
+        assert!(saida.stdout.is_empty(), "ação {acao}: stdout em recusa");
+        let erro = texto(&saida.stderr);
+        assert!(
+            RECUSAS
+                .iter()
+                .any(|codigo| erro == format!("linha 1: {codigo}\n")),
+            "ação {acao} recusada antes do validador: {erro}"
+        );
+    }
+}
+
+#[test]
+fn acoes_com_destino_exigem_coordenadas_finitas_e_rejeitam_coordenadas_extras() {
+    assert_eq!(ACOES_PERMITIDAS.len(), 13);
+    let com_destino = ACOES_PERMITIDAS
+        .iter()
+        .filter(|acao| acao_exige_destino(acao))
+        .count();
+    assert_eq!(com_destino, 11);
+    assert!(!acao_exige_destino("sinalizar_sincronia"));
+    assert!(!acao_exige_destino("sinalizar_alavanca"));
+
+    for caso in [
+        ("7 mover 1 1", "linha 1: ação exige coordenadas x e y\n"),
+        ("7 mover 1 1 NaN 0.0", "linha 1: x inválido\n"),
+        ("7 mover 1 1 0.0 inf", "linha 1: y inválido\n"),
+        (
+            "7 mover 1 1 0.0 0.0 1.0",
+            "linha 1: esperado 'peer_id acao seq request_id [x y]'\n",
+        ),
+        (
+            "7 sinalizar_sincronia 1 1 0.5 0.0",
+            "linha 1: ação não aceita coordenadas\n",
+        ),
+    ] {
+        let saida = executar_ou_falhar(&["--ticks", "1"], caso.0);
+        assert_eq!(saida.status.code(), Some(2), "entrada {:?}", caso.0);
+        assert!(saida.stdout.is_empty(), "entrada {:?}", caso.0);
+        assert_eq!(texto(&saida.stderr), caso.1, "entrada {:?}", caso.0);
+    }
+
+    for acao in ACOES_PERMITIDAS {
+        let linha = if acao_exige_destino(acao) {
+            format!("7 {acao} 1 1\n")
+        } else {
+            format!("7 {acao} 1 1 1.0 2.0\n")
+        };
+        let esperado = if acao_exige_destino(acao) {
+            "linha 1: ação exige coordenadas x e y\n"
+        } else {
+            "linha 1: ação não aceita coordenadas\n"
+        };
+        let saida = executar_ou_falhar(&["--ticks", "1"], &linha);
+        assert_eq!(saida.status.code(), Some(2), "ação {acao}: exit inesperado");
+        assert!(saida.stdout.is_empty(), "ação {acao}: stdout em recusa");
+        assert_eq!(
+            texto(&saida.stderr),
+            esperado,
+            "ação {acao}: erro inesperado"
+        );
+    }
+}
+
+#[test]
+fn comando_recusado_pela_validacao_retorna_exit_2_sem_stdout_e_com_codigo_na_stderr() {
+    const CASOS: &[(&str, usize, CodigoRecusa)] = &[
+        (
+            "7 mover 1 1 2.0 0.0\n",
+            1,
+            CodigoRecusa::MovimentoForaDoLimite,
+        ),
+        (
+            "7 construir_barreira 1 1 0.0 0.0\n",
+            1,
+            CodigoRecusa::AcaoBloqueada,
+        ),
+        (
+            "9 coletar_materiais 1 1 0.5 0.5\n",
+            1,
+            CodigoRecusa::DestinoInvalido,
+        ),
+        (
+            "7 mover 1 1 0.25 0.0\n7 mover 1 1 0.25 0.0\n",
+            2,
+            CodigoRecusa::SeqOuRequestReplay,
+        ),
+        (
+            "7 atacar_forte 1 1 0.0 0.0\n",
+            1,
+            CodigoRecusa::AlvoInvalido,
+        ),
+    ];
+
+    for (entrada, linha, codigo) in CASOS {
+        let saida = executar_ou_falhar(&["--ticks", "2"], entrada);
+        assert_eq!(
+            saida.status.code(),
+            Some(2),
+            "entrada {entrada:?}: código de saída inesperado"
+        );
+        assert!(
+            saida.stdout.is_empty(),
+            "entrada {entrada:?}: stdout deveria estar vazia"
+        );
+        assert_eq!(
+            texto(&saida.stderr),
+            format!("linha {linha}: {codigo}\n"),
+            "entrada {entrada:?}: recusa inesperada"
+        );
+    }
+}
+
+#[test]
+fn comandos_validados_preservam_formato_tick_hash_e_determinismo() {
+    let ticks = TICKS.to_string();
+    let primeira = executar_ou_falhar(&["--ticks", ticks.as_str()], ENTRADA_VALIDA);
+    let segunda = executar_ou_falhar(&["--ticks", ticks.as_str()], ENTRADA_VALIDA);
+    assert!(
+        primeira.status.success() && segunda.status.success(),
+        "pelo menos uma execução falhou"
+    );
+    assert_eq!(
+        primeira.stdout, segunda.stdout,
+        "stdout divergente entre execuções idênticas"
+    );
+
+    let stdout = texto(&primeira.stdout);
+    let linhas: Vec<&str> = stdout.lines().collect();
+    assert_eq!(linhas.len(), TICKS, "esperadas {TICKS} linhas: {stdout}");
+    for (indice, linha) in linhas.iter().enumerate() {
+        let campos: Vec<&str> = linha.split('\t').collect();
+        assert_eq!(campos.len(), 2, "linha {indice} sem dois campos: {linha}");
+        assert_eq!(
+            campos[0],
+            indice.to_string().as_str(),
+            "tick inesperado: {linha}"
+        );
+        assert_eq!(
+            campos[1].len(),
+            64,
+            "hash com tamanho inesperado: {}",
+            campos[1]
+        );
+        assert!(
+            campos[1].bytes().all(|byte| byte.is_ascii_hexdigit()),
+            "hash não hexadecimal: {}",
+            campos[1]
+        );
+    }
+}
+
+#[test]
+fn hash_inicial_com_stdin_vazia_permanece_igual_ao_estado_inicial() {
+    let saida = executar_ou_falhar(&["--ticks", "1"], "");
+    assert!(
+        saida.status.success(),
+        "execução falhou: {}",
+        texto(&saida.stderr)
+    );
+
+    let esperado = format!("0\t{}", insurgencia_sim::Mundo::new().hash_estado());
+    assert_eq!(
+        texto(&saida.stdout),
+        format!("{esperado}\n"),
+        "hash inicial divergente do estado inicial"
     );
 }

@@ -145,6 +145,14 @@
     "specs/054-analise-materialista/converge.md": {
       "bytes": 10435,
       "sha256": "7a28ab53a1ae5c522bdaaf4622531969ff842b29eb0f6d62c566690f5d2f2607"
+    },
+    "specs/055-escudo-milicia/converge.md": {
+      "bytes": 10343,
+      "sha256": "9a60eac69610cb312622e6d38e700b854d42ccad7251b65529ea5e897658b6bb"
+    },
+    "specs/056-servidor-validacao/converge.md": {
+      "bytes": 9974,
+      "sha256": "e27655b96c54e00f5de776f505c1c1df1b92a08a26d19dee5701d71d1861fbcc"
     }
   },
   "_provenance": {

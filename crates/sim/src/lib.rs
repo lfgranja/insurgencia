@@ -160,11 +160,34 @@ pub const FOLEGO_REGENERACAO_FORA: i64 = 10;
 /// Nome alternativo da regeneração em combate na spec 047 (`[HIPÓTESE]`, não cânone).
 pub const FOLEGO_REGENERACAO_COMBATE: i64 = 5;
 
+/// Custo de Fôlego de `escudo` (`[HIPÓTESE]`/GDD §10.6:687-692, não cânone).
+pub const CUSTO_ESCUDO_FOLEGO: i64 = 25;
+
+/// Absorção máxima de `escudo` (`[HIPÓTESE]`/GDD §10.6:690, não cânone).
+pub const ABSORCAO_ESCUDO: i64 = 250;
+
+/// Duração da absorção em ticks (5 s × 30 Hz; `[HIPÓTESE]`, não cânone).
+pub const TICKS_DURACAO_ESCUDO: i64 = 150;
+
+/// Recarga em ticks (14 s × 30 Hz; `[HIPÓTESE]`/GDD §10.6:687, não cânone).
+pub const RECARGA_ESCUDO_TICKS: i64 = 420;
+
+/// Alcance de `escudo`, em metros: si mesmo ou um aliado (`[HIPÓTESE]`).
+pub const ALCANCE_ESCUDO_M: f64 = 3.0;
+
+/// Resistência a dano contínuo de gás lacrimogêneo (`[HIPÓTESE]`/GDD §10.6:691).
+///
+/// Reservada e documentada: o Núcleo não possui dano contínuo, portanto este
+/// percentual não é aplicado neste corte (fora da `DoD`).
+pub const RESISTENCIA_CONTINUA_ESCUDO_PERCENT: i64 = 15;
+
 /// Distância máxima de um comando `mover`, em metros.
 const LIMITE_MOVIMENTO_M: f64 = 1.0;
 
-/// Ações previstas no contrato (`ACOES_PERMITIDAS`).
-const ACOES_PERMITIDAS: &[&str] = &[
+/// Lista canônica local ao sim das ações aceitas pelo contrato.
+///
+/// Referência estável para validação e para consumidores headless.
+pub const ACOES_PERMITIDAS: &[&str] = &[
     "mover",
     "sinalizar_sincronia",
     "sinalizar_alavanca",
@@ -177,6 +200,7 @@ const ACOES_PERMITIDAS: &[&str] = &[
     "atacar_no",
     "atacar_pnj",
     "analise_materialista",
+    "escudo",
 ];
 
 /// Compara dois pontos sem depender de tolerância de arredondamento.
@@ -189,11 +213,20 @@ fn ponto_igual(a: (f64, f64), b: (f64, f64)) -> bool {
 /// Mapa Q1/W2/E3/R6: ações sem slot permanecem livres (nível 1).
 fn nivel_minimo_para_acao(acao: &str) -> u8 {
     match acao {
-        "construir_barreira" | "construir_ponte" => 2,
+        "construir_barreira" | "construir_ponte" | "escudo" => 2,
         "propaganda" | "propaganda_no" | "analise_materialista" => 3,
         "atacar_no" => 6,
         _ => 1,
     }
+}
+
+/// Indica se a ação exige coordenadas de destino no comando.
+///
+/// Somente `sinalizar_sincronia` e `sinalizar_alavanca` dispensam destino;
+/// as outras 11 ações canônicas exigem coordenadas.
+#[must_use]
+pub fn acao_exige_destino(acao: &str) -> bool {
+    !matches!(acao, "sinalizar_sincronia" | "sinalizar_alavanca")
 }
 
 /// Origem do alvo de Nó fixado no jogador.
@@ -291,6 +324,14 @@ pub struct Jogador {
     pub combate_ticks: i64,
     /// Ticks restantes de recarga de `analise_materialista` (`[HIPÓTESE]`/protótipo).
     pub analise_recarga_ticks: i64,
+    /// Absorção de dano restante do escudo ativo; zero quando não há escudo.
+    pub escudo_pv: i64,
+    /// Ticks restantes do escudo ativo; zero quando não há escudo.
+    pub escudo_ticks: i64,
+    /// Ticks restantes de recarga de `escudo`; zero quando disponível.
+    pub escudo_recarga_ticks: i64,
+    /// `peer_id` do jogador protegido pelo escudo ativo; `None` quando expirado.
+    pub escudo_alvo: Option<u64>,
 }
 
 /// Barricada ativa no mundo, identificada por `id`.
@@ -412,7 +453,7 @@ pub struct Comando {
     /// Identificador de requisição monotônico do comando.
     pub request_id: i64,
     /// Destino opcional, usado por `mover`, `coletar_materiais`,
-    /// `construir_barreira`, `construir_ponte` e `propaganda`.
+    /// `construir_barreira`, `construir_ponte`, `propaganda` e `escudo`.
     pub destino: Option<(f64, f64)>,
 }
 
@@ -505,6 +546,10 @@ impl Mundo {
                 folego_ticks: 0,
                 combate_ticks: 0,
                 analise_recarga_ticks: 0,
+                escudo_pv: 0,
+                escudo_ticks: 0,
+                escudo_recarga_ticks: 0,
+                escudo_alvo: None,
                 seq: 0,
                 request_id: 0,
                 funcao: Funcao::Artesao,
@@ -558,6 +603,32 @@ impl Mundo {
                 marca_ticks: 0,
             },
         );
+    }
+
+    /// Aplica dano a um jogador, debitando primeiro a absorção do escudo ativo.
+    ///
+    /// `dano` não positivo ou `peer_id` inexistente não altera o estado. O dano
+    /// excedente reduz a vida com piso zero; o escudo só absorve enquanto
+    /// `escudo_ticks > 0` e ainda resta `escudo_pv`.
+    ///
+    /// Retorna o total absorvido pelo escudo nesta chamada. O retorno é zero quando
+    /// o dano não é positivo, o jogador não existe ou não há escudo ativo; o dano
+    /// restante já foi debitado da vida antes do retorno.
+    pub fn aplicar_dano_a_jogador(&mut self, peer_id: u64, dano: i64) -> i64 {
+        if dano <= 0 {
+            return 0;
+        }
+        let Some(jogador) = self.jogadores.get_mut(&peer_id) else {
+            return 0;
+        };
+        let absorvido = if jogador.escudo_ticks > 0 {
+            jogador.escudo_pv.min(dano).max(0)
+        } else {
+            0
+        };
+        jogador.escudo_pv = jogador.escudo_pv.saturating_sub(absorvido).max(0);
+        jogador.vida = jogador.vida.saturating_sub(dano - absorvido).max(0);
+        absorvido
     }
 
     /// Aplica dano de jogador a um PNJ, inativando-o ao zerar os PV.
@@ -700,6 +771,7 @@ impl Mundo {
         let convertidos_no_inicio = self.nos.values().filter(|no| no.convertido).count();
         self.fase_prepare();
         self.avancar_analises_materialistas();
+        self.avancar_escudos();
         self.fase_skills();
         self.fase_defesa();
         self.fase_ataque_pnjs();
@@ -732,6 +804,7 @@ impl Mundo {
         let comandos = std::mem::take(&mut self.comandos_do_tick);
         let mut ataques_realizados: BTreeSet<u64> = BTreeSet::new();
         let mut analises_realizadas: BTreeSet<u64> = BTreeSet::new();
+        let mut escudos_realizados: BTreeSet<u64> = BTreeSet::new();
 
         for comando in &comandos {
             let mut atualizar_monotonicos = true;
@@ -786,6 +859,8 @@ impl Mundo {
             } else if comando.acao == "analise_materialista" {
                 atualizar_monotonicos =
                     self.aplicar_analise_materialista(comando, &mut analises_realizadas);
+            } else if comando.acao == "escudo" {
+                atualizar_monotonicos = self.aplicar_escudo(comando, &mut escudos_realizados);
             }
             if atualizar_monotonicos {
                 if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
@@ -836,9 +911,11 @@ impl Mundo {
             // A unidade extra é consumida por `fase_finish` no próprio tick do ataque.
             atacante.combate_ticks = TICKS_COMBATE + 1;
         }
+        // Toda incidência de dano ao jogador passa pela rota única, que aplica
+        // a absorção do escudo e mantém o piso zero da spec 047. O retorno é o
+        // absorvido pelo escudo; o dano à vida já foi aplicado pela rota.
+        let _ = self.aplicar_dano_a_jogador(alvo, DANO_ATAQUE);
         if let Some(vitima) = self.jogadores.get_mut(&alvo) {
-            // FR-001/SC-001 da spec 047: vida nunca negativa, mesmo partindo de valor < 0.
-            vitima.vida = vitima.vida.saturating_sub(DANO_ATAQUE).max(0);
             vitima.combate_ticks = TICKS_COMBATE + 1;
         }
     }
@@ -910,6 +987,62 @@ impl Mundo {
         true
     }
 
+    /// Aplica `escudo` a si mesmo ou a um aliado, no máximo uma vez por tick.
+    ///
+    /// Exige `destino` na posição de um jogador a até `ALCANCE_ESCUDO_M` (3 m),
+    /// Fôlego suficiente e recarga zerada. Absorção e duração são atribuídas,
+    /// nunca acumuladas, e a recarga é própria de cada conjurador. Retorna
+    /// `true` somente quando o efeito foi aplicado, para que os monotônicos
+    /// avancem apenas em comando aceito.
+    fn aplicar_escudo(&mut self, comando: &Comando, escudos: &mut BTreeSet<u64>) -> bool {
+        let Some(destino) = comando.destino else {
+            return false;
+        };
+        let Some((origem, folego, recarga)) = self.jogadores.get(&comando.peer_id).map(|jogador| {
+            (
+                jogador.posicao,
+                jogador.folego,
+                jogador.escudo_recarga_ticks,
+            )
+        }) else {
+            return false;
+        };
+        if folego < CUSTO_ESCUDO_FOLEGO || recarga > 0 {
+            return false;
+        }
+        let alvo = if ponto_igual(destino, origem) {
+            comando.peer_id
+        } else {
+            let Some(alvo) = self
+                .jogadores
+                .iter()
+                .find(|(_, jogador)| ponto_igual(jogador.posicao, destino))
+                .map(|(&peer_id, _)| peer_id)
+            else {
+                return false;
+            };
+            alvo
+        };
+        if (destino.0 - origem.0).hypot(destino.1 - origem.1) > ALCANCE_ESCUDO_M {
+            return false;
+        }
+        // A cota só é consumida depois de todas as guardas.
+        if !escudos.insert(comando.peer_id) {
+            return false;
+        }
+        if let Some(conjurador) = self.jogadores.get_mut(&comando.peer_id) {
+            conjurador.folego = conjurador.folego.saturating_sub(CUSTO_ESCUDO_FOLEGO);
+            conjurador.escudo_recarga_ticks = RECARGA_ESCUDO_TICKS;
+            conjurador.escudo_alvo = Some(alvo);
+        }
+        if let Some(protegido) = self.jogadores.get_mut(&alvo) {
+            protegido.escudo_pv = ABSORCAO_ESCUDO;
+            protegido.escudo_ticks = TICKS_DURACAO_ESCUDO;
+            protegido.escudo_alvo = Some(alvo);
+        }
+        true
+    }
+
     /// Decrementa uma vez por tick marcas e recargas, em ordem estável de
     /// `id` dos PNJs e `peer_id` dos jogadores (`[HIPÓTESE]`/protótipo).
     fn avancar_analises_materialistas(&mut self) {
@@ -919,6 +1052,30 @@ impl Mundo {
         for jogador in self.jogadores.values_mut() {
             let recarga = jogador.analise_recarga_ticks.saturating_sub(1).max(0);
             jogador.analise_recarga_ticks = recarga;
+        }
+    }
+
+    /// Decrementa uma vez por tick a duração e a recarga de `escudo`.
+    ///
+    /// A ordem é a de `peer_id` no `BTreeMap`. Ao expirar, absorção e alvo são
+    /// limpos; a recarga chega a zero no tick `T + RECARGA_ESCUDO_TICKS`, quando
+    /// o alvo registrado pelo conjurador também é limpo. Essa limpeza ocorre só
+    /// na transição para zero: um protegido que não conjurou não tem recarga
+    /// própria e preserva o alvo enquanto o escudo estiver ativo.
+    fn avancar_escudos(&mut self) {
+        for jogador in self.jogadores.values_mut() {
+            if jogador.escudo_ticks > 0 {
+                jogador.escudo_ticks -= 1;
+                if jogador.escudo_ticks == 0 {
+                    jogador.escudo_pv = 0;
+                    jogador.escudo_alvo = None;
+                }
+            }
+            let recarga_anterior = jogador.escudo_recarga_ticks;
+            jogador.escudo_recarga_ticks = recarga_anterior.saturating_sub(1).max(0);
+            if recarga_anterior > 0 && jogador.escudo_recarga_ticks == 0 {
+                jogador.escudo_alvo = None;
+            }
         }
     }
 
@@ -988,9 +1145,8 @@ impl Mundo {
                 .map(|(&peer_id, _)| peer_id)
                 .min();
             if let Some(peer_id) = alvo {
-                if let Some(jogador) = self.jogadores.get_mut(&peer_id) {
-                    jogador.vida = jogador.vida.saturating_sub(DANO_ATAQUE_PNJ).max(0);
-                }
+                // O absorvido pelo escudo é descartado: a vida já foi debitada.
+                let _ = self.aplicar_dano_a_jogador(peer_id, DANO_ATAQUE_PNJ);
             }
         }
     }
@@ -1623,7 +1779,8 @@ impl Mundo {
                         "{construcao_ponto:?}:{pontos_autogestao}:{ponte_ticks}:",
                         "{ponte_ponto:?}:{propaganda_alvo:?}:{folego}:{folego_ticks}:",
                         "{combate_ticks}:{analise_recarga_ticks}:{no_alvo:?}:{no_acao_no:?}:",
-                        "{funcao:?}:{nivel}:{nivel_ticks}"
+                        "{funcao:?}:{nivel}:{nivel_ticks}:{escudo_pv}:{escudo_ticks}:",
+                        "{escudo_recarga_ticks}:{escudo_alvo:?}"
                     ),
                     peer_id = peer_id,
                     x = x,
@@ -1650,6 +1807,10 @@ impl Mundo {
                     funcao = jogador.funcao,
                     nivel = jogador.nivel,
                     nivel_ticks = jogador.nivel_ticks,
+                    escudo_pv = jogador.escudo_pv,
+                    escudo_ticks = jogador.escudo_ticks,
+                    escudo_recarga_ticks = jogador.escudo_recarga_ticks,
+                    escudo_alvo = jogador.escudo_alvo,
                 )
             })
             .collect::<Vec<_>>()
@@ -1805,12 +1966,15 @@ pub enum CodigoRecusa {
     /// `atacar_forte` sem alvo no destino ou além do alcance de contato.
     #[error("alvo invalido")]
     AlvoInvalido,
-    /// Fôlego abaixo do custo de `atacar_forte` ou `analise_materialista`.
+    /// Fôlego abaixo do custo de `atacar_forte`, `analise_materialista` ou `escudo`.
     #[error("folego insuficiente")]
     FolegoInsuficiente,
     /// `analise_materialista` durante a recarga de 450 ticks.
     #[error("analise materialista em recarga")]
     AnaliseEmRecarga,
+    /// `escudo` durante a recarga de 420 ticks (`[HIPÓTESE]`/protótipo, não cânone).
+    #[error("escudo em recarga")]
+    EscudoEmRecarga,
     /// Destino ausente ou fora do ponto para `mover`, `coletar_materiais`,
     /// `construir_barreira`, `construir_ponte`, `propaganda`, `propaganda_no` ou
     /// `atacar_no`; `atacar_pnj` recusa destino sem PNJ ativo ou além de 2 m do
@@ -1889,6 +2053,33 @@ fn validar_ataque_pnj(
     Ok(())
 }
 
+/// Valida `escudo` quanto ao alvo, alcance de 3 m, Fôlego e recarga.
+fn validar_escudo(
+    mundo: &Mundo,
+    jogador: &Jogador,
+    destino: Option<(f64, f64)>,
+) -> Result<(), CodigoRecusa> {
+    let ponto = destino.ok_or(CodigoRecusa::AlvoInvalido)?;
+    let alvo_no_ponto = mundo
+        .jogadores
+        .values()
+        .any(|alvo| ponto_igual(alvo.posicao, ponto));
+    if !alvo_no_ponto {
+        return Err(CodigoRecusa::AlvoInvalido);
+    }
+    let (origem_x, origem_y) = jogador.posicao;
+    if (ponto.0 - origem_x).hypot(ponto.1 - origem_y) > ALCANCE_ESCUDO_M {
+        return Err(CodigoRecusa::AlvoInvalido);
+    }
+    if jogador.folego < CUSTO_ESCUDO_FOLEGO {
+        return Err(CodigoRecusa::FolegoInsuficiente);
+    }
+    if jogador.escudo_recarga_ticks > 0 {
+        return Err(CodigoRecusa::EscudoEmRecarga);
+    }
+    Ok(())
+}
+
 impl ValidacaoComandos {
     /// Valida um comando contra o estado autoritativo.
     ///
@@ -1902,7 +2093,8 @@ impl ValidacaoComandos {
     /// com o jogador a até 2 m desse ponto; `analise_materialista` exige PNJ ativo
     /// em `destino`, até 12 m de distância, Fôlego e recarga zerada.
     /// `propaganda_no`/`atacar_no` exigem Nó no ponto do jogador e não exigem
-    /// saldo ou Fôlego.
+    /// saldo ou Fôlego. `escudo` exige um jogador no destino a até 3 m, Fôlego
+    /// suficiente e recarga zerada.
     pub fn validar(
         mundo: &Mundo,
         peer_id: u64,
@@ -1987,6 +2179,10 @@ impl ValidacaoComandos {
             if acao == "atacar_no" && mundo.nos[&id].inativo_ticks > 0 {
                 return Err(CodigoRecusa::DestinoInvalido);
             }
+        }
+
+        if acao == "escudo" {
+            validar_escudo(mundo, jogador, destino)?;
         }
 
         if acao == "analise_materialista" {

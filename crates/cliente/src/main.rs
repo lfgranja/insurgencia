@@ -23,8 +23,8 @@ use insurgencia_cliente::{
     VELOCIDADE,
 };
 use insurgencia_sim::{
-    Comando, Mundo, ResultadoPartida, ALCANCE_ANALISE_MATERIALISTA_M, MAX_RECONQUISTAS,
-    NIVEL_MAXIMO, PASSO_SEGUNDOS, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA,
+    Comando, Mundo, ResultadoPartida, ALCANCE_ANALISE_MATERIALISTA_M, ALCANCE_ESCUDO_M,
+    MAX_RECONQUISTAS, NIVEL_MAXIMO, PASSO_SEGUNDOS, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA,
 };
 
 /// Identificador do jogador local no espelho da simulação.
@@ -118,6 +118,7 @@ fn main() {
                 solicitar_atacar_no,
                 solicitar_atacar_pnj,
                 solicitar_analise_materialista,
+                solicitar_escudo,
                 sincronizar_sim,
                 avancar_simulacao,
                 atualizar_texto,
@@ -950,6 +951,74 @@ fn solicitar_analise_materialista(
     });
 }
 
+/// Escolhe o alvo do Escudo de Milícia no espelho autoritativo.
+///
+/// Prefere o aliado ativo (`vida > 0`) mais próximo a `ALCANCE_ESCUDO_M`, com
+/// desempate pelo menor `peer_id`. Sem aliado elegível, protege a si mesmo;
+/// sem o próprio jogador ativo no espelho, não há alvo. A comparação usa
+/// distância ao quadrado e `total_cmp` para permanecer determinística.
+#[must_use]
+fn destino_escudo(mundo: &Mundo) -> Option<(f64, f64)> {
+    let origem = mundo.jogadores.get(&PEER_ID)?;
+    if origem.vida <= 0 {
+        return None;
+    }
+    let (x, y) = origem.posicao;
+    let alcance2 = ALCANCE_ESCUDO_M.powi(2);
+    let aliado = mundo
+        .jogadores
+        .iter()
+        .filter(|(&peer_id, jogador)| {
+            if peer_id == PEER_ID || jogador.vida <= 0 {
+                return false;
+            }
+            let dx = jogador.posicao.0 - x;
+            let dy = jogador.posicao.1 - y;
+            dx.mul_add(dx, dy * dy) <= alcance2
+        })
+        .min_by(|a, b| {
+            let (id_a, aliado_a) = *a;
+            let (id_b, aliado_b) = *b;
+            let da = (aliado_a.posicao.0 - x)
+                .mul_add(aliado_a.posicao.0 - x, (aliado_a.posicao.1 - y).powi(2));
+            let db = (aliado_b.posicao.0 - x)
+                .mul_add(aliado_b.posicao.0 - x, (aliado_b.posicao.1 - y).powi(2));
+            da.total_cmp(&db).then_with(|| id_a.cmp(id_b))
+        })
+        .map(|(_, jogador)| jogador.posicao);
+    Some(aliado.unwrap_or(origem.posicao))
+}
+
+/// Agenda o Escudo de Milícia no aliado ativo mais próximo ao pressionar `V`.
+///
+/// Sem aliado em alcance, o destino é a própria posição; sem nenhum jogador
+/// elegível, nenhum comando é agendado e os contadores locais não avançam.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_escudo(
+    teclado: Res<ButtonInput<KeyCode>>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyV) {
+        return;
+    }
+    let Some(destino) = destino_escudo(&simulacao.0) else {
+        return;
+    };
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "escudo".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(destino),
+    });
+}
+
 /// Copia a posição do estado para a transformação 3D do avatar no plano do mapa.
 #[expect(
     clippy::needless_pass_by_value,
@@ -1041,6 +1110,14 @@ fn contar_pnjs_analisados(simulacao: &Simulacao) -> usize {
         .count()
 }
 
+/// Dica de teclas exibida no rodapé da HUD; `V` ergue o escudo.
+const DICA_TECLAS: &str = concat!(
+    "WASD ou setas para mover · B para construir barreira · P para construir ponte · ",
+    "C para coletar materiais · G para propaganda · R para propaganda no Nó · ",
+    "F para atacar o Nó · Aproxime-se do alvo e use Q para atacar · ",
+    "T para atacar o PNJ mais próximo · E para analisar o PNJ mais próximo · V para erguer escudo"
+);
+
 /// Monta o texto do painel a partir do estado local e do espelho da simulação.
 #[must_use]
 fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
@@ -1055,6 +1132,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
     let suprimentos = remoto.map_or(0, |j| j.suprimentos);
     let autogestao = remoto.map_or(0, |j| j.pontos_autogestao);
     let folego = remoto.map_or(0, |j| j.folego);
+    let (escudo_pv, escudo_ticks) = remoto.map_or((0, 0), |j| (j.escudo_pv, j.escudo_ticks));
     let vida = remoto.map_or(0, |j| j.vida);
     let vida_alvo = if let Some(alvo) = simulacao.0.jogadores.get(&PEER_ALVO_TREINO) {
         alvo.vida
@@ -1100,16 +1178,14 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
             "Função: {funcao}\nNível: {nivel}/{NIVEL_MAXIMO}\n",
             "Limites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\n",
             "Suprimentos: {suprimentos}\nMateriais: {materiais}\n",
-            "Fôlego: {folego}\nVida: {vida}\nAlvo: {vida_alvo}\nPNJs: {pnjs}\n",
+            "Fôlego: {folego}\nEscudo: {escudo_pv} ({escudo_ticks})\n",
+            "Vida: {vida}\nAlvo: {vida_alvo}\nPNJs: {pnjs}\n",
             "Análise: {analise}\nAutogestão: {autogestao}\nBarreiras: {barreiras}\n",
             "Pontes: {pontes}\nSúditos: {suditos}\n",
             "Resistência: {resistencia}\nNós: {nos_convertidos}/3\n",
             "Ilhas: {ilhas_controladas}\nSinais: {sinais}\nResultado: {resultado}\n",
             "Construindo: {construindo}\nColeta: {coletando}\n",
-            "WASD ou setas para mover · B para construir barreira · P para construir ponte · ",
-            "C para coletar materiais · G para propaganda · R para propaganda no Nó · ",
-            "F para atacar o Nó · Aproxime-se do alvo e use Q para atacar · ",
-            "T para atacar o PNJ mais próximo · E para analisar o PNJ mais próximo"
+            "{dica}"
         ),
         x = x,
         y = y,
@@ -1122,6 +1198,8 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
         suprimentos = suprimentos,
         materiais = materiais,
         folego = folego,
+        escudo_pv = escudo_pv,
+        escudo_ticks = escudo_ticks,
         vida = vida,
         vida_alvo = vida_alvo,
         pnjs = pnjs,
@@ -1137,6 +1215,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
         resultado = resultado,
         construindo = construindo,
         coletando = coletando,
+        dica = DICA_TECLAS,
     )
 }
 
