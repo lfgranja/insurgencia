@@ -184,8 +184,10 @@ pub const RESISTENCIA_CONTINUA_ESCUDO_PERCENT: i64 = 15;
 /// Distância máxima de um comando `mover`, em metros.
 const LIMITE_MOVIMENTO_M: f64 = 1.0;
 
-/// Ações previstas no contrato (`ACOES_PERMITIDAS`).
-const ACOES_PERMITIDAS: &[&str] = &[
+/// Lista canônica local ao sim das ações aceitas pelo contrato.
+///
+/// Referência estável para validação e para consumidores headless.
+pub const ACOES_PERMITIDAS: &[&str] = &[
     "mover",
     "sinalizar_sincronia",
     "sinalizar_alavanca",
@@ -216,6 +218,15 @@ fn nivel_minimo_para_acao(acao: &str) -> u8 {
         "atacar_no" => 6,
         _ => 1,
     }
+}
+
+/// Indica se a ação exige coordenadas de destino no comando.
+///
+/// Somente `sinalizar_sincronia` e `sinalizar_alavanca` dispensam destino;
+/// as outras 11 ações canônicas exigem coordenadas.
+#[must_use]
+pub fn acao_exige_destino(acao: &str) -> bool {
+    !matches!(acao, "sinalizar_sincronia" | "sinalizar_alavanca")
 }
 
 /// Origem do alvo de Nó fixado no jogador.

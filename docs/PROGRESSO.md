@@ -418,3 +418,33 @@ implementada. O item 13 é divergência de layout de diretórios, não um "gate 
 - **[NV]**: CI/deploy remoto e qualquer estado externo não confirmado ao vivo nesta sessão.
 - **[INF]**: a meta de 141 testes decorre de 136 + 5 novos testes do escudo; a implementação segue a rota única `aplicar_dano_a_jogador` e os campos de escudo no hash (conforme DoD em `.specify/memory/STATE.md`). Inferência, não verificação.
 - **Histórico**: notas anteriores (inclusive 2026-11-23T01:31Z, ciclo 038, `e010363`/PR #48) permanecem imutáveis; esta é a vigente. Correção append-only; nenhum gate/build/formatter/commit/push/PR/deploy executado; 0 linhas removidas.
+
+## 2026-11-24T10:29Z — Ciclo 056 (validação do servidor headless): baseline e decisão 1280/3125
+
+- **Sessão/escopo**: `insurgencia - validacao do servidor headless`
+  (`20261124T102734Z-servidor-validacao`), worktree `.specify/queue/worktrees/servidor-056`, branch
+  `feature/056-servidor-validacao`, base `0bc2c25`. Nota didática append-only; nada executado nesta edição.
+- **Âncora (Bloco 0.a, [EV])**: ALVO `origin/dev=0bc2c25` (= HEAD do worktree), `origin/main=2acf9e5`;
+  FONTE `mdmv-dark-factory` `b1deab1` (fonte, não autoridade; nada transplantado). Fila 0.0: apenas
+  PR #72 `dev→main`, GREEN em `gates`/`rust` no head `0bc2c25`, **escalado ao SWE e não mesclado**
+  (babysitter `orphaned` por TTL vencido, escalonamento entregue). Worktrees 2 (compartilhada suja +
+  esta), stashes 0; trabalho alheio untracked preservado. 54 specs no head; 141 testes no baseline;
+  5 gates locais PASS. Gate autoritativo `./verify.sh`; CI `gates`+`rust`; CLI `gh`.
+- **Decisão 80/20 do ciclo 056 ([EV])**: **1280/3125** (critério impacto × confiança × fechamento ×
+  esforço⁻¹ × risco⁻¹, escala 1–5, denominador 3125; filtro: comportamento observável + consumidor fora
+  dos artefatos do ciclo); opção **BF-011** (paridade de whitelist/validação do servidor headless)
+  escolhida frente a BF-014 (1125/3125), BF-012 (240/3125), BF-013 (100/3125) e BF-001 (50/3125,
+  inelegível por autorização).
+- **Escopo/DoD ([EV])**: whitelist única derivada de `ACOES_PERMITIDAS` (13 ações canônicas),
+  `acao_exige_destino` pública no sim, validação no servidor antes de `agendar_comando`, recusa
+  `linha N: <CodigoRecusa>` com exit 2/stdout vazia, formato `<tick>\t<sha256>` e hash inicial
+  preservados; 5 novos testes cobrem paridade das 13 ações, coordenadas finitas, recusa, determinismo
+  e hash inicial (meta 146 testes, 141 + 5 — **[INF]**, conforme DoD em `.specify/memory/STATE.md`).
+  Consumidores: usuário/automação do CLI `insurgencia-servidor` e `crates/servidor/tests/cli.rs`.
+  Sem mudança de protocolo, Cargo, CI, stack ou rede.
+- **Governança ([EV])**: **R6** N/A/bloqueado (BF-007; se invocada, PARE e escale ao SWE, nunca simular
+  issue); promoção `dev→main` e deploy são competência **exclusiva do SWE**. Nenhum merge/deploy por agente.
+- **[NV]**: CI/deploy remoto e qualquer estado externo não confirmado ao vivo nesta sessão.
+- **Histórico**: notas anteriores (inclusive 2026-11-23T22:00Z, ciclo 055, `3f3b01c`/960/3125, e
+  2026-11-23T01:31Z, ciclo 038, `e010363`/PR #48) permanecem imutáveis; esta é a vigente. Nota
+  append-only; nenhum gate/build/formatter/commit/push/PR/deploy executado; 0 linhas removidas.
