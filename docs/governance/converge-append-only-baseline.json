@@ -153,6 +153,10 @@
     "specs/056-servidor-validacao/converge.md": {
       "bytes": 9974,
       "sha256": "e27655b96c54e00f5de776f505c1c1df1b92a08a26d19dee5701d71d1861fbcc"
+    },
+    "specs/057-armadilha-improvisada/converge.md": {
+      "bytes": 11398,
+      "sha256": "cd151aa570143b71724d5ad10ca06aa9ac592254b0c76c4d2790a7d848919725"
     }
   },
   "_provenance": {

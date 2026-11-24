@@ -1,6 +1,20 @@
 # ROADMAP.md — Insurgência
 
-> **Nota datada (2026-11-24T10:29Z) — vigente.** Ciclo 056, worktree
+> **Nota datada (2026-11-24T12:15Z) — vigente.** Ciclo 057, worktree
+> `feature/057-armadilha-improvisada` (base `661890f`), sessão
+> `20261124T121311Z-armadilha-improvisada`. Fatos **[EV]** do baseline: ALVO `origin/dev=661890f`
+> (`origin/main=2acf9e5`), FONTE `b1deab1` (fonte, não autoridade); fila 0.0: apenas PR #72
+> `dev→main`, `gates`/`rust` success no head `661890f`, escalado ao SWE, **sem merge/deploy**;
+> 55 specs no head; 146 testes; 5 gates locais PASS no head correto; decisão 057 **720/3125**;
+> opção **BF-002b** (Armadilha Improvisada do Artesão — GDD §10.3:588-593) escolhida, com
+> **reescalonamento de BF-014** (HUD `hash_estado`) de 1125 para 250/3125 (diagnóstico, sem efeito
+> de jogo); **R6** N/A/bloqueado (BF-007; se invocada, PARE e escale ao SWE, nunca simular issue) e
+> promoção `dev→main`/deploy **exclusivos do SWE**. **[NV]**: CI/deploy remoto. **[INF]**: as fases
+> 80/20 e o horizonte GDD §16.6 abaixo seguem como plano; a nota de 2026-11-24T10:29Z e as seções
+> seguintes são **histórico**. "80/20" ordena a fila, nunca percentual de conclusão.
+
+> **Nota datada (2026-11-24T10:29Z) — histórica** (superada pela nota vigente de 2026-11-24T12:15Z).
+> Ciclo 056, worktree
 > `feature/056-servidor-validacao` (base `0bc2c25`), sessão `20261124T102734Z-servidor-validacao`.
 > Fatos **[EV]** do baseline: ALVO `origin/dev=0bc2c25` (`origin/main=2acf9e5`), FONTE `b1deab1`
 > (fonte, não autoridade); fila 0.0: apenas PR #72 `dev→main`, GREEN em `gates`/`rust`, escalado ao SWE,

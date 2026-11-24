@@ -3,18 +3,21 @@
 
 use insurgencia_sim::{
     Barreira, CodigoRecusa, Comando, Funcao, Mundo, Ponte, ResultadoPartida, ValidacaoComandos,
-    ABSORCAO_ESCUDO, ALCANCE_ANALISE_MATERIALISTA_M, ALCANCE_ATAQUE_PNJ_M, ALCANCE_ESCUDO_M,
-    BONUS_DANO_ANALISE_PERCENT, CONTRIBUICAO_NO, CUSTO_ANALISE_MATERIALISTA, CUSTO_ATAQUE_FOLEGO,
+    ABSORCAO_ESCUDO, ALCANCE_ANALISE_MATERIALISTA_M, ALCANCE_ARMADILHA_M, ALCANCE_ATAQUE_PNJ_M,
+    ALCANCE_ESCUDO_M, BONUS_DANO_ANALISE_PERCENT, CONTRIBUICAO_NO, CUSTO_ANALISE_MATERIALISTA,
+    CUSTO_ARMADILHA_FOLEGO, CUSTO_ARMADILHA_MATERIAIS, CUSTO_ATAQUE_FOLEGO,
     CUSTO_BARREIRA_MATERIAIS, CUSTO_ESCUDO_FOLEGO, CUSTO_PONTE_MATERIAIS, DANO_ATAQUE,
-    DANO_ATAQUE_PNJ, DANO_MAXIMO_NOS, FOLEGO_MAXIMO, MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS,
-    NIVEL_MAXIMO, PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA, PV_PNJ, PV_PONTE,
-    RECARGA_ANALISE_MATERIALISTA_TICKS, RECARGA_ESCUDO_TICKS, RESISTENCIA_CONTINUA_ESCUDO_PERCENT,
-    RESISTENCIA_INICIAL, TICKS_ANALISE_MATERIALISTA, TICKS_ATAQUE_PNJ, TICKS_AUTOGESTAO_POR_PONTO,
-    TICKS_COLETA, TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA, TICKS_CONSTRUCAO_PONTE,
-    TICKS_CONTROLE_ILHA, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_ESCUDO, TICKS_DURACAO_PONTE,
-    TICKS_INATIVIDADE_NO, TICKS_LIMITE_PARTIDA, TICKS_POR_NIVEL, TICKS_PROPAGANDA,
-    TICKS_PROPAGANDA_NO, TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE,
-    TICKS_REVERSAO_SUDITO, TOTAL_PNJS_PADRAO,
+    DANO_ATAQUE_PNJ, DANO_MAXIMO_NOS, FOLEGO_MAXIMO, MAX_ARMADILHAS_POR_JOGADOR,
+    MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS, NIVEL_MAXIMO, PONTOS_AUTOGESTAO_POR_DEFESA,
+    PV_BARREIRA, PV_PNJ, PV_PONTE, RAIO_ARMADILHA_M, RECARGA_ANALISE_MATERIALISTA_TICKS,
+    RECARGA_ARMADILHA_TICKS, RECARGA_ESCUDO_TICKS, RESISTENCIA_CONTINUA_ESCUDO_PERCENT,
+    RESISTENCIA_INICIAL, TICKS_ANALISE_MATERIALISTA, TICKS_ARMAR_ARMADILHA, TICKS_ATAQUE_PNJ,
+    TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA,
+    TICKS_CONSTRUCAO_PONTE, TICKS_CONTROLE_ILHA, TICKS_DURACAO_ARMADILHA, TICKS_DURACAO_BARREIRA,
+    TICKS_DURACAO_ESCUDO, TICKS_DURACAO_PONTE, TICKS_IMOBILIZACAO_ARMADILHA, TICKS_INATIVIDADE_NO,
+    TICKS_LIMITE_PARTIDA, TICKS_POR_NIVEL, TICKS_PROPAGANDA, TICKS_PROPAGANDA_NO,
+    TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE, TICKS_REVERSAO_SUDITO,
+    TOTAL_PNJS_PADRAO,
 };
 
 /// Eleva o nível do jogador ao mínimo exigido por uma ação (protótipo).
@@ -3880,6 +3883,348 @@ fn hash_estado_cobre_escudo() {
     assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
     if let Some(jogador) = segundo.jogadores.get_mut(&1) {
         jogador.escudo_alvo = Some(2);
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+}
+
+/// Monta um comando `armadilha` com os monotônicos já preenchidos.
+#[must_use]
+fn comando_armadilha(peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) -> Comando {
+    Comando {
+        peer_id,
+        acao: "armadilha".to_string(),
+        seq,
+        request_id,
+        destino: Some(ponto),
+    }
+}
+
+/// Agenda uma armadilha somente após validá-la contra o estado corrente.
+fn agendar_armadilha(
+    mundo: &mut Mundo,
+    peer_id: u64,
+    seq: i64,
+    request_id: i64,
+    ponto: (f64, f64),
+) {
+    assert!(
+        ValidacaoComandos::validar(mundo, peer_id, "armadilha", seq, request_id, Some(ponto),)
+            .is_ok()
+    );
+    mundo.agendar_comando(comando_armadilha(peer_id, seq, request_id, ponto));
+}
+
+#[test]
+fn armadilha_custa_25_folego_e_5_materiais() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 3);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.materiais = 10;
+    }
+    assert_eq!(CUSTO_ARMADILHA_FOLEGO, 25);
+    assert_eq!(CUSTO_ARMADILHA_MATERIAIS, 5);
+
+    agendar_armadilha(&mut mundo, 1, 1, 1, (0.0, 0.0));
+    mundo.avancar_tick();
+
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.folego, FOLEGO_MAXIMO - CUSTO_ARMADILHA_FOLEGO);
+    assert_eq!(jogador.materiais, 10 - CUSTO_ARMADILHA_MATERIAIS);
+    assert_eq!(jogador.seq, 1);
+    assert_eq!(jogador.request_id, 1);
+    assert_eq!(jogador.armadilha_recarga_ticks, RECARGA_ARMADILHA_TICKS);
+    assert_eq!(jogador.imobilizado_ticks, 0);
+    assert_eq!(mundo.armadilhas.len(), 1);
+    assert_eq!(mundo.proxima_armadilha_id, 2);
+    let armadilha = &mundo.armadilhas[&1];
+    assert_eq!(armadilha.id, 1);
+    assert_eq!(armadilha.dono, 1);
+    assert!(armadilha.posicao.0.abs() < 1e-12);
+    assert!(armadilha.posicao.1.abs() < 1e-12);
+    assert_eq!(armadilha.ticks_armar, TICKS_ARMAR_ARMADILHA);
+    assert_eq!(armadilha.ticks_restantes, TICKS_DURACAO_ARMADILHA);
+
+    // A recarga própria bloqueia uma segunda armadilha no mesmo instante.
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "armadilha", 2, 2, Some((0.0, 0.0))),
+        Err(CodigoRecusa::ArmadilhaEmRecarga)
+    );
+    // A ordem de validação mantém Fôlego e Materiais antes da recarga.
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.folego = CUSTO_ARMADILHA_FOLEGO - 1;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "armadilha", 2, 2, Some((0.0, 0.0))),
+        Err(CodigoRecusa::FolegoInsuficiente)
+    );
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.folego = CUSTO_ARMADILHA_FOLEGO;
+        jogador.materiais = CUSTO_ARMADILHA_MATERIAIS - 1;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "armadilha", 2, 2, Some((0.0, 0.0))),
+        Err(CodigoRecusa::SaldoInsuficiente)
+    );
+}
+
+#[test]
+fn armadilha_recusa_destino_alem_de_3_m() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 3);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.materiais = 20;
+    }
+    assert!((ALCANCE_ARMADILHA_M - 3.0).abs() < 1e-12);
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "armadilha", 1, 1, None),
+        Err(CodigoRecusa::DestinoInvalido)
+    );
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "armadilha", 1, 1, Some((3.0001, 0.0))),
+        Err(CodigoRecusa::DestinoInvalido)
+    );
+    assert!(ValidacaoComandos::validar(
+        &mundo,
+        1,
+        "armadilha",
+        1,
+        1,
+        Some((ALCANCE_ARMADILHA_M, 0.0)),
+    )
+    .is_ok());
+
+    // Um comando enfileirado diretamente fora do alcance não cobra nem cria armadilha.
+    mundo.agendar_comando(comando_armadilha(1, 1, 1, (3.0001, 0.0)));
+    mundo.avancar_tick();
+    assert!(mundo.armadilhas.is_empty());
+    assert_eq!(mundo.proxima_armadilha_id, 1);
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(mundo.jogadores[&1].folego, FOLEGO_MAXIMO);
+    assert_eq!(mundo.jogadores[&1].materiais, 20);
+}
+
+#[test]
+fn armadilha_imobiliza_inimigo_por_60_ticks_e_poupa_aliados() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    mundo.adicionar_jogador(3);
+    garantir_nivel(&mut mundo, 1, 3);
+    garantir_nivel(&mut mundo, 2, 3);
+    garantir_nivel(&mut mundo, 3, 3);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.equipe = 1;
+        jogador.materiais = 10;
+    }
+    if let Some(jogador) = mundo.jogadores.get_mut(&2) {
+        jogador.equipe = 1;
+        jogador.posicao = (RAIO_ARMADILHA_M / 2.0, 0.0);
+    }
+    if let Some(jogador) = mundo.jogadores.get_mut(&3) {
+        jogador.equipe = 2;
+        jogador.posicao = (-RAIO_ARMADILHA_M / 2.0, 0.0);
+    }
+    assert!((RAIO_ARMADILHA_M - 1.0).abs() < 1e-12);
+    assert_eq!(TICKS_IMOBILIZACAO_ARMADILHA, 60);
+
+    agendar_armadilha(&mut mundo, 1, 1, 1, (0.0, 0.0));
+    mundo.avancar_tick();
+    assert_eq!(mundo.armadilhas.len(), 1);
+    for _ in 0..(TICKS_ARMAR_ARMADILHA - 1) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.armadilhas[&1].ticks_armar, 1);
+    assert_eq!(mundo.jogadores[&3].imobilizado_ticks, 0);
+    // No trigésimo tick de arme o inimigo pisa; o aliado da mesma equipe passa.
+    mundo.avancar_tick();
+    assert!(mundo.armadilhas.is_empty());
+    assert_eq!(
+        mundo.jogadores[&3].imobilizado_ticks,
+        TICKS_IMOBILIZACAO_ARMADILHA
+    );
+    assert_eq!(mundo.jogadores[&2].imobilizado_ticks, 0);
+
+    // Enquanto imobilizado, `mover` não muda posição nem monotônicos.
+    agendar_mover(&mut mundo, 3, 1, 1, (0.0, 0.0));
+    mundo.avancar_tick();
+    assert!((mundo.jogadores[&3].posicao.0 + RAIO_ARMADILHA_M / 2.0).abs() < 1e-12);
+    assert_eq!(mundo.jogadores[&3].seq, 0);
+    assert_eq!(mundo.jogadores[&3].request_id, 0);
+    assert_eq!(
+        mundo.jogadores[&3].imobilizado_ticks,
+        TICKS_IMOBILIZACAO_ARMADILHA - 1
+    );
+
+    for _ in 0..(TICKS_IMOBILIZACAO_ARMADILHA - 2) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&3].imobilizado_ticks, 1);
+    agendar_mover(&mut mundo, 3, 2, 2, (0.0, 0.0));
+    mundo.avancar_tick();
+    assert!(mundo.jogadores[&3].posicao.0.abs() < 1e-12);
+    assert_eq!(mundo.jogadores[&3].seq, 2);
+    assert_eq!(mundo.jogadores[&3].request_id, 2);
+    assert_eq!(mundo.jogadores[&3].imobilizado_ticks, 0);
+    assert_eq!(mundo.jogadores[&2].imobilizado_ticks, 0);
+    assert!((mundo.jogadores[&2].posicao.0 - RAIO_ARMADILHA_M / 2.0).abs() < 1e-12);
+}
+
+#[test]
+fn armadilha_expira_apos_1800_ticks_e_limite_de_tres() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 3);
+    let mut seq = 1;
+    for ponto in [(0.0, 0.0), (2.0, 0.0), (-2.0, 0.0)] {
+        if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+            jogador.folego = FOLEGO_MAXIMO;
+            jogador.materiais = 20;
+            jogador.armadilha_recarga_ticks = 0;
+        }
+        agendar_armadilha(&mut mundo, 1, seq, seq, ponto);
+        mundo.avancar_tick();
+        seq += 1;
+    }
+    assert_eq!(TICKS_DURACAO_ARMADILHA, 1800);
+    assert_eq!(MAX_ARMADILHAS_POR_JOGADOR, 3);
+    assert_eq!(mundo.armadilhas.len(), MAX_ARMADILHAS_POR_JOGADOR);
+    assert_eq!(mundo.proxima_armadilha_id, 4);
+    for id in 1..=3 {
+        assert_eq!(mundo.armadilhas[&id].dono, 1);
+    }
+
+    // Com recarga zerada e recursos suficientes, o limite de três ainda recusa.
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.folego = FOLEGO_MAXIMO;
+        jogador.materiais = 20;
+        jogador.armadilha_recarga_ticks = 0;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "armadilha", seq, seq, Some((0.0, 0.0))),
+        Err(CodigoRecusa::SaldoInsuficiente)
+    );
+    mundo.agendar_comando(comando_armadilha(1, seq, seq, (0.0, 0.0)));
+    mundo.avancar_tick();
+    assert_eq!(mundo.armadilhas.len(), MAX_ARMADILHAS_POR_JOGADOR);
+    assert_eq!(mundo.proxima_armadilha_id, 4);
+
+    // Sem inimigo em raio, a armadilha expira exatamente 1800 ticks depois.
+    let mut expiracao = Mundo::new();
+    expiracao.adicionar_jogador(1);
+    garantir_nivel(&mut expiracao, 1, 3);
+    if let Some(jogador) = expiracao.jogadores.get_mut(&1) {
+        jogador.materiais = 10;
+    }
+    agendar_armadilha(&mut expiracao, 1, 1, 1, (0.0, 0.0));
+    expiracao.avancar_tick();
+    assert_eq!(
+        expiracao.armadilhas[&1].ticks_restantes,
+        TICKS_DURACAO_ARMADILHA
+    );
+    for _ in 0..(TICKS_DURACAO_ARMADILHA - 1) {
+        expiracao.avancar_tick();
+    }
+    assert_eq!(expiracao.armadilhas.len(), 1);
+    assert_eq!(expiracao.armadilhas[&1].ticks_restantes, 1);
+    expiracao.avancar_tick();
+    assert!(expiracao.armadilhas.is_empty());
+}
+
+#[test]
+fn hash_reflete_armadilha_e_imobilizacao() {
+    let mut primeiro = Mundo::new();
+    primeiro.adicionar_jogador(1);
+    garantir_nivel(&mut primeiro, 1, 3);
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.materiais = 20;
+    }
+    let mut segundo = Mundo::new();
+    segundo.adicionar_jogador(1);
+    garantir_nivel(&mut segundo, 1, 3);
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.materiais = 20;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    agendar_armadilha(&mut primeiro, 1, 1, 1, (0.0, 0.0));
+    primeiro.avancar_tick();
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    agendar_armadilha(&mut segundo, 1, 1, 1, (0.0, 0.0));
+    segundo.avancar_tick();
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.equipe = 2;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.equipe = 2;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.armadilha_recarga_ticks = 123;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.armadilha_recarga_ticks = 123;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.imobilizado_ticks = TICKS_IMOBILIZACAO_ARMADILHA;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.imobilizado_ticks = TICKS_IMOBILIZACAO_ARMADILHA;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(armadilha) = primeiro.armadilhas.get_mut(&1) {
+        armadilha.ticks_armar = 7;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(armadilha) = segundo.armadilhas.get_mut(&1) {
+        armadilha.ticks_armar = 7;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(armadilha) = primeiro.armadilhas.get_mut(&1) {
+        armadilha.ticks_restantes = 1000;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(armadilha) = segundo.armadilhas.get_mut(&1) {
+        armadilha.ticks_restantes = 1000;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(armadilha) = primeiro.armadilhas.get_mut(&1) {
+        armadilha.posicao = (1.0, 1.0);
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(armadilha) = segundo.armadilhas.get_mut(&1) {
+        armadilha.posicao = (1.0, 1.0);
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(armadilha) = primeiro.armadilhas.get_mut(&1) {
+        armadilha.dono = 9;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(armadilha) = segundo.armadilhas.get_mut(&1) {
+        armadilha.dono = 9;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(armadilha) = primeiro.armadilhas.get_mut(&1) {
+        armadilha.id = 42;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(armadilha) = segundo.armadilhas.get_mut(&1) {
+        armadilha.id = 42;
     }
     assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
 }
