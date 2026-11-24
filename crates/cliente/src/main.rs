@@ -23,7 +23,7 @@ use insurgencia_cliente::{
     VELOCIDADE,
 };
 use insurgencia_sim::{
-    Comando, Mundo, ResultadoPartida, ALCANCE_ANALISE_MATERIALISTA_M, ALCANCE_ESCUDO_M,
+    Comando, Funcao, Mundo, ResultadoPartida, ALCANCE_ANALISE_MATERIALISTA_M, ALCANCE_ESCUDO_M,
     MAX_RECONQUISTAS, NIVEL_MAXIMO, PASSO_SEGUNDOS, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA,
 };
 
@@ -117,6 +117,7 @@ fn main() {
                 solicitar_propaganda_no,
                 solicitar_atacar_no,
                 solicitar_atacar_pnj,
+                solicitar_armadilha,
                 solicitar_analise_materialista,
                 solicitar_escudo,
                 sincronizar_sim,
@@ -613,7 +614,16 @@ fn mover_jogador(
     teclado: Res<ButtonInput<KeyCode>>,
     tempo: Res<Time>,
     mut jogador: ResMut<JogadorLocal>,
+    simulacao: Res<Simulacao>,
 ) {
+    if simulacao
+        .0
+        .jogadores
+        .get(&PEER_ID)
+        .is_some_and(|remoto| remoto.imobilizado_ticks > 0)
+    {
+        return;
+    }
     let mut horizontal = 0.0_f32;
     let mut vertical = 0.0_f32;
 
@@ -920,8 +930,47 @@ fn solicitar_atacar_pnj(
     });
 }
 
+/// Informa se o papel do jogador local é Artesão no espelho autoritativo.
+#[must_use]
+fn jogador_e_artesao(mundo: &Mundo) -> bool {
+    mundo
+        .jogadores
+        .get(&PEER_ID)
+        .is_none_or(|jogador| jogador.funcao == Funcao::Artesao)
+}
+
+/// Agenda `armadilha` na própria posição ao pressionar `E` sendo Artesão.
+///
+/// O núcleo valida nível, alcance, Fôlego, Materiais e recarga; aqui apenas
+/// montamos o comando com `seq` e `request_id` monotônicos locais.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_armadilha(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyE) || !jogador_e_artesao(&simulacao.0) {
+        return;
+    }
+    local.seq += 1;
+    local.request_id += 1;
+    let (x, y) = jogador.0.posicao;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "armadilha".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some((f64::from(x), f64::from(y))),
+    });
+}
+
 /// Agenda `analise_materialista` no PNJ ativo mais próximo ao pressionar `E`.
 ///
+/// Vale para papéis que não sejam Artesão, pois `E` arma a armadilha do Artesão.
 /// Sem alvo dentro de 12 m, nenhum comando é agendado e os contadores locais
 /// permanecem intactos; o núcleo valida Fôlego, nível e recarga.
 #[expect(
@@ -934,7 +983,7 @@ fn solicitar_analise_materialista(
     mut local: ResMut<ComandoLocal>,
     mut simulacao: ResMut<Simulacao>,
 ) {
-    if !teclado.just_pressed(KeyCode::KeyE) {
+    if !teclado.just_pressed(KeyCode::KeyE) || jogador_e_artesao(&simulacao.0) {
         return;
     }
     let Some(destino) = posicao_analise_materialista(&simulacao.0, jogador.0.posicao) else {
@@ -1043,6 +1092,9 @@ fn sincronizar_sim(jogador: Res<JogadorLocal>, mut simulacao: ResMut<Simulacao>)
     let Some(remoto) = simulacao.0.jogadores.get_mut(&PEER_ID) else {
         return;
     };
+    if remoto.imobilizado_ticks > 0 {
+        return;
+    }
     let (x, y) = jogador.0.posicao;
     remoto.posicao = (f64::from(x), f64::from(y));
 }
@@ -1115,7 +1167,8 @@ const DICA_TECLAS: &str = concat!(
     "WASD ou setas para mover · B para construir barreira · P para construir ponte · ",
     "C para coletar materiais · G para propaganda · R para propaganda no Nó · ",
     "F para atacar o Nó · Aproxime-se do alvo e use Q para atacar · ",
-    "T para atacar o PNJ mais próximo · E para analisar o PNJ mais próximo · V para erguer escudo"
+    "T para atacar o PNJ mais próximo · E para armadilha (Artesão) ou analisar o PNJ ",
+    "mais próximo · V para erguer escudo"
 );
 
 /// Monta o texto do painel a partir do estado local e do espelho da simulação.
@@ -1155,6 +1208,12 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
         .values()
         .filter(|ponte| ponte.dono == PEER_ID)
         .count();
+    let armadilhas = simulacao
+        .0
+        .armadilhas
+        .values()
+        .filter(|armadilha| armadilha.dono == PEER_ID)
+        .count();
     let suditos = simulacao
         .0
         .suditos
@@ -1181,7 +1240,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
             "Fôlego: {folego}\nEscudo: {escudo_pv} ({escudo_ticks})\n",
             "Vida: {vida}\nAlvo: {vida_alvo}\nPNJs: {pnjs}\n",
             "Análise: {analise}\nAutogestão: {autogestao}\nBarreiras: {barreiras}\n",
-            "Pontes: {pontes}\nSúditos: {suditos}\n",
+            "Pontes: {pontes}\nArmadilhas: {armadilhas}\nSúditos: {suditos}\n",
             "Resistência: {resistencia}\nNós: {nos_convertidos}/3\n",
             "Ilhas: {ilhas_controladas}\nSinais: {sinais}\nResultado: {resultado}\n",
             "Construindo: {construindo}\nColeta: {coletando}\n",
@@ -1207,6 +1266,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
         autogestao = autogestao,
         barreiras = barreiras,
         pontes = pontes,
+        armadilhas = armadilhas,
         suditos = suditos,
         resistencia = resistencia,
         nos_convertidos = nos_convertidos,

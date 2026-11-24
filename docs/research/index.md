@@ -1,6 +1,17 @@
 # Índice de pesquisa e avaliação — Insurgência
 
-> **Nota datada (2026-11-24T10:29Z) — vigente.** Baseline do ciclo 056: ALVO `origin/dev=0bc2c25`
+> **Nota datada (2026-11-24T12:15Z) — vigente.** Baseline do ciclo 057: ALVO `origin/dev=661890f`
+> (`origin/main=2acf9e5`), FONTE `b1deab1` (fonte, não autoridade), fila 0.0 com apenas PR #72
+> `dev→main` `gates`/`rust` success no head `661890f`, escalado ao SWE e não mesclado, 55 specs no
+> head, 146 testes, 5 gates locais PASS no head correto, decisão 057 **720/3125** (**BF-002b** —
+> Armadilha Improvisada do Artesão, GDD §10.3:588-593 — escolhido; **BF-014** reescalonado de 1125
+> para 250/3125 por ser diagnóstico), **R6** N/A/bloqueado (BF-007; PARE e escale ao SWE se
+> invocada) e promoção `dev→main`/deploy **exclusivos do SWE** (**[EV]**). CI/deploy remoto **[NV]**;
+> os inventários abaixo (2026-11-19, 2026-11-23, 2026-11-24 e atualizações seguintes) são
+> **histórico**. Detalhes em `docs/PROGRESSO.md` e `.specify/memory/STATE.md`.
+
+> **Nota datada (2026-11-24T10:29Z) — histórica** (superada pela nota vigente de 2026-11-24T12:15Z).
+> Baseline do ciclo 056: ALVO `origin/dev=0bc2c25`
 > (`origin/main=2acf9e5`), FONTE `b1deab1` (fonte, não autoridade), fila 0.0 com apenas PR #72
 > `dev→main` GREEN em `gates`/`rust`, escalado ao SWE e não mesclado, 54 specs no head, 141 testes,
 > 5 gates locais PASS, decisão 056 **1280/3125** (**BF-011** — paridade de whitelist/validação do

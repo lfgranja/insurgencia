@@ -181,6 +181,33 @@ pub const ALCANCE_ESCUDO_M: f64 = 3.0;
 /// percentual não é aplicado neste corte (fora da `DoD`).
 pub const RESISTENCIA_CONTINUA_ESCUDO_PERCENT: i64 = 15;
 
+/// Custo de Fôlego de `armadilha` (`[HIPÓTESE]`/GDD §10.3:588, não cânone).
+pub const CUSTO_ARMADILHA_FOLEGO: i64 = 25;
+
+/// Custo de Materiais de `armadilha` (`[HIPÓTESE]`/GDD §10.3:588, não cânone).
+pub const CUSTO_ARMADILHA_MATERIAIS: i64 = 5;
+
+/// Alcance de `armadilha`, em metros (`[HIPÓTESE]`/GDD §10.3:588).
+pub const ALCANCE_ARMADILHA_M: f64 = 3.0;
+
+/// Ticks de arme da armadilha (1 s × 30 Hz; `[HIPÓTESE]`/protótipo).
+pub const TICKS_ARMAR_ARMADILHA: i64 = 30;
+
+/// Raio de ativação da armadilha, em metros (`[HIPÓTESE]`/GDD §10.3:588).
+pub const RAIO_ARMADILHA_M: f64 = 1.0;
+
+/// Ticks de imobilização causada pela armadilha (2 s × 30 Hz; `[HIPÓTESE]`).
+pub const TICKS_IMOBILIZACAO_ARMADILHA: i64 = 60;
+
+/// Duração da armadilha em ticks (60 s × 30 Hz; `[HIPÓTESE]`/protótipo).
+pub const TICKS_DURACAO_ARMADILHA: i64 = 1800;
+
+/// Número máximo de armadilhas ativas por jogador (`[HIPÓTESE]`/GDD §10.3).
+pub const MAX_ARMADILHAS_POR_JOGADOR: usize = 3;
+
+/// Recarga de `armadilha` em ticks (14 s × 30 Hz; `[HIPÓTESE]`/GDD §10.3).
+pub const RECARGA_ARMADILHA_TICKS: i64 = 420;
+
 /// Distância máxima de um comando `mover`, em metros.
 const LIMITE_MOVIMENTO_M: f64 = 1.0;
 
@@ -201,6 +228,7 @@ pub const ACOES_PERMITIDAS: &[&str] = &[
     "atacar_pnj",
     "analise_materialista",
     "escudo",
+    "armadilha",
 ];
 
 /// Compara dois pontos sem depender de tolerância de arredondamento.
@@ -214,7 +242,7 @@ fn ponto_igual(a: (f64, f64), b: (f64, f64)) -> bool {
 fn nivel_minimo_para_acao(acao: &str) -> u8 {
     match acao {
         "construir_barreira" | "construir_ponte" | "escudo" => 2,
-        "propaganda" | "propaganda_no" | "analise_materialista" => 3,
+        "propaganda" | "propaganda_no" | "analise_materialista" | "armadilha" => 3,
         "atacar_no" => 6,
         _ => 1,
     }
@@ -223,7 +251,7 @@ fn nivel_minimo_para_acao(acao: &str) -> u8 {
 /// Indica se a ação exige coordenadas de destino no comando.
 ///
 /// Somente `sinalizar_sincronia` e `sinalizar_alavanca` dispensam destino;
-/// as outras 11 ações canônicas exigem coordenadas.
+/// as outras 12 ações canônicas exigem coordenadas.
 #[must_use]
 pub fn acao_exige_destino(acao: &str) -> bool {
     !matches!(acao, "sinalizar_sincronia" | "sinalizar_alavanca")
@@ -332,6 +360,12 @@ pub struct Jogador {
     pub escudo_recarga_ticks: i64,
     /// `peer_id` do jogador protegido pelo escudo ativo; `None` quando expirado.
     pub escudo_alvo: Option<u64>,
+    /// Equipe do jogador; armadilhas não ativam aliados da mesma equipe.
+    pub equipe: u8,
+    /// Ticks restantes de recarga de `armadilha`; zero quando disponível.
+    pub armadilha_recarga_ticks: i64,
+    /// Ticks restantes de imobilização; enquanto positivo, `mover` é ignorado.
+    pub imobilizado_ticks: i64,
 }
 
 /// Barricada ativa no mundo, identificada por `id`.
@@ -363,6 +397,21 @@ pub struct Ponte {
     /// Pontos de vida restantes; zero ou menos destrói a ponte.
     pub pv: i64,
     /// Ticks restantes de duração; zero expira a ponte.
+    pub ticks_restantes: i64,
+}
+
+/// Armadilha improvisada ativa no mundo, identificada por `id`.
+#[derive(Clone, Debug)]
+pub struct Armadilha {
+    /// Identificador monotônico da armadilha.
+    pub id: u64,
+    /// `peer_id` do jogador que armou a armadilha.
+    pub dono: u64,
+    /// Posição no plano `(x, y)` onde a armadilha foi armada.
+    pub posicao: (f64, f64),
+    /// Ticks restantes de arme; zero permite a ativação por inimigo.
+    pub ticks_armar: i64,
+    /// Ticks restantes de duração; zero expira a armadilha.
     pub ticks_restantes: i64,
 }
 
@@ -452,8 +501,8 @@ pub struct Comando {
     pub seq: i64,
     /// Identificador de requisição monotônico do comando.
     pub request_id: i64,
-    /// Destino opcional, usado por `mover`, `coletar_materiais`,
-    /// `construir_barreira`, `construir_ponte`, `propaganda` e `escudo`.
+    /// Destino opcional, usado por `mover`, `coletar_materiais`, `construir_barreira`,
+    /// `construir_ponte`, `propaganda`, `escudo` e `armadilha`.
     pub destino: Option<(f64, f64)>,
 }
 
@@ -480,6 +529,10 @@ pub struct Mundo {
     pub pontes: BTreeMap<u64, Ponte>,
     /// Próximo identificador de ponte, começando em um.
     pub proxima_ponte_id: u64,
+    /// Armadilhas ativas indexadas por `id`, em ordem determinística.
+    pub armadilhas: BTreeMap<u64, Armadilha>,
+    /// Próximo identificador de armadilha, começando em um.
+    pub proxima_armadilha_id: u64,
     /// Súditos indexados por `id`.
     pub suditos: BTreeMap<u64, Sudito>,
     /// PNJs defensores indexados por `id`, em ordem determinística.
@@ -523,6 +576,8 @@ impl Mundo {
             proxima_barreira_id: 1,
             pontes: BTreeMap::new(),
             proxima_ponte_id: 1,
+            armadilhas: BTreeMap::new(),
+            proxima_armadilha_id: 1,
             suditos: BTreeMap::new(),
             pnjs: BTreeMap::new(),
             ilhas: BTreeMap::new(),
@@ -550,6 +605,9 @@ impl Mundo {
                 escudo_ticks: 0,
                 escudo_recarga_ticks: 0,
                 escudo_alvo: None,
+                equipe: 0,
+                armadilha_recarga_ticks: 0,
+                imobilizado_ticks: 0,
                 seq: 0,
                 request_id: 0,
                 funcao: Funcao::Artesao,
@@ -767,11 +825,13 @@ impl Mundo {
 
     /// Avança um tick nas fases `prepare`, `skills`, `defesa`, `ataque_pnjs`,
     /// `controle_ilhas`, `vitoria` e `finish`; a derrota é avaliada após o incremento.
+    /// `avancar_armadilhas` roda antes de `fase_skills`.
     pub fn avancar_tick(&mut self) {
         let convertidos_no_inicio = self.nos.values().filter(|no| no.convertido).count();
         self.fase_prepare();
         self.avancar_analises_materialistas();
         self.avancar_escudos();
+        self.avancar_armadilhas();
         self.fase_skills();
         self.fase_defesa();
         self.fase_ataque_pnjs();
@@ -805,6 +865,7 @@ impl Mundo {
         let mut ataques_realizados: BTreeSet<u64> = BTreeSet::new();
         let mut analises_realizadas: BTreeSet<u64> = BTreeSet::new();
         let mut escudos_realizados: BTreeSet<u64> = BTreeSet::new();
+        let mut armadilhas_realizadas: BTreeSet<u64> = BTreeSet::new();
 
         for comando in &comandos {
             let mut atualizar_monotonicos = true;
@@ -817,6 +878,15 @@ impl Mundo {
             };
             if jogador.nivel < nivel_minimo_para_acao(&comando.acao) {
                 self.ultima_recusa = Some(CodigoRecusa::AcaoBloqueada);
+                continue;
+            }
+            // Imobilizado não se move: nem a posição nem os monotônicos avançam.
+            if comando.acao == "mover"
+                && self
+                    .jogadores
+                    .get(&comando.peer_id)
+                    .is_some_and(|jogador| jogador.imobilizado_ticks > 0)
+            {
                 continue;
             }
             if comando.acao == "mover" {
@@ -861,6 +931,8 @@ impl Mundo {
                     self.aplicar_analise_materialista(comando, &mut analises_realizadas);
             } else if comando.acao == "escudo" {
                 atualizar_monotonicos = self.aplicar_escudo(comando, &mut escudos_realizados);
+            } else if comando.acao == "armadilha" {
+                atualizar_monotonicos = self.aplicar_armadilha(comando, &mut armadilhas_realizadas);
             }
             if atualizar_monotonicos {
                 if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
@@ -1043,6 +1115,59 @@ impl Mundo {
         true
     }
 
+    /// Arma uma armadilha no destino, no máximo uma vez por conjurador por tick.
+    ///
+    /// Exige `destino` a até `ALCANCE_ARMADILHA_M` (3 m), Fôlego e Materiais
+    /// suficientes, recarga zerada e menos de `MAX_ARMADILHAS_POR_JOGADOR`
+    /// armadilhas ativas do conjurador. Retorna `true` somente quando a
+    /// armadilha foi criada, para que os monotônicos avancem só em comando aceito.
+    fn aplicar_armadilha(&mut self, comando: &Comando, armadilhas: &mut BTreeSet<u64>) -> bool {
+        let Some(destino) = comando.destino else {
+            return false;
+        };
+        let Some(jogador) = self.jogadores.get(&comando.peer_id) else {
+            return false;
+        };
+        let distancia = (destino.0 - jogador.posicao.0).hypot(destino.1 - jogador.posicao.1);
+        if distancia > ALCANCE_ARMADILHA_M
+            || jogador.folego < CUSTO_ARMADILHA_FOLEGO
+            || jogador.materiais < CUSTO_ARMADILHA_MATERIAIS
+            || jogador.armadilha_recarga_ticks > 0
+            || self
+                .armadilhas
+                .values()
+                .filter(|armadilha| armadilha.dono == comando.peer_id)
+                .count()
+                >= MAX_ARMADILHAS_POR_JOGADOR
+        {
+            return false;
+        }
+        // A cota só é consumida depois de todas as guardas, como em `aplicar_escudo`.
+        if !armadilhas.insert(comando.peer_id) {
+            return false;
+        }
+        let id = self.proxima_armadilha_id;
+        self.proxima_armadilha_id = self.proxima_armadilha_id.saturating_add(1);
+        self.armadilhas.insert(
+            id,
+            Armadilha {
+                id,
+                dono: comando.peer_id,
+                posicao: destino,
+                ticks_armar: TICKS_ARMAR_ARMADILHA,
+                ticks_restantes: TICKS_DURACAO_ARMADILHA,
+            },
+        );
+        if let Some(conjurador) = self.jogadores.get_mut(&comando.peer_id) {
+            conjurador.folego = conjurador.folego.saturating_sub(CUSTO_ARMADILHA_FOLEGO);
+            conjurador.materiais = conjurador
+                .materiais
+                .saturating_sub(CUSTO_ARMADILHA_MATERIAIS);
+            conjurador.armadilha_recarga_ticks = RECARGA_ARMADILHA_TICKS;
+        }
+        true
+    }
+
     /// Decrementa uma vez por tick marcas e recargas, em ordem estável de
     /// `id` dos PNJs e `peer_id` dos jogadores (`[HIPÓTESE]`/protótipo).
     fn avancar_analises_materialistas(&mut self) {
@@ -1075,6 +1200,65 @@ impl Mundo {
             jogador.escudo_recarga_ticks = recarga_anterior.saturating_sub(1).max(0);
             if recarga_anterior > 0 && jogador.escudo_recarga_ticks == 0 {
                 jogador.escudo_alvo = None;
+            }
+        }
+    }
+
+    /// Decrementa arme, duração, recarga e imobilização em um tick e dispara
+    /// armadilhas prontas contra inimigos a até `RAIO_ARMADILHA_M`.
+    ///
+    /// A ordem é a de `id` das armadilhas e de `peer_id` dos jogadores. Aliados
+    /// (mesma `equipe` do dono) atravessam a armadilha sem ativá-la; ao disparar,
+    /// a armadilha é removida e o inimigo fica imobilizado por 60 ticks.
+    fn avancar_armadilhas(&mut self) {
+        for jogador in self.jogadores.values_mut() {
+            jogador.armadilha_recarga_ticks =
+                jogador.armadilha_recarga_ticks.saturating_sub(1).max(0);
+            jogador.imobilizado_ticks = jogador.imobilizado_ticks.saturating_sub(1).max(0);
+        }
+        let ids: Vec<u64> = self.armadilhas.keys().copied().collect();
+        let mut disparos: Vec<(u64, Option<u64>)> = Vec::new();
+        for id in ids {
+            let Some(armadilha) = self.armadilhas.get_mut(&id) else {
+                continue;
+            };
+            if armadilha.ticks_restantes > 0 {
+                armadilha.ticks_restantes -= 1;
+            }
+            if armadilha.ticks_restantes == 0 {
+                disparos.push((id, None));
+                continue;
+            }
+            if armadilha.ticks_armar > 0 {
+                armadilha.ticks_armar -= 1;
+                if armadilha.ticks_armar > 0 {
+                    continue;
+                }
+            }
+            let Some(equipe_dono) = self.jogadores.get(&armadilha.dono).map(|j| j.equipe) else {
+                continue;
+            };
+            let posicao = armadilha.posicao;
+            let vitima = self
+                .jogadores
+                .iter()
+                .find(|(&peer_id, jogador)| {
+                    peer_id != armadilha.dono
+                        && jogador.equipe != equipe_dono
+                        && (jogador.posicao.0 - posicao.0).hypot(jogador.posicao.1 - posicao.1)
+                            <= RAIO_ARMADILHA_M
+                })
+                .map(|(&peer_id, _)| peer_id);
+            if let Some(peer_id) = vitima {
+                disparos.push((id, Some(peer_id)));
+            }
+        }
+        for (id, vitima) in disparos {
+            self.armadilhas.remove(&id);
+            if let Some(peer_id) = vitima {
+                if let Some(jogador) = self.jogadores.get_mut(&peer_id) {
+                    jogador.imobilizado_ticks = TICKS_IMOBILIZACAO_ARMADILHA;
+                }
             }
         }
     }
@@ -1780,7 +1964,8 @@ impl Mundo {
                         "{ponte_ponto:?}:{propaganda_alvo:?}:{folego}:{folego_ticks}:",
                         "{combate_ticks}:{analise_recarga_ticks}:{no_alvo:?}:{no_acao_no:?}:",
                         "{funcao:?}:{nivel}:{nivel_ticks}:{escudo_pv}:{escudo_ticks}:",
-                        "{escudo_recarga_ticks}:{escudo_alvo:?}"
+                        "{escudo_recarga_ticks}:{escudo_alvo:?}:{equipe}:",
+                        "{armadilha_recarga_ticks}:{imobilizado_ticks}"
                     ),
                     peer_id = peer_id,
                     x = x,
@@ -1811,13 +1996,16 @@ impl Mundo {
                     escudo_ticks = jogador.escudo_ticks,
                     escudo_recarga_ticks = jogador.escudo_recarga_ticks,
                     escudo_alvo = jogador.escudo_alvo,
+                    equipe = jogador.equipe,
+                    armadilha_recarga_ticks = jogador.armadilha_recarga_ticks,
+                    imobilizado_ticks = jogador.imobilizado_ticks,
                 )
             })
             .collect::<Vec<_>>()
             .join(";")
     }
 
-    /// Serializa barricadas, pontes, súditos, ilhas, reconquistas e sinais.
+    /// Serializa barricadas, pontes, armadilhas, súditos, ilhas, reconquistas e sinais.
     fn serializar_estruturas(&self) -> String {
         let barreiras: String = self
             .barreiras
@@ -1843,6 +2031,19 @@ impl Mundo {
                 let pv = ponte.pv;
                 let ticks = ponte.ticks_restantes;
                 format!("{id}:{dono}:{x}:{y}:{pv}:{ticks}")
+            })
+            .collect::<Vec<_>>()
+            .join(";");
+        let armadilhas: String = self
+            .armadilhas
+            .values()
+            .map(|armadilha| {
+                let (x, y) = armadilha.posicao;
+                let id = armadilha.id;
+                let dono = armadilha.dono;
+                let arme = armadilha.ticks_armar;
+                let ticks = armadilha.ticks_restantes;
+                format!("{id}:{dono}:{x}:{y}:{arme}:{ticks}")
             })
             .collect::<Vec<_>>()
             .join(";");
@@ -1895,7 +2096,20 @@ impl Mundo {
             .map(String::as_str)
             .collect::<Vec<_>>()
             .join(";");
-        format!("{barreiras}|{pontes}|{suditos}|{pnjs}|{ilhas}|{ilhas_reconquistadas}|{sinais}")
+        format!(
+            concat!(
+                "{barreiras}|{pontes}|{armadilhas}|{suditos}|{pnjs}|",
+                "{ilhas}|{ilhas_reconquistadas}|{sinais}"
+            ),
+            barreiras = barreiras,
+            pontes = pontes,
+            armadilhas = armadilhas,
+            suditos = suditos,
+            pnjs = pnjs,
+            ilhas = ilhas,
+            ilhas_reconquistadas = ilhas_reconquistadas,
+            sinais = sinais,
+        )
     }
 
     /// Calcula o hash SHA-256 canônico do estado corrente.
@@ -1966,7 +2180,7 @@ pub enum CodigoRecusa {
     /// `atacar_forte` sem alvo no destino ou além do alcance de contato.
     #[error("alvo invalido")]
     AlvoInvalido,
-    /// Fôlego abaixo do custo de `atacar_forte`, `analise_materialista` ou `escudo`.
+    /// Fôlego abaixo do custo de `atacar_forte`, `analise_materialista`, `escudo` ou `armadilha`.
     #[error("folego insuficiente")]
     FolegoInsuficiente,
     /// `analise_materialista` durante a recarga de 450 ticks.
@@ -1975,17 +2189,21 @@ pub enum CodigoRecusa {
     /// `escudo` durante a recarga de 420 ticks (`[HIPÓTESE]`/protótipo, não cânone).
     #[error("escudo em recarga")]
     EscudoEmRecarga,
+    /// `armadilha` durante a recarga de 420 ticks (`[HIPÓTESE]`/GDD §10.3).
+    #[error("armadilha em recarga")]
+    ArmadilhaEmRecarga,
     /// Destino ausente ou fora do ponto para `mover`, `coletar_materiais`,
     /// `construir_barreira`, `construir_ponte`, `propaganda`, `propaganda_no` ou
     /// `atacar_no`; `atacar_pnj` recusa destino sem PNJ ativo ou além de 2 m do
-    /// jogador. `analise_materialista` recusa destino sem PNJ ativo ou além de 12 m.
-    /// Nó inativo também recusa `atacar_no`.
+    /// jogador. `analise_materialista` recusa destino sem PNJ ativo ou além de 12 m,
+    /// e `armadilha` recusa destino além de 3 m. Nó inativo também recusa `atacar_no`.
     #[error("destino ausente ou fora do ponto")]
     DestinoInvalido,
     /// Deslocamento acima de `LIMITE_MOVIMENTO_M`.
     #[error("movimento fora do limite")]
     MovimentoForaDoLimite,
-    /// Materiais abaixo do custo de uma barricada ou ponte.
+    /// Materiais abaixo do custo de uma barricada, ponte ou armadilha; também
+    /// recusa uma quarta armadilha ativa do mesmo conjurador.
     #[error("materiais insuficientes")]
     SaldoInsuficiente,
 }
@@ -2080,6 +2298,39 @@ fn validar_escudo(
     Ok(())
 }
 
+/// Valida `armadilha` na ordem destino/alcance, Fôlego, Materiais e recarga.
+fn validar_armadilha(
+    mundo: &Mundo,
+    peer_id: u64,
+    jogador: &Jogador,
+    destino: Option<(f64, f64)>,
+) -> Result<(), CodigoRecusa> {
+    let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
+    let distancia = (ponto.0 - jogador.posicao.0).hypot(ponto.1 - jogador.posicao.1);
+    if distancia > ALCANCE_ARMADILHA_M {
+        return Err(CodigoRecusa::DestinoInvalido);
+    }
+    if jogador.folego < CUSTO_ARMADILHA_FOLEGO {
+        return Err(CodigoRecusa::FolegoInsuficiente);
+    }
+    if jogador.materiais < CUSTO_ARMADILHA_MATERIAIS {
+        return Err(CodigoRecusa::SaldoInsuficiente);
+    }
+    if jogador.armadilha_recarga_ticks > 0 {
+        return Err(CodigoRecusa::ArmadilhaEmRecarga);
+    }
+    if mundo
+        .armadilhas
+        .values()
+        .filter(|armadilha| armadilha.dono == peer_id)
+        .count()
+        >= MAX_ARMADILHAS_POR_JOGADOR
+    {
+        return Err(CodigoRecusa::SaldoInsuficiente);
+    }
+    Ok(())
+}
+
 impl ValidacaoComandos {
     /// Valida um comando contra o estado autoritativo.
     ///
@@ -2094,7 +2345,8 @@ impl ValidacaoComandos {
     /// em `destino`, até 12 m de distância, Fôlego e recarga zerada.
     /// `propaganda_no`/`atacar_no` exigem Nó no ponto do jogador e não exigem
     /// saldo ou Fôlego. `escudo` exige um jogador no destino a até 3 m, Fôlego
-    /// suficiente e recarga zerada.
+    /// suficiente e recarga zerada. `armadilha` exige destino a até 3 m, Fôlego,
+    /// Materiais, recarga zerada e no máximo três armadilhas ativas por jogador.
     pub fn validar(
         mundo: &Mundo,
         peer_id: u64,
@@ -2183,6 +2435,9 @@ impl ValidacaoComandos {
 
         if acao == "escudo" {
             validar_escudo(mundo, jogador, destino)?;
+        }
+        if acao == "armadilha" {
+            validar_armadilha(mundo, peer_id, jogador, destino)?;
         }
 
         if acao == "analise_materialista" {

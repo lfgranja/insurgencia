@@ -538,3 +538,32 @@ Critério `impacto × confiança × fechamento × esforço⁻¹ × risco⁻¹`, 
 ## 2026-11-24T10:49Z — fechamento do ciclo 056
 
 **Sessão**: `20261124T102734Z-servidor-validacao` · **Título**: `insurgencia - validacao do servidor headless`. Roteiro **10/10 PASS** (`.specify/validations/servidor-validacao/evidence.md`); `cargo fmt --all` OK, `cargo check -p insurgencia-sim --tests` EXIT 0, `cargo test -p insurgencia-sim --test simulacao` **97/97**, `cargo check -p insurgencia-servidor --tests` EXIT 0, `cargo test -p insurgencia-servidor --test cli` **10/10**, inventário **146**. Cinco gates locais PASS; converge `files=38 baselined=38`. Implementação: `ACOES_PERMITIDAS` pública e `acao_exige_destino` no sim; servidor com whitelist derivada, parser por 11/2, validação antes de agendar, recusa `linha N: <CodigoRecusa>` exit 2/stdout vazia, formato tick/hash preservado. Dois placeholders corrigidos e dois artefatos históricos restaurados byte a byte. R4 PASS, R7 `1.0.0-local`, R6 N/A/bloqueado. CI/merge em `dev` e promoção/deploy **[NV]**; promoção/deploy SWE-exclusivos.
+
+## 2026-11-24T12:15Z — auditoria, backlog e decisão 80/20 do ciclo 057
+
+**Sessão**: `20261124T121311Z-armadilha-improvisada` · **Título**: `insurgencia - armadilha improvisada`. **FONTE_FACTORY** `b1deab1` (`origin/dev` `daa21eb` [EV]); ALVO `origin/dev=661890f`, `origin/main=2acf9e5`, checkout local sujo `990ab06`. Fila 0.0: apenas PR #72 → `main`, `gates`/`rust` success no head `661890f`, **não mesclado**; babysitter anterior marcado `orphaned` por TTL. Worktrees 2 (compartilhada + esta), stashes 0. Gate `./verify.sh`, CI GitHub Actions `gates`/`rust`/`strict=true`, CLI `gh`, superfície CLI/headless. R6 bloqueada; promoção/deploy SWE-exclusivos.
+
+**[EV] Auditoria**: 6 crates, 146 testes. Núcleo com 13 ações, 11 com destino, hash SHA-256 canônico e validação isolada no sim; servidor valida antes de agendar; cliente não chama validador e não agenda `mover`. Backlog vigente: BF-002a/BF-008/BF-011 fechados; BF-001/BF-006/BF-007/BF-009/BF-010 inelegíveis por autorização/capacidade; BF-004 depende de execução externa. BF-014 (HUD hash) teve scoring anterior 1125/3125, mas é diagnóstico, não muda comportamento de jogo; BF-012 (mover) tem risco de unidade e é correção de plumbing; BF-003 (mapa/rotas) é amplo. BF-002b é o primeiro incremento nomeado do elenco de habilidades com âncora canônica em GDD §10.3:588-593.
+
+### Decisão 80/20 — 2026-11-24T12:15Z
+
+Critério `impacto × confiança × fechamento × esforço⁻¹ × risco⁻¹`, denominador **3125**. Filtro: comportamento observável + consumidor fora dos artefatos do ciclo.
+
+| Candidato | I | C | Fch | E⁻¹ | R⁻¹ | Pontuação | Consumidor |
+|:--|--:|--:|--:|--:|--:|--:|:--|
+| **BF-002b `armadilha-improvisada`** | 5 | 4 | 4 | 3 | 3 | **720/3125** | jogador do cliente Bevy (Artesão) |
+| BF-003 mapa/rotas | 5 | 3 | 3 | 2 | 3 | 270/3125 | jogador/servidor |
+| BF-014 HUD `hash_estado` | 2 | 5 | 1 | 5 | 5 | 250/3125 | jogador (diagnóstico) |
+| BF-012 cliente `mover` | 4 | 3 | 3 | 2 | 2 | 144/3125 | jogador (correção de plumbing) |
+| BF-013 contratos consumidos | 5 | 2 | 5 | 1 | 2 | 100/3125 | protocolo/servidor |
+| BF-001 rede | 5 | 2 | 5 | 1 | 1 | 50/3125 — **inelegível** | SWE decide |
+
+**Escolha**: `armadilha-improvisada`. Reescalonamento de BF-014 de 1125 para 250 reflete que exibir hash não muda o jogo; BF-002b entrega habilidade material de controle de área, com efeito visível no cliente e consumidor jogador. Nenhuma mudança de stack, contrato, Cargo, CI, rede ou GDD canônico.
+
+**DoD (0.9)**: (1) comportamento final — ação `armadilha` nível 3, custo 25 Fôlego + 5 Materiais, alcance 3 m, arme 30 ticks, raio 1 m, imobilização 60 ticks, duração 1800 ticks, máximo 3 por jogador, aliados imunes por `equipe`, hash cobrindo campos/estado, HUD `Armadilhas: N`, tecla `E` com despacho por `funcao` e bloqueio de movimento local enquanto imobilizado; (2) consumidor — jogador do Artesão no cliente Bevy e testes de integração da sim; (3) comandos que provam — `cargo test -p insurgencia-sim --test simulacao`, `cargo test -p insurgencia-cliente --lib`, `./verify.sh` remoto `gates`+`rust`, roteiro 10/10; (4) backlog — **BF-002b passa a `fechado`**.
+
+**R6**: N/A/bloqueado (BF-007); não será invocada, simulada nem improvisada com `gh`. Promoção `dev→main` e deploy permanecem SWE-exclusivos.
+
+## 2026-11-24T12:55Z — fechamento do ciclo 057
+
+**Sessão**: `20261124T121311Z-armadilha-improvisada` · **Título**: `insurgencia - armadilha improvisada`. Roteiro **10/10 PASS** (`.specify/validations/armadilha-improvisada/evidence.md`); `cargo fmt --all` OK, `cargo check -p insurgencia-sim --tests` EXIT 0, `cargo test -p insurgencia-sim --test simulacao` **102/102**, `cargo check -p insurgencia-cliente` EXIT 0, inventário **151**. Cinco gates locais PASS; converge `files=39 baselined=39`. Implementação: 9 constantes, `Armadilha`, `Mundo.armadilhas`, `Jogador.equipe/recarga/imobilização`, ação `armadilha` nível 3, validação, cota de 3, arme 30, imobilização 60, duração 1800, bloqueio de `mover`, hash e HUD `Armadilhas: N` com `E` por `funcao`. Três RED corrigidos na fonte (hash, import e tipo do helper). R4 PASS, R7 `1.0.0-local`, R6 N/A/bloqueado. CI/merge em `dev` e promoção/deploy **[NV]**; promoção/deploy SWE-exclusivos.
