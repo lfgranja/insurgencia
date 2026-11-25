@@ -38,7 +38,7 @@ const PEER_ALVO_TREINO: u64 = 2;
 const ALVO_TREINO_POSICAO: (f64, f64) = (2.0, 0.0);
 
 /// Tolerância máxima, em metros, para alinhar o avatar à posição exata de um Nó.
-const TOLERANCIA_NO_M: f64 = 2.0;
+const TOLERANCIA_NO_M: f64 = 1.0;
 
 /// Posições fixas dos quatro guardas no protótipo (`[HIPÓTESE]`: sem mapa canônico).
 const PNJS_INICIAIS: [(u64, (f64, f64)); 4] = [
@@ -77,6 +77,8 @@ struct Simulacao(Mundo);
 struct ComandoLocal {
     seq: i64,
     request_id: i64,
+    /// Destino pendente em pixels, acumulado até o próximo tick da simulação.
+    intencao: (f32, f32),
 }
 
 /// Tempo acumulado para avançar a simulação em passos fixos.
@@ -593,6 +595,9 @@ fn configurar(
 
     let mut sim = Mundo::new();
     sim.adicionar_jogador(PEER_ID);
+    if let Some(local) = sim.jogadores.get_mut(&PEER_ID) {
+        local.posicao = pixels_para_metros(jogador.posicao);
+    }
     sim.adicionar_jogador(PEER_ALVO_TREINO);
     for (id, posicao) in PNJS_INICIAIS {
         sim.adicionar_pnj(id, posicao);
@@ -606,6 +611,7 @@ fn configurar(
     commands.insert_resource(ComandoLocal {
         seq: 0,
         request_id: 0,
+        intencao: jogador.posicao,
     });
     commands.insert_resource(Simulacao(sim));
     commands.insert_resource(AccumuladorTick(0.0));
@@ -619,7 +625,6 @@ fn configurar(
 fn mover_jogador(
     teclado: Res<ButtonInput<KeyCode>>,
     tempo: Res<Time>,
-    mut jogador: ResMut<JogadorLocal>,
     mut local: ResMut<ComandoLocal>,
     mut simulacao: ResMut<Simulacao>,
 ) {
@@ -653,7 +658,12 @@ fn mover_jogador(
     }
 
     let passo = direcao.normalize() * VELOCIDADE * tempo.delta_secs();
-    let deslocado = deslocar(jogador.0, (passo.x, passo.y));
+    let deslocado = deslocar(
+        EstadoJogador {
+            posicao: local.intencao,
+        },
+        (passo.x, passo.y),
+    );
     let destino_m = pixels_para_metros(deslocado.posicao);
     if ValidacaoComandos::validar(
         &simulacao.0,
@@ -667,7 +677,7 @@ fn mover_jogador(
     {
         return;
     }
-    jogador.0 = deslocado;
+    local.intencao = deslocado.posicao;
     local.seq += 1;
     local.request_id += 1;
     simulacao.0.agendar_comando(Comando {
@@ -837,7 +847,7 @@ fn posicao_no_mais_proximo(mundo: &Mundo, jogador: (f64, f64)) -> Option<(f64, f
 )]
 fn solicitar_propaganda_no(
     teclado: Res<ButtonInput<KeyCode>>,
-    mut jogador: ResMut<JogadorLocal>,
+    jogador: Res<JogadorLocal>,
     mut local: ResMut<ComandoLocal>,
     mut simulacao: ResMut<Simulacao>,
 ) {
@@ -856,7 +866,28 @@ fn solicitar_propaganda_no(
     ) else {
         return;
     };
-    jogador.0.posicao = metros_para_pixels(ancorado);
+    local.intencao = metros_para_pixels(ancorado);
+    if ValidacaoComandos::validar(
+        &simulacao.0,
+        PEER_ID,
+        "mover",
+        local.seq + 1,
+        local.request_id + 1,
+        Some(ancorado),
+    )
+    .is_err()
+    {
+        return;
+    }
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "mover".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(ancorado),
+    });
     local.seq += 1;
     local.request_id += 1;
     simulacao.0.agendar_comando(Comando {
@@ -875,7 +906,7 @@ fn solicitar_propaganda_no(
 )]
 fn solicitar_atacar_no(
     teclado: Res<ButtonInput<KeyCode>>,
-    mut jogador: ResMut<JogadorLocal>,
+    jogador: Res<JogadorLocal>,
     mut local: ResMut<ComandoLocal>,
     mut simulacao: ResMut<Simulacao>,
 ) {
@@ -894,7 +925,28 @@ fn solicitar_atacar_no(
     ) else {
         return;
     };
-    jogador.0.posicao = metros_para_pixels(ancorado);
+    local.intencao = metros_para_pixels(ancorado);
+    if ValidacaoComandos::validar(
+        &simulacao.0,
+        PEER_ID,
+        "mover",
+        local.seq + 1,
+        local.request_id + 1,
+        Some(ancorado),
+    )
+    .is_err()
+    {
+        return;
+    }
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "mover".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(ancorado),
+    });
     local.seq += 1;
     local.request_id += 1;
     simulacao.0.agendar_comando(Comando {
