@@ -194,10 +194,28 @@ pub fn ilha_em(ponto: (f32, f32)) -> Option<&'static Ilha> {
         .find(|ilha| ilha.forma.contem(ilha.centro, ponto))
 }
 
+/// Aproxima a posição local de um destino da simulação, quando dentro da tolerância.
+///
+/// A distância é calculada em `f64` a partir da posição `f32` do cliente, sem
+/// arredondamento: o destino exato só é devolvido quando a hipotenusa não excede
+/// `tolerancia_m`. Isso alinha o espelho local aos Nós da simulação, cuja
+/// comparação de posição é exata (`total_cmp`, sem epsilon).
+#[must_use]
+pub fn aproximar_no(
+    posicao: (f32, f32),
+    destino: (f64, f64),
+    tolerancia_m: f64,
+) -> Option<(f64, f64)> {
+    let dx = f64::from(posicao.0) - destino.0;
+    let dy = f64::from(posicao.1) - destino.1;
+    (dx.hypot(dy) <= tolerancia_m).then_some(destino)
+}
+
 #[cfg(test)]
 mod testes {
     use super::{
-        deslocar, estado_inicial, ilha_em, Forma, ILHAS, LIMITE_X, LIMITE_Y, POSICAO_INICIAL,
+        aproximar_no, deslocar, estado_inicial, ilha_em, Forma, ILHAS, LIMITE_X, LIMITE_Y,
+        POSICAO_INICIAL,
     };
 
     #[test]
@@ -261,5 +279,23 @@ mod testes {
         let (lado_a, lado_b) = losango.tamanho();
         assert!((lado_a - lado_b).abs() < 1e-6);
         assert!(losango.rotacao() > 0.0);
+    }
+
+    #[test]
+    fn aproximar_no_aceita_coincidencia_exata() {
+        let destino = (1.5, -2.5);
+        assert_eq!(aproximar_no((1.5, -2.5), destino, 2.0), Some(destino));
+    }
+
+    #[test]
+    fn aproximar_no_aceita_posicao_dentro_da_tolerancia() {
+        let destino = (1.5, -2.5);
+        assert_eq!(aproximar_no((1.5, -1.0), destino, 2.0), Some(destino));
+    }
+
+    #[test]
+    fn aproximar_no_recusa_posicao_fora_da_tolerancia() {
+        let destino = (1.5, -2.5);
+        assert_eq!(aproximar_no((10.0, -2.5), destino, 2.0), None);
     }
 }

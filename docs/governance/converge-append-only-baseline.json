@@ -157,6 +157,10 @@
     "specs/057-armadilha-improvisada/converge.md": {
       "bytes": 11398,
       "sha256": "cd151aa570143b71724d5ad10ca06aa9ac592254b0c76c4d2790a7d848919725"
+    },
+    "specs/058-mirror-vitoria-local/converge.md": {
+      "bytes": 7191,
+      "sha256": "55d0e98266ac7d667236a49bb88487fc55057b6c07d9957b18867b668df21b4e"
     }
   },
   "_provenance": {

@@ -561,6 +561,29 @@ impl Default for Mundo {
     }
 }
 
+/// Posições dos três Nós de Controle do espelho local (`[HIPÓTESE]`/protótipo,
+/// não cânone). Coincidem com as posições usadas pelos testes de simulação para
+/// que a vitória seja alcançável sem depender da engine.
+pub const POSICOES_NOS_LOCAIS: [(u64, (f64, f64)); 3] =
+    [(1, (0.5, 0.0)), (2, (1.5, 0.0)), (3, (2.5, 0.0))];
+
+/// Semeia um espelho local mínimo no `Mundo` (`[HIPÓTESE]`/protótipo, não cânone):
+/// quatro ilhas, um Súdito na posição derivada `(0.0, 236.0)` e os três Nós de
+/// Controle em `POSICOES_NOS_LOCAIS`.
+///
+/// Complementa `Mundo::adicionar_ilha`, `Mundo::adicionar_sudito` e
+/// `Mundo::adicionar_no` para que o cliente Bevy possa alcançar a vitória sem o
+/// mapa completo de 12 ilhas. O estado semeado é refletido por `hash_estado`.
+pub fn semear_espelho_local(mundo: &mut Mundo) {
+    for id in 1..=4 {
+        mundo.adicionar_ilha(id);
+    }
+    mundo.adicionar_sudito(1, (0.0, 236.0));
+    for (id, posicao) in POSICOES_NOS_LOCAIS {
+        mundo.adicionar_no(id, posicao);
+    }
+}
+
 impl Mundo {
     /// Cria um mundo zerado, com `epoch` e `match_id` iguais a um.
     #[must_use]

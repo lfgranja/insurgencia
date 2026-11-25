@@ -19,8 +19,8 @@ use bevy::prelude::*;
 use bevy::text::FontSize;
 use bevy::window::PrimaryWindow;
 use insurgencia_cliente::{
-    deslocar, estado_inicial, ilha_em, EstadoJogador, Geometria3d, Ilha, ILHAS, LIMITE_X, LIMITE_Y,
-    VELOCIDADE,
+    aproximar_no, deslocar, estado_inicial, ilha_em, EstadoJogador, Geometria3d, Ilha, ILHAS,
+    LIMITE_X, LIMITE_Y, VELOCIDADE,
 };
 use insurgencia_sim::{
     Comando, Funcao, Mundo, ResultadoPartida, ALCANCE_ANALISE_MATERIALISTA_M, ALCANCE_ESCUDO_M,
@@ -35,6 +35,9 @@ const PEER_ALVO_TREINO: u64 = 2;
 
 /// Posição fixa do alvo de treino no plano do mapa (scaffolding não-canônico).
 const ALVO_TREINO_POSICAO: (f64, f64) = (2.0, 0.0);
+
+/// Tolerância máxima, em metros, para alinhar o avatar à posição exata de um Nó.
+const TOLERANCIA_NO_M: f64 = 2.0;
 
 /// Posições fixas dos quatro guardas no protótipo (`[HIPÓTESE]`: sem mapa canônico).
 const PNJS_INICIAIS: [(u64, (f64, f64)); 4] = [
@@ -593,6 +596,8 @@ fn configurar(
     for (id, posicao) in PNJS_INICIAIS {
         sim.adicionar_pnj(id, posicao);
     }
+    // Semente estática prototípica: ilhas, súditos e nós tornam a vitória observável no cliente.
+    insurgencia_sim::semear_espelho_local(&mut sim);
     if let Some(alvo) = sim.jogadores.get_mut(&PEER_ALVO_TREINO) {
         alvo.posicao = ALVO_TREINO_POSICAO;
     }
@@ -811,7 +816,7 @@ fn posicao_no_mais_proximo(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, f
 )]
 fn solicitar_propaganda_no(
     teclado: Res<ButtonInput<KeyCode>>,
-    jogador: Res<JogadorLocal>,
+    mut jogador: ResMut<JogadorLocal>,
     mut local: ResMut<ComandoLocal>,
     mut simulacao: ResMut<Simulacao>,
 ) {
@@ -821,6 +826,15 @@ fn solicitar_propaganda_no(
     let Some(destino) = posicao_no_mais_proximo(&simulacao.0, jogador.0.posicao) else {
         return;
     };
+    let Some(ancorado) = aproximar_no(jogador.0.posicao, destino, TOLERANCIA_NO_M) else {
+        return;
+    };
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "As posicoes dos Nos (0.5/1.5/2.5) sao exatamente representaveis em f32"
+    )]
+    let ancorado_f32 = (ancorado.0 as f32, ancorado.1 as f32);
+    jogador.0.posicao = ancorado_f32;
     local.seq += 1;
     local.request_id += 1;
     simulacao.0.agendar_comando(Comando {
@@ -839,7 +853,7 @@ fn solicitar_propaganda_no(
 )]
 fn solicitar_atacar_no(
     teclado: Res<ButtonInput<KeyCode>>,
-    jogador: Res<JogadorLocal>,
+    mut jogador: ResMut<JogadorLocal>,
     mut local: ResMut<ComandoLocal>,
     mut simulacao: ResMut<Simulacao>,
 ) {
@@ -849,6 +863,15 @@ fn solicitar_atacar_no(
     let Some(destino) = posicao_no_mais_proximo(&simulacao.0, jogador.0.posicao) else {
         return;
     };
+    let Some(ancorado) = aproximar_no(jogador.0.posicao, destino, TOLERANCIA_NO_M) else {
+        return;
+    };
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "As posicoes dos Nos (0.5/1.5/2.5) sao exatamente representaveis em f32"
+    )]
+    let ancorado_f32 = (ancorado.0 as f32, ancorado.1 as f32);
+    jogador.0.posicao = ancorado_f32;
     local.seq += 1;
     local.request_id += 1;
     simulacao.0.agendar_comando(Comando {

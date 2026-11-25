@@ -1,0 +1,40 @@
+# Analyze (READ-ONLY) — 058-mirror-vitoria-local
+
+**READ-ONLY — nenhum artefato-fonte foi modificado nesta etapa.** Verificação de consistência `spec → plan → tasks` por inspeção: não houve edição de `spec.md`, `plan.md`, `checklists/requirements.md`, `tasks.md`, código (`crates/sim`, `crates/cliente`), GDD, constituição, `.specify/memory/STATE.md`, backlog ou documento de outro ciclo; nenhum build, teste, gate, formatador, commit, push, PR ou issue (real ou simulada) foi executado.
+
+**Data:** 2026-11-24 · **Alvo:** worktree `.specify/queue/worktrees/impl-058-mirror-vitoria/`, branch `feature/058-mirror-vitoria-local`, base `origin/dev = 1855e5c`, constituição v1.2.2. **Score:** 270/3125 (`5×3×3×2×3`). **Consumidores:** jogador do cliente Bevy e testes de integração da sim. **Inspeção:** definição canônica de FR/SC e sequência de passos do plano de 058 (comunicada pelo agente responsável por `spec.md`/`plan.md` e já registrada em `tasks.md`), `tasks.md` deste diretório, `crates/sim/src/lib.rs` (`semear_espelho_local`, `POSICOES_NOS_LOCAIS`, `fase_vitoria`, `hash_estado`), `crates/sim/tests/simulacao.rs`, `crates/cliente/src/main.rs` (`configurar`), `docs/GDD - Insurgência.md:275` e `.specify/memory/STATE.md` (BF-003). `spec.md` e `plan.md` são escritos em paralelo por outro agente; quando ausentes no momento desta leitura, a checagem abaixo incide sobre a definição canônica já fixada para ambos, não sobre uma reescrita de fontes.
+
+## Matriz de consistência (spec → plan → tasks)
+
+| FR | SC | Passo(s) do plano | T | Resultado |
+|---|---|---|---|---|
+| FR-001 helper do sim e constantes determinísticas: `semear_espelho_local` + `POSICOES_NOS_LOCAIS`, semeando 4 ilhas (ids 1..=4), 1 súdito (id 1 em `(0.0, 236.0)`) e 3 nós | SC-001 — espelho semeado observável no `Mundo` com as contagens e posições exatas | 02 research / 04 shape / 07 clarify / 12 implement | T002, T004, T005, T010 | Consistente |
+| FR-002 chamada do helper em `configurar` no cliente Bevy (`crates/cliente/src/main.rs`) | SC-002 — `configurar` chama o helper e `hash_estado` do espelho difere do `Mundo` vazio | 06 specify / 12 implement | T005, T010 | Consistente |
+| FR-003 teste de regressão da sim (`crates/sim/tests/simulacao.rs`): converter os 3 nós com `propaganda_no` leva à vitória e `hash_estado` muda | SC-003 — vitória alcançável no teste após a conversão dos 3 nós, com reflexo no hash | 06 specify / 12 implement / 27 validate (R4) | T005, T010 | Consistente |
+| FR-004 artefatos de evidência, validação e release: BF-003a fechado, BF-003b (12 ilhas) aberto, R6 N/A | SC-004 — prova registrada, `./verify.sh` (jobs `gates` e `rust`), backlog e governança corretos | 00 constituição / 06 specify / 27 validate (R4) / 26 release (R7 `1.0.0-local`) | T001, T005, T010 | Consistente |
+
+Confirmações por FR, uma a uma:
+
+- **FR-001 ↔ SC-001 ↔ passos 02/04/07/12 ↔ T002/T004/T005/T010.** O helper público `semear_espelho_local(&mut Mundo)` e a constante `POSICOES_NOS_LOCAIS: [(u64, (f64, f64)); 3]` aparecem em `lib.rs` com documentação `[HIPÓTESE]`/protótipo; o helper reaproveita `adicionar_ilha`/`adicionar_sudito`/`adicionar_no`, sem RNG, relógio, mapa auxiliar ou duplicação no cliente. Os ids das ilhas (1..=4), o súdito (id 1 em `(0.0, 236.0)`) e os três nós (`(0.5, 0.0)`, `(1.5, 0.0)`, `(2.5, 0.0)`) casam com SC-001 e com o teste de regressão. Nenhuma regra canônica do GDD é alterada (GDD:275 permanece `[HIPÓTESE]`).
+- **FR-002 ↔ SC-002 ↔ passos 06/12 ↔ T005/T010.** `configurar` em `crates/cliente/src/main.rs` chama `insurgencia_sim::semear_espelho_local(&mut sim)` após o cadastro de jogadores/PNJs e antes de inserir o recurso `Simulacao`; o estado semeado é observável pelo HUD e por `hash_estado`. O cliente não duplica verdade nem cria estado paralelo: a sim continua autoritativa. SC-002 é distinguível de SC-003 porque compara o mundo semeado com o mundo vazio no instante da inicialização, não o hash antes/depois da conversão.
+- **FR-003 ↔ SC-003 ↔ passos 06/12/27 ↔ T005/T010.** O teste `espelho_local_seed_viabiliza_vitoria_e_reflete_hash` verifica o estado vazio antes do seed, as contagens 3 nós/4 ilhas/1 súdito, a mudança de `hash_estado()`, a conversão dos nós via `propaganda_no` e a vitória com resistência zerada após `TICKS_PROPAGANDA_NO + 1` ticks. Isso é compatível com `fase_vitoria`, que exige os três nós convertidos no início do tick e o pulso final no tick seguinte (`TOTAL_NOS = 3`, `PULSO_FINAL = 10`). A execução real do teste pertence ao orquestrador e fica **[NV]** nesta etapa.
+- **FR-004 ↔ SC-004 ↔ passos 00/06/27/26 ↔ T001/T005/T010.** A evidência fecha BF-003a sem fechar BF-003b (o mapa completo de 12 ilhas segue como dívida explícita); `./verify.sh` é o gate alvo com os jobs `gates`/`rust` do GitHub Actions; PRs usam `gh`, mas nenhum PR é aberto por esta etapa e o PR #76 pertence a outro dono ativo. R6 (`taskstoissues`) é **N/A** sob v1.2.2, sem issue simulada; `dev→main` e deploy são SWE-exclusivos.
+
+## Contradições e resoluções
+
+| # | Contradição aparente | Resolução (sem edição de fontes) |
+|:--|:--|:--|
+| C1 | Nome do helper: um palpite inicial de documento usava `semear_espelho_vitoria`, enquanto o contrato fixo e o código usam `semear_espelho_local`. | Correção obrigatória do orquestrador: canônico é `semear_espelho_local` com `POSICOES_NOS_LOCAIS`. `tasks.md` e este `analyze.md` usam apenas esses nomes; nenhuma renomeação de código foi feita ou solicitada aqui. |
+| C2 | Escopo: o backlog registra BF-003 (mapa/rotas, 270/3125) como amplo, mas o corte semeia só 4 ilhas e nenhum mapa completo. | Cisão BF-003a/BF-003b: BF-003a (espelho local mínimo com vitória jogável) é fechado por FR-001..FR-003; BF-003b (12 ilhas/rotas) permanece aberto. Nenhuma regra canônica do GDD é mudada; todos os números são `[HIPÓTESE]` (GDD:275). |
+| C3 | Hash: SC-002 exige `hash_estado` diferente do mundo vazio e SC-003 exige mudança durante o teste. | Não há conflito: são observações em instantes distintos (seed vs. conversão dos nós). FR-001/FR-002 cobrem o primeiro, FR-003 cobre o segundo; ambos são verificáveis por inspeção do teste. |
+| C4 | Governança: portarias ratificadas poderiam sugerir `analyze` antes de `tasks`, execução de R6 e abertura de issues/`gh`. | Constituição v1.2.2 prevalece: `tasks` (T008) vem antes de `analyze` (T009), `analyze` é READ-ONLY, R4 validate precede R7 release (`1.0.0-local`), R6 é N/A/bloqueada e **nenhuma issue é simulada**. `converge.md` é append-only; promoção/deploy permanecem SWE-exclusivos. |
+
+Nenhuma outra contradição entre os quatro FR, seus SC, os passos do plano e a cadeia de T foi encontrada na leitura realizada.
+
+## Convergência
+
+A decisão 80/20 (270/3125, `5×3×3×2×3`) escolhe o espelho local como incremento jogável de BF-003a e nomeia dois consumidores (jogador do cliente Bevy e testes de integração da sim). A sequência normativa `00→26` é respeitada em `tasks.md`: intake/research, define/shape, decide/clarify, specify, plan, checklist e revisão, tasks, analyze (READ-ONLY), implement, converge (append-only), validate (R4) e release (R7 `1.0.0-local`). O helper determinístico no sim, a chamada única no cliente e o teste de regressão formam uma cadeia fechada de observabilidade: seed → `hash_estado` → conversão dos três nós → vitória → evidência. Os números derivados de GDD:275 continuam rotulados `[HIPÓTESE]`; o mapa de 12 ilhas não é prometido neste ciclo.
+
+## Veredito
+
+Prosseguir com a cadeia a partir de T010, sob execução do orquestrador: implementar FR-001..FR-004, registrar `converge.md` append-only com seção **[NV]**, validar com `./verify.sh` (R4 antes de R7) e publicar `release.md` `1.0.0-local` com BF-003a fechado e BF-003b aberto. Este `analyze.md` não autoriza edição de spec, plano, checklist, tasks ou código; é apenas o registro READ-ONLY da checagem de consistência. Resultados de gates, janelas e capturas permanecem **[NV]** até confirmação ao vivo, sem issue simulada, sem `gh` improvisado, sem toque no PR #76 e sem promoção `dev→main` ou deploy.
