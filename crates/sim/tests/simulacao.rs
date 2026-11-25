@@ -4250,7 +4250,7 @@ fn espelho_local_seed_viabiliza_vitoria_e_reflete_hash() {
     for (id, posicao) in insurgencia_sim::POSICOES_NOS_LOCAIS {
         agendar_no(&mut mundo, id, "propaganda_no", 10, 10, posicao);
     }
-    for _ in 0..(TICKS_PROPAGANDA_NO + 1) {
+    for _ in 0..=TICKS_PROPAGANDA_NO {
         mundo.avancar_tick();
     }
 

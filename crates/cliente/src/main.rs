@@ -830,7 +830,7 @@ fn solicitar_propaganda_no(
         return;
     };
     #[expect(
-        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
         reason = "As posicoes dos Nos (0.5/1.5/2.5) sao exatamente representaveis em f32"
     )]
     let ancorado_f32 = (ancorado.0 as f32, ancorado.1 as f32);
@@ -867,7 +867,7 @@ fn solicitar_atacar_no(
         return;
     };
     #[expect(
-        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
         reason = "As posicoes dos Nos (0.5/1.5/2.5) sao exatamente representaveis em f32"
     )]
     let ancorado_f32 = (ancorado.0 as f32, ancorado.1 as f32);
