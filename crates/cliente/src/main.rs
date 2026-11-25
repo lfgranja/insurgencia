@@ -124,6 +124,7 @@ fn main() {
                 mover_jogador,
                 solicitar_barreira,
                 solicitar_coleta,
+                solicitar_coleta_eficiente,
                 solicitar_ponte,
                 solicitar_propaganda,
                 solicitar_ataque,
@@ -756,6 +757,46 @@ fn solicitar_coleta(
     });
 }
 
+/// Agenda a coleta eficiente no ponto atual ao pressionar `K`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_coleta_eficiente(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyK) {
+        return;
+    }
+
+    let destino = pixels_para_metros(jogador.0.posicao);
+    if ValidacaoComandos::validar(
+        &simulacao.0,
+        PEER_ID,
+        "coleta_eficiente",
+        local.seq + 1,
+        local.request_id + 1,
+        Some(destino),
+    )
+    .is_err()
+    {
+        return;
+    }
+
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "coleta_eficiente".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(destino),
+    });
+}
+
 /// Agenda a construção de uma ponte provisória no ponto atual ao pressionar `P`.
 #[expect(
     clippy::needless_pass_by_value,
@@ -1374,6 +1415,8 @@ struct DadosHud {
     escudo_ticks: i64,
     silenciado_ticks: i64,
     vandalismo_recarga_ticks: i64,
+    coleta_eficiente_ticks: i64,
+    coleta_eficiente_recarga_ticks: i64,
     vida: i64,
     vida_alvo: i64,
     pnjs: usize,
@@ -1412,6 +1455,8 @@ fn coletar_dados_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> DadosHud 
         escudo_ticks: remoto.map_or(0, |j| j.escudo_ticks),
         silenciado_ticks: remoto.map_or(0, |j| j.silenciado_ticks),
         vandalismo_recarga_ticks: remoto.map_or(0, |j| j.vandalismo_recarga_ticks),
+        coleta_eficiente_ticks: remoto.map_or(0, |j| j.coleta_eficiente_ticks),
+        coleta_eficiente_recarga_ticks: remoto.map_or(0, |j| j.coleta_eficiente_recarga_ticks),
         vida: remoto.map_or(0, |j| j.vida),
         vida_alvo: simulacao
             .0
@@ -1467,6 +1512,7 @@ const DICA_TECLAS: &str = concat!(
     "C para coletar materiais · G para propaganda · R para propaganda no Nó · ",
     "F para atacar o Nó · Aproxime-se do alvo e use Q para atacar · ",
     "H para vandalismo (Agitador, protótipo) · ",
+    "K para coleta eficiente (Camponês, protótipo) · ",
     "T para atacar o PNJ mais próximo · E para armadilha (Artesão) ou analisar o PNJ ",
     "mais próximo · Y para analisar em qualquer papel · V para erguer escudo · ",
     "Espaço para sinalizar sincronia"
@@ -1491,6 +1537,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
             "Ilhas: {ilhas_controladas}\nSinais: {sinais}\nSincronias: {sincronias}\n",
             "Resultado: {resultado}\n",
             "Construindo: {construindo}\nColeta: {coletando}\n",
+            "Coleta eficiente: {buff} (recarga {rec})\n",
             "{dica}"
         ),
         x = dados.x,
@@ -1525,6 +1572,8 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
         resultado = dados.resultado,
         construindo = dados.construindo,
         coletando = dados.coletando,
+        buff = dados.coleta_eficiente_ticks,
+        rec = dados.coleta_eficiente_recarga_ticks,
         dica = DICA_TECLAS,
     )
 }
