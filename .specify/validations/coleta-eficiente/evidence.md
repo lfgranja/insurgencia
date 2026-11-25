@@ -33,3 +33,11 @@
 - Correções aplicadas após `analyze`: F1 (documentação sem afirmação de posição do token), F2 (`ultima_recusa` preservada na recusa), F3 (`assert_eq!` de Fôlego), E0594 em 5 testes (`get_mut` em vez de indexação mutável de `BTreeMap`) e lint `too_many_lines`.
 - [NV] CI remoto `gates`/`rust`, `verify.sh` completo e captura visual da HUD — a observar no PR.
 
+
+## Adendo [EV] 2026-11-25T07:34:34Z — CI remoto e ACR
+
+- [EV] PR https://github.com/lfgranja/insurgencia/pull/81 , CI observada no head `7cb310e4c4b2159208f3173ecad19f738deeaba2`: run `45568442817` (`deterministic-gates`) com `gates` **success** (https://github.com/lfgranja/insurgencia/actions/runs/45568442817/job/139048899720) e `rust` **success** (https://github.com/lfgranja/insurgencia/actions/runs/45568442817/job/139048900028, `verify.sh: ALL STAGES OK`, 4m33s).
+- [EV] ACR independente postada no PR por `Acr062` (1 rodada, advisory): **nenhum** achado CRITICAL/HIGH/MEDIUM/LOW; `overall_correctness: correct`, confidence 0.84. URL: https://github.com/lfgranja/insurgencia/pull/81#issuecomment-7156014642 .
+- Passo 8 do roteiro passa a **PASS [EV]**; os passos 1–7 permanecem no adendo anterior. Este adendo é documental; o head final conterá apenas esta evidência, sem mudança de código.
+- **[NV]**: promoção `dev→main`, deploy, efeito de produção e captura visual da HUD — competências/estados fora deste ciclo.
+
