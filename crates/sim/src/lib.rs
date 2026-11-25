@@ -143,6 +143,17 @@ pub const CUSTO_ATAQUE_FORTE: i64 = CUSTO_ATAQUE_FOLEGO;
 
 /// Nome alternativo do dano na spec 047 (`[HIPÓTESE]`/protótipo, não cânone).
 pub const DANO_ATAQUE_FORTE: i64 = DANO_ATAQUE;
+/// Custo de Fôlego de `vandalismo` (`[HIPÓTESE]`/protótipo, não cânone).
+pub const CUSTO_VANDALISMO_FOLEGO: i64 = 20;
+
+/// Dano de `vandalismo` (`[HIPÓTESE]`/protótipo, não cânone).
+pub const DANO_VANDALISMO: i64 = 120;
+
+/// Ticks de silêncio imposto por `vandalismo` (`[HIPÓTESE]`/protótipo, não cânone).
+pub const TICKS_SILENCIO_VANDALISMO: i64 = 45;
+
+/// Recarga de `vandalismo` em ticks (`[HIPÓTESE]`/protótipo, não cânone).
+pub const RECARGA_VANDALISMO_TICKS: i64 = 210;
 
 /// Custo de Fôlego de `analise_materialista` (`[HIPÓTESE]`/GDD §10.2:554-559, protótipo).
 pub const CUSTO_ANALISE_MATERIALISTA: i64 = 20;
@@ -234,6 +245,7 @@ pub const ACOES_PERMITIDAS: &[&str] = &[
     "analise_materialista",
     "escudo",
     "armadilha",
+    "vandalismo",
 ];
 
 /// Compara dois pontos sem depender de tolerância de arredondamento.
@@ -256,10 +268,18 @@ fn nivel_minimo_para_acao(acao: &str) -> u8 {
 /// Indica se a ação exige coordenadas de destino no comando.
 ///
 /// Somente `sinalizar_sincronia` e `sinalizar_alavanca` dispensam destino;
-/// as outras 12 ações canônicas exigem coordenadas.
+/// as outras 13 ações canônicas exigem coordenadas.
 #[must_use]
 pub fn acao_exige_destino(acao: &str) -> bool {
     !matches!(acao, "sinalizar_sincronia" | "sinalizar_alavanca")
+}
+
+/// Ações bloqueadas enquanto o jogador está silenciado (`[HIPÓTESE]`/protótipo).
+fn acao_bloqueada_por_silencio(acao: &str) -> bool {
+    matches!(
+        acao,
+        "sinalizar_sincronia" | "propaganda" | "propaganda_no" | "vandalismo"
+    )
 }
 
 /// Origem do alvo de Nó fixado no jogador.
@@ -371,6 +391,10 @@ pub struct Jogador {
     pub armadilha_recarga_ticks: i64,
     /// Ticks restantes de imobilização; enquanto positivo, `mover` é ignorado.
     pub imobilizado_ticks: i64,
+    /// Ticks restantes de silêncio; bloqueia sinalização, propaganda e vandalismo.
+    pub silenciado_ticks: i64,
+    /// Ticks restantes de recarga de `vandalismo`; zero quando disponível.
+    pub vandalismo_recarga_ticks: i64,
 }
 
 /// Barricada ativa no mundo, identificada por `id`.
@@ -645,6 +669,8 @@ impl Mundo {
                 equipe: 0,
                 armadilha_recarga_ticks: 0,
                 imobilizado_ticks: 0,
+                silenciado_ticks: 0,
+                vandalismo_recarga_ticks: 0,
                 seq: 0,
                 request_id: 0,
                 funcao: Funcao::Artesao,
@@ -802,6 +828,15 @@ impl Mundo {
         }
     }
 
+    /// Decrementa em um tick o silêncio e a recarga de vandalismo de cada jogador.
+    fn avancar_vandalismos(&mut self) {
+        for jogador in self.jogadores.values_mut() {
+            jogador.silenciado_ticks = jogador.silenciado_ticks.saturating_sub(1).max(0);
+            jogador.vandalismo_recarga_ticks =
+                jogador.vandalismo_recarga_ticks.saturating_sub(1).max(0);
+        }
+    }
+
     /// Registra o sinal de um par na janela corrente de sincronia.
     ///
     /// A primeira sinalização com a janela zerada abre uma nova janela e
@@ -892,7 +927,8 @@ impl Mundo {
 
     /// Avança um tick nas fases `prepare`, `skills`, `defesa`, `ataque_pnjs`,
     /// `controle_ilhas`, `vitoria` e `finish`; a derrota é avaliada após o incremento.
-    /// `avancar_armadilhas` e `avancar_sincronias` rodam antes de `fase_skills`.
+    /// `avancar_armadilhas`, `avancar_sincronias` e `avancar_vandalismos` rodam
+    /// antes de `fase_skills`.
     pub fn avancar_tick(&mut self) {
         let convertidos_no_inicio = self.nos.values().filter(|no| no.convertido).count();
         self.fase_prepare();
@@ -900,6 +936,7 @@ impl Mundo {
         self.avancar_escudos();
         self.avancar_armadilhas();
         self.avancar_sincronias();
+        self.avancar_vandalismos();
         self.fase_skills();
         self.fase_defesa();
         self.fase_ataque_pnjs();
@@ -934,6 +971,7 @@ impl Mundo {
         let mut analises_realizadas: BTreeSet<u64> = BTreeSet::new();
         let mut escudos_realizados: BTreeSet<u64> = BTreeSet::new();
         let mut armadilhas_realizadas: BTreeSet<u64> = BTreeSet::new();
+        let mut vandalismos_realizados: BTreeSet<u64> = BTreeSet::new();
 
         for comando in &comandos {
             let mut atualizar_monotonicos = true;
@@ -945,6 +983,10 @@ impl Mundo {
                 continue;
             };
             if jogador.nivel < nivel_minimo_para_acao(&comando.acao) {
+                self.ultima_recusa = Some(CodigoRecusa::AcaoBloqueada);
+                continue;
+            }
+            if jogador.silenciado_ticks > 0 && acao_bloqueada_por_silencio(&comando.acao) {
                 self.ultima_recusa = Some(CodigoRecusa::AcaoBloqueada);
                 continue;
             }
@@ -1001,6 +1043,9 @@ impl Mundo {
                 atualizar_monotonicos = self.aplicar_escudo(comando, &mut escudos_realizados);
             } else if comando.acao == "armadilha" {
                 atualizar_monotonicos = self.aplicar_armadilha(comando, &mut armadilhas_realizadas);
+            } else if comando.acao == "vandalismo" {
+                atualizar_monotonicos =
+                    self.aplicar_vandalismo(comando, &mut vandalismos_realizados);
             } else if comando.acao == "sinalizar_sincronia" {
                 self.registrar_sinalizacao_sincronia(comando.peer_id);
             }
@@ -1060,6 +1105,78 @@ impl Mundo {
         if let Some(vitima) = self.jogadores.get_mut(&alvo) {
             vitima.combate_ticks = TICKS_COMBATE + 1;
         }
+    }
+
+    /// Aplica no máximo um `vandalismo` por atacante a cada tick.
+    ///
+    /// Exige outro jogador exatamente em `destino`, a até `ALCANCE_CONTATO_M`,
+    /// Fôlego suficiente e recarga zerada. A vítima sofre `DANO_VANDALISMO`,
+    /// fica silenciada e perde qualquer canalização em curso. Retorna `true`
+    /// somente quando o dano foi aplicado, para que os monotônicos avancem só
+    /// com comandos aceitos.
+    fn aplicar_vandalismo(&mut self, comando: &Comando, vandalismos: &mut BTreeSet<u64>) -> bool {
+        let Some(destino) = comando.destino else {
+            return false;
+        };
+        let Some((origem, folego, recarga, silenciado)) =
+            self.jogadores.get(&comando.peer_id).map(|jogador| {
+                (
+                    jogador.posicao,
+                    jogador.folego,
+                    jogador.vandalismo_recarga_ticks,
+                    jogador.silenciado_ticks,
+                )
+            })
+        else {
+            return false;
+        };
+        if silenciado > 0 || recarga > 0 {
+            return false;
+        }
+        let alvo = self
+            .jogadores
+            .iter()
+            .find(|(&peer_id, jogador)| {
+                peer_id != comando.peer_id && ponto_igual(jogador.posicao, destino)
+            })
+            .map(|(&peer_id, _)| peer_id);
+        let Some(alvo) = alvo else {
+            return false;
+        };
+        if (destino.0 - origem.0).hypot(destino.1 - origem.1) > ALCANCE_CONTATO_M
+            || folego < CUSTO_VANDALISMO_FOLEGO
+        {
+            return false;
+        }
+        // A cota só é consumida por um vandalismo válido: um comando recusado não
+        // pode suprimir um vandalismo válido do mesmo atacante neste tick.
+        if !vandalismos.insert(comando.peer_id) {
+            return false;
+        }
+        if let Some(atacante) = self.jogadores.get_mut(&comando.peer_id) {
+            atacante.folego = atacante.folego.saturating_sub(CUSTO_VANDALISMO_FOLEGO);
+            atacante.vandalismo_recarga_ticks = RECARGA_VANDALISMO_TICKS;
+            // A unidade extra é consumida por `fase_finish` no próprio tick da ação.
+            atacante.combate_ticks = TICKS_COMBATE + 1;
+        }
+        let _ = self.aplicar_dano_a_jogador(alvo, DANO_VANDALISMO);
+        if let Some(vitima) = self.jogadores.get_mut(&alvo) {
+            vitima.silenciado_ticks = TICKS_SILENCIO_VANDALISMO;
+            vitima.combate_ticks = TICKS_COMBATE + 1;
+            vitima.coleta_ticks = 0;
+            vitima.coleta_ponto = None;
+            vitima.construcao_ticks = 0;
+            vitima.construcao_ponto = None;
+            vitima.ponte_ticks = 0;
+            vitima.ponte_ponto = None;
+            if let Some(id) = vitima.propaganda_alvo.take() {
+                if let Some(sudito) = self.suditos.get_mut(&id) {
+                    sudito.propaganda_ticks = 0;
+                }
+            }
+            vitima.no_alvo = None;
+        }
+        true
     }
 
     /// Aplica no máximo um `atacar_pnj` por atacante a cada tick.
@@ -2035,7 +2152,8 @@ impl Mundo {
                         "{combate_ticks}:{analise_recarga_ticks}:{no_alvo:?}:{no_acao_no:?}:",
                         "{funcao:?}:{nivel}:{nivel_ticks}:{escudo_pv}:{escudo_ticks}:",
                         "{escudo_recarga_ticks}:{escudo_alvo:?}:{equipe}:",
-                        "{armadilha_recarga_ticks}:{imobilizado_ticks}"
+                        "{armadilha_recarga_ticks}:{imobilizado_ticks}:{silenciado_ticks}:",
+                        "{vandalismo_recarga_ticks}"
                     ),
                     peer_id = peer_id,
                     x = x,
@@ -2069,6 +2187,8 @@ impl Mundo {
                     equipe = jogador.equipe,
                     armadilha_recarga_ticks = jogador.armadilha_recarga_ticks,
                     imobilizado_ticks = jogador.imobilizado_ticks,
+                    silenciado_ticks = jogador.silenciado_ticks,
+                    vandalismo_recarga_ticks = jogador.vandalismo_recarga_ticks,
                 )
             })
             .collect::<Vec<_>>()
@@ -2296,13 +2416,14 @@ pub enum CodigoRecusa {
     /// A ação não pertence ao contrato.
     #[error("acao desconhecida")]
     AcaoDesconhecida,
-    /// Ação fora do nível do jogador (`[HIPÓTESE]`/protótipo, não cânone).
+    /// Ação fora do nível do jogador ou bloqueada por silêncio (`[HIPÓTESE]`/protótipo).
     #[error("acao bloqueada por nivel")]
     AcaoBloqueada,
-    /// `atacar_forte` sem alvo no destino ou além do alcance de contato.
+    /// `atacar_forte` ou `vandalismo` sem alvo no destino ou além do alcance de contato.
     #[error("alvo invalido")]
     AlvoInvalido,
-    /// Fôlego abaixo do custo de `atacar_forte`, `analise_materialista`, `escudo` ou `armadilha`.
+    /// Fôlego abaixo do custo de `atacar_forte`, `analise_materialista`, `escudo`,
+    /// `armadilha` ou `vandalismo`.
     #[error("folego insuficiente")]
     FolegoInsuficiente,
     /// `analise_materialista` durante a recarga de 450 ticks.
@@ -2314,6 +2435,9 @@ pub enum CodigoRecusa {
     /// `armadilha` durante a recarga de 420 ticks (`[HIPÓTESE]`/GDD §10.3).
     #[error("armadilha em recarga")]
     ArmadilhaEmRecarga,
+    /// `vandalismo` durante a recarga de 210 ticks (`[HIPÓTESE]`/protótipo).
+    #[error("vandalismo em recarga")]
+    VandalismoEmRecarga,
     /// Destino ausente ou fora do ponto para `mover`, `coletar_materiais`,
     /// `construir_barreira`, `construir_ponte`, `propaganda`, `propaganda_no` ou
     /// `atacar_no`; `atacar_pnj` recusa destino sem PNJ ativo ou além de 2 m do
@@ -2355,6 +2479,36 @@ fn validar_ataque_forte(
     }
     if jogador.folego < CUSTO_ATAQUE_FOLEGO {
         return Err(CodigoRecusa::FolegoInsuficiente);
+    }
+    Ok(())
+}
+
+/// Valida `vandalismo` quanto a alvo, alcance, Fôlego, recarga e silêncio.
+fn validar_vandalismo(
+    mundo: &Mundo,
+    jogador: &Jogador,
+    destino: Option<(f64, f64)>,
+) -> Result<(), CodigoRecusa> {
+    let ponto = destino.ok_or(CodigoRecusa::AlvoInvalido)?;
+    let alvo_no_ponto = mundo
+        .jogadores
+        .values()
+        .any(|alvo| !std::ptr::eq(alvo, jogador) && ponto_igual(alvo.posicao, ponto));
+    if !alvo_no_ponto {
+        return Err(CodigoRecusa::AlvoInvalido);
+    }
+    let (origem_x, origem_y) = jogador.posicao;
+    if (ponto.0 - origem_x).hypot(ponto.1 - origem_y) > ALCANCE_CONTATO_M {
+        return Err(CodigoRecusa::AlvoInvalido);
+    }
+    if jogador.folego < CUSTO_VANDALISMO_FOLEGO {
+        return Err(CodigoRecusa::FolegoInsuficiente);
+    }
+    if jogador.vandalismo_recarga_ticks > 0 {
+        return Err(CodigoRecusa::VandalismoEmRecarga);
+    }
+    if jogador.silenciado_ticks > 0 {
+        return Err(CodigoRecusa::AcaoBloqueada);
     }
     Ok(())
 }
@@ -2469,6 +2623,9 @@ impl ValidacaoComandos {
     /// saldo ou Fôlego. `escudo` exige um jogador no destino a até 3 m, Fôlego
     /// suficiente e recarga zerada. `armadilha` exige destino a até 3 m, Fôlego,
     /// Materiais, recarga zerada e no máximo três armadilhas ativas por jogador.
+    /// `vandalismo` exige outro jogador no destino a até 2 m, Fôlego e recarga
+    /// zerada; enquanto `silenciado_ticks > 0`, sinalização, propaganda e
+    /// vandalismo são recusados com `AcaoBloqueada`.
     pub fn validar(
         mundo: &Mundo,
         peer_id: u64,
@@ -2495,6 +2652,10 @@ impl ValidacaoComandos {
             return Err(CodigoRecusa::AcaoBloqueada);
         }
 
+        if jogador.silenciado_ticks > 0 && acao_bloqueada_por_silencio(acao) {
+            return Err(CodigoRecusa::AcaoBloqueada);
+        }
+
         if acao == "mover" {
             let (x, y) = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
             let (origem_x, origem_y) = jogador.posicao;
@@ -2505,6 +2666,10 @@ impl ValidacaoComandos {
 
         if acao == "atacar_forte" {
             validar_ataque_forte(mundo, peer_id, jogador, destino)?;
+        }
+
+        if acao == "vandalismo" {
+            validar_vandalismo(mundo, jogador, destino)?;
         }
 
         if acao == "coletar_materiais" {

@@ -127,6 +127,7 @@ fn main() {
                 solicitar_ponte,
                 solicitar_propaganda,
                 solicitar_ataque,
+                solicitar_vandalismo,
                 solicitar_propaganda_no,
                 solicitar_atacar_no,
                 solicitar_atacar_pnj,
@@ -835,6 +836,46 @@ fn solicitar_ataque(
     });
 }
 
+/// Agenda vandalismo ao alvo de treino ao pressionar `H`.
+///
+/// Ação de protótipo `[HIPÓTESE]` do Agitador; o alvo é o mesmo scaffolding
+/// não-canônico de `ALVO_TREINO_POSICAO`, dentro do alcance de contato de 2 m.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_vandalismo(
+    teclado: Res<ButtonInput<KeyCode>>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyH) {
+        return;
+    }
+
+    if ValidacaoComandos::validar(
+        &simulacao.0,
+        PEER_ID,
+        "vandalismo",
+        local.seq + 1,
+        local.request_id + 1,
+        Some(ALVO_TREINO_POSICAO),
+    )
+    .is_err()
+    {
+        return;
+    }
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "vandalismo".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(ALVO_TREINO_POSICAO),
+    });
+}
+
 /// Devolve a posição do Nó mais próximo do jogador, com desempate pelo menor `id`.
 ///
 /// A distância euclidiana ao quadrado preserva a ordem da distância e `total_cmp`
@@ -1331,6 +1372,8 @@ struct DadosHud {
     folego: i64,
     escudo_pv: i64,
     escudo_ticks: i64,
+    silenciado_ticks: i64,
+    vandalismo_recarga_ticks: i64,
     vida: i64,
     vida_alvo: i64,
     pnjs: usize,
@@ -1367,6 +1410,8 @@ fn coletar_dados_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> DadosHud 
         folego: remoto.map_or(0, |j| j.folego),
         escudo_pv: remoto.map_or(0, |j| j.escudo_pv),
         escudo_ticks: remoto.map_or(0, |j| j.escudo_ticks),
+        silenciado_ticks: remoto.map_or(0, |j| j.silenciado_ticks),
+        vandalismo_recarga_ticks: remoto.map_or(0, |j| j.vandalismo_recarga_ticks),
         vida: remoto.map_or(0, |j| j.vida),
         vida_alvo: simulacao
             .0
@@ -1421,6 +1466,7 @@ const DICA_TECLAS: &str = concat!(
     "WASD ou setas para mover · B para construir barreira · P para construir ponte · ",
     "C para coletar materiais · G para propaganda · R para propaganda no Nó · ",
     "F para atacar o Nó · Aproxime-se do alvo e use Q para atacar · ",
+    "H para vandalismo (Agitador, protótipo) · ",
     "T para atacar o PNJ mais próximo · E para armadilha (Artesão) ou analisar o PNJ ",
     "mais próximo · Y para analisar em qualquer papel · V para erguer escudo · ",
     "Espaço para sinalizar sincronia"
@@ -1437,6 +1483,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
             "Limites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\n",
             "Suprimentos: {suprimentos}\nMateriais: {materiais}\n",
             "Fôlego: {folego}\nEscudo: {escudo_pv} ({escudo_ticks})\n",
+            "Vandalismo: recarga {recarga} · silêncio {silencio}\n",
             "Vida: {vida}\nAlvo: {vida_alvo}\nPNJs: {pnjs}\n",
             "Análise: {analise}\nAutogestão: {autogestao}\nBarreiras: {barreiras}\n",
             "Pontes: {pontes}\nArmadilhas: {armadilhas}\nSúditos: {suditos}\n",
@@ -1459,6 +1506,8 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
         folego = dados.folego,
         escudo_pv = dados.escudo_pv,
         escudo_ticks = dados.escudo_ticks,
+        recarga = dados.vandalismo_recarga_ticks,
+        silencio = dados.silenciado_ticks,
         vida = dados.vida,
         vida_alvo = dados.vida_alvo,
         pnjs = dados.pnjs,

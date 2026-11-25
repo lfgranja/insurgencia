@@ -6,18 +6,19 @@ use insurgencia_sim::{
     ABSORCAO_ESCUDO, ALCANCE_ANALISE_MATERIALISTA_M, ALCANCE_ARMADILHA_M, ALCANCE_ATAQUE_PNJ_M,
     ALCANCE_ESCUDO_M, BONUS_DANO_ANALISE_PERCENT, CONTRIBUICAO_NO, CUSTO_ANALISE_MATERIALISTA,
     CUSTO_ARMADILHA_FOLEGO, CUSTO_ARMADILHA_MATERIAIS, CUSTO_ATAQUE_FOLEGO,
-    CUSTO_BARREIRA_MATERIAIS, CUSTO_ESCUDO_FOLEGO, CUSTO_PONTE_MATERIAIS, DANO_ATAQUE,
-    DANO_ATAQUE_PNJ, DANO_MAXIMO_NOS, FOLEGO_MAXIMO, MAX_ARMADILHAS_POR_JOGADOR,
-    MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS, NIVEL_MAXIMO, PONTOS_AUTOGESTAO_POR_DEFESA,
-    PV_BARREIRA, PV_PNJ, PV_PONTE, RAIO_ARMADILHA_M, RECARGA_ANALISE_MATERIALISTA_TICKS,
-    RECARGA_ARMADILHA_TICKS, RECARGA_ESCUDO_TICKS, RESISTENCIA_CONTINUA_ESCUDO_PERCENT,
-    RESISTENCIA_INICIAL, TICKS_ANALISE_MATERIALISTA, TICKS_ARMAR_ARMADILHA, TICKS_ATAQUE_PNJ,
+    CUSTO_BARREIRA_MATERIAIS, CUSTO_ESCUDO_FOLEGO, CUSTO_PONTE_MATERIAIS, CUSTO_VANDALISMO_FOLEGO,
+    DANO_ATAQUE, DANO_ATAQUE_PNJ, DANO_MAXIMO_NOS, DANO_VANDALISMO, FOLEGO_MAXIMO,
+    MAX_ARMADILHAS_POR_JOGADOR, MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS, NIVEL_MAXIMO,
+    PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA, PV_PNJ, PV_PONTE, RAIO_ARMADILHA_M,
+    RECARGA_ANALISE_MATERIALISTA_TICKS, RECARGA_ARMADILHA_TICKS, RECARGA_ESCUDO_TICKS,
+    RECARGA_VANDALISMO_TICKS, RESISTENCIA_CONTINUA_ESCUDO_PERCENT, RESISTENCIA_INICIAL,
+    TICKS_ANALISE_MATERIALISTA, TICKS_ARMAR_ARMADILHA, TICKS_ATAQUE_PNJ,
     TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA,
     TICKS_CONSTRUCAO_PONTE, TICKS_CONTROLE_ILHA, TICKS_DURACAO_ARMADILHA, TICKS_DURACAO_BARREIRA,
     TICKS_DURACAO_ESCUDO, TICKS_DURACAO_PONTE, TICKS_IMOBILIZACAO_ARMADILHA, TICKS_INATIVIDADE_NO,
     TICKS_JANELA_SINCRONIA, TICKS_LIMITE_PARTIDA, TICKS_POR_NIVEL, TICKS_PROPAGANDA,
     TICKS_PROPAGANDA_NO, TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE,
-    TICKS_REVERSAO_SUDITO, TOTAL_PNJS_PADRAO,
+    TICKS_REVERSAO_SUDITO, TICKS_SILENCIO_VANDALISMO, TOTAL_PNJS_PADRAO,
 };
 
 /// Eleva o nível do jogador ao mínimo exigido por uma ação (protótipo).
@@ -4384,5 +4385,312 @@ fn hash_reflete_sincronia() {
 
     segunda.sinalizadores_sincronia.remove(&3);
     segunda.sinalizadores_sincronia.insert(2);
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+}
+
+/// Monta um mundo com atacante na origem e vítima a 1 m, em `(1.0, 0.0)`.
+#[must_use]
+fn mundo_para_vandalismo() -> Mundo {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    if let Some(vitima) = mundo.jogadores.get_mut(&2) {
+        vitima.posicao = (1.0, 0.0);
+    }
+    mundo
+}
+
+/// Monta um comando `vandalismo` com os monotônicos já preenchidos.
+#[must_use]
+fn comando_vandalismo(peer_id: u64, seq: i64, request_id: i64, destino: (f64, f64)) -> Comando {
+    Comando {
+        peer_id,
+        acao: "vandalismo".to_string(),
+        seq,
+        request_id,
+        destino: Some(destino),
+    }
+}
+
+/// Agenda um vandalismo somente após validá-lo contra o estado corrente.
+fn agendar_vandalismo(
+    mundo: &mut Mundo,
+    peer_id: u64,
+    seq: i64,
+    request_id: i64,
+    destino: (f64, f64),
+) {
+    assert!(ValidacaoComandos::validar(
+        mundo,
+        peer_id,
+        "vandalismo",
+        seq,
+        request_id,
+        Some(destino),
+    )
+    .is_ok());
+    mundo.agendar_comando(comando_vandalismo(peer_id, seq, request_id, destino));
+}
+
+/// Agenda `sinalizar_sincronia` somente após validá-lo.
+fn agendar_sinal(mundo: &mut Mundo, peer_id: u64, seq: i64) {
+    assert!(
+        ValidacaoComandos::validar(mundo, peer_id, "sinalizar_sincronia", seq, seq, None,).is_ok()
+    );
+    mundo.agendar_comando(Comando {
+        peer_id,
+        acao: "sinalizar_sincronia".to_string(),
+        seq,
+        request_id: seq,
+        destino: None,
+    });
+}
+
+#[test]
+fn vandalismo_causa_dano_silencio_e_cancela_canalizacao() {
+    let mut mundo = mundo_para_vandalismo();
+    mundo.adicionar_sudito(9, (1.0, 0.0));
+    mundo.adicionar_no(4, (1.0, 0.0));
+    if let Some(vitima) = mundo.jogadores.get_mut(&2) {
+        vitima.vida = 200;
+        vitima.coleta_ticks = 5;
+        vitima.coleta_ponto = Some((1.0, 0.0));
+        vitima.construcao_ticks = 7;
+        vitima.construcao_ponto = Some((1.0, 0.0));
+        vitima.ponte_ticks = 9;
+        vitima.ponte_ponto = Some((1.0, 0.0));
+        vitima.propaganda_alvo = Some(9);
+        vitima.no_alvo = Some(4);
+    }
+    if let Some(sudito) = mundo.suditos.get_mut(&9) {
+        sudito.propaganda_ticks = 20;
+    }
+
+    agendar_vandalismo(&mut mundo, 1, 1, 1, (1.0, 0.0));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.jogadores[&2].vida, 200_i64 - DANO_VANDALISMO);
+    assert_eq!(
+        mundo.jogadores[&2].silenciado_ticks,
+        TICKS_SILENCIO_VANDALISMO
+    );
+    assert_eq!(
+        mundo.jogadores[&1].vandalismo_recarga_ticks,
+        RECARGA_VANDALISMO_TICKS,
+    );
+    assert_eq!(
+        mundo.jogadores[&1].folego,
+        FOLEGO_MAXIMO - CUSTO_VANDALISMO_FOLEGO,
+    );
+    assert_eq!(mundo.jogadores[&1].seq, 1);
+    assert_eq!(mundo.jogadores[&1].request_id, 1);
+
+    let vitima = &mundo.jogadores[&2];
+    assert_eq!(vitima.coleta_ticks, 0);
+    assert_eq!(vitima.coleta_ponto, None);
+    assert_eq!(vitima.construcao_ticks, 0);
+    assert_eq!(vitima.construcao_ponto, None);
+    assert_eq!(vitima.ponte_ticks, 0);
+    assert_eq!(vitima.ponte_ponto, None);
+    assert_eq!(vitima.propaganda_alvo, None);
+    assert_eq!(vitima.no_alvo, None);
+    assert_eq!(mundo.suditos[&9].propaganda_ticks, 0);
+}
+
+#[test]
+fn vandalismo_recusa_alvo_fora_do_alcance() {
+    let mut mundo = mundo_para_vandalismo();
+    let destino = (3.0, 0.0);
+    if let Some(vitima) = mundo.jogadores.get_mut(&2) {
+        vitima.posicao = destino;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "vandalismo", 1, 1, Some(destino)),
+        Err(CodigoRecusa::AlvoInvalido),
+    );
+
+    mundo.agendar_comando(comando_vandalismo(1, 1, 1, destino));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+    assert_eq!(mundo.jogadores[&2].silenciado_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(mundo.jogadores[&1].vandalismo_recarga_ticks, 0);
+}
+
+#[test]
+fn vandalismo_recusa_folego_insuficiente() {
+    let mut mundo = mundo_para_vandalismo();
+    if let Some(atacante) = mundo.jogadores.get_mut(&1) {
+        atacante.folego = CUSTO_VANDALISMO_FOLEGO - 1;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "vandalismo", 1, 1, Some((1.0, 0.0))),
+        Err(CodigoRecusa::FolegoInsuficiente),
+    );
+
+    mundo.agendar_comando(comando_vandalismo(1, 1, 1, (1.0, 0.0)));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+    assert_eq!(mundo.jogadores[&2].silenciado_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(mundo.jogadores[&1].vandalismo_recarga_ticks, 0);
+}
+
+#[test]
+fn vandalismo_recusa_durante_recarga() {
+    let mut mundo = mundo_para_vandalismo();
+    if let Some(atacante) = mundo.jogadores.get_mut(&1) {
+        atacante.vandalismo_recarga_ticks = RECARGA_VANDALISMO_TICKS;
+    }
+    assert_eq!(
+        CodigoRecusa::VandalismoEmRecarga.to_string(),
+        "vandalismo em recarga",
+    );
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "vandalismo", 1, 1, Some((1.0, 0.0))),
+        Err(CodigoRecusa::VandalismoEmRecarga),
+    );
+
+    mundo.agendar_comando(comando_vandalismo(1, 1, 1, (1.0, 0.0)));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+    assert_eq!(mundo.jogadores[&2].silenciado_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(
+        mundo.jogadores[&1].vandalismo_recarga_ticks,
+        RECARGA_VANDALISMO_TICKS - 1,
+    );
+}
+
+#[test]
+fn vandalismo_recusa_durante_silencio() {
+    let mut mundo = mundo_para_vandalismo();
+    if let Some(atacante) = mundo.jogadores.get_mut(&1) {
+        atacante.silenciado_ticks = TICKS_SILENCIO_VANDALISMO;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "vandalismo", 1, 1, Some((1.0, 0.0))),
+        Err(CodigoRecusa::AcaoBloqueada),
+    );
+
+    mundo.agendar_comando(comando_vandalismo(1, 1, 1, (1.0, 0.0)));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+    assert_eq!(mundo.jogadores[&2].silenciado_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(mundo.jogadores[&1].vandalismo_recarga_ticks, 0);
+    assert_eq!(mundo.ultima_recusa, Some(CodigoRecusa::AcaoBloqueada));
+    assert_eq!(
+        mundo.jogadores[&1].silenciado_ticks,
+        TICKS_SILENCIO_VANDALISMO - 1,
+    );
+}
+
+#[test]
+fn vandalismo_limite_de_alcance_2m01() {
+    let mut mundo = mundo_para_vandalismo();
+    // Fronteira exata: 2,01 m está além de `ALCANCE_CONTATO_M` (2 m).
+    let destino = (2.01, 0.0);
+    if let Some(vitima) = mundo.jogadores.get_mut(&2) {
+        vitima.posicao = destino;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "vandalismo", 1, 1, Some(destino)),
+        Err(CodigoRecusa::AlvoInvalido),
+    );
+
+    mundo.agendar_comando(comando_vandalismo(1, 1, 1, destino));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+    assert_eq!(mundo.jogadores[&2].silenciado_ticks, 0);
+    assert_eq!(mundo.jogadores[&2].posicao, destino);
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(mundo.jogadores[&1].folego, FOLEGO_MAXIMO);
+    assert_eq!(mundo.jogadores[&1].vandalismo_recarga_ticks, 0);
+    assert_eq!(mundo.ultima_recusa, None);
+}
+
+#[test]
+fn jogador_silenciado_nao_sinaliza_sincronia() {
+    let mut mundo = Mundo::new();
+    for peer_id in 1..=3 {
+        mundo.adicionar_jogador(peer_id);
+    }
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.silenciado_ticks = TICKS_SILENCIO_VANDALISMO;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "sinalizar_sincronia", 1, 1, None),
+        Err(CodigoRecusa::AcaoBloqueada),
+    );
+
+    mundo.agendar_comando(Comando {
+        peer_id: 1,
+        acao: "sinalizar_sincronia".to_string(),
+        seq: 2,
+        request_id: 2,
+        destino: None,
+    });
+    agendar_sinal(&mut mundo, 2, 1);
+    agendar_sinal(&mut mundo, 3, 1);
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.sincronias_iniciadas, 0);
+    assert!(mundo.sinais.is_empty());
+    assert_eq!(mundo.sinalizadores_sincronia.len(), 2);
+    assert!(!mundo.sinalizadores_sincronia.contains(&1));
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(mundo.ultima_recusa, Some(CodigoRecusa::AcaoBloqueada));
+    assert_eq!(
+        mundo.jogadores[&1].silenciado_ticks,
+        TICKS_SILENCIO_VANDALISMO - 1,
+    );
+
+    for _ in 1..TICKS_SILENCIO_VANDALISMO {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].silenciado_ticks, 0);
+    assert!(ValidacaoComandos::validar(&mundo, 1, "sinalizar_sincronia", 1, 1, None).is_ok());
+}
+
+#[test]
+fn hash_reflete_vandalismo_e_silencio() {
+    let mut primeira = mundo_para_vandalismo();
+    let mut segunda = mundo_para_vandalismo();
+    for mundo in [&mut primeira, &mut segunda] {
+        agendar_vandalismo(mundo, 1, 1, 1, (1.0, 0.0));
+        mundo.avancar_tick();
+    }
+
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+    assert_eq!(
+        primeira.jogadores[&2].silenciado_ticks,
+        TICKS_SILENCIO_VANDALISMO,
+    );
+
+    if let Some(vitima) = segunda.jogadores.get_mut(&2) {
+        vitima.silenciado_ticks = 0;
+    }
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+
+    if let Some(vitima) = segunda.jogadores.get_mut(&2) {
+        vitima.silenciado_ticks = TICKS_SILENCIO_VANDALISMO;
+    }
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    if let Some(atacante) = segunda.jogadores.get_mut(&1) {
+        atacante.vandalismo_recarga_ticks = 0;
+    }
     assert_ne!(primeira.hash_estado(), segunda.hash_estado());
 }
