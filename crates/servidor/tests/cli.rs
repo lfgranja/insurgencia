@@ -391,6 +391,10 @@ fn hash_inicial_com_stdin_vazia_permanece_igual_ao_estado_inicial() {
 fn vandalismo_com_alvo_no_destino_e_aceito_e_destino_invalido_e_recusado() {
     // Os peers nascem em (0.0, 0.0); a segunda linha registra o alvo nesse ponto.
     const ACEITA: &str = concat!("2 mover 1 1 0.0 0.0\n", "1 vandalismo 1 1 0.0 0.0\n",);
+    // Sem coordenadas, o parser do CLI recusa a linha antes do validador do núcleo.
+    const SEM_COORDENADAS: &str = "1 vandalismo 1 1\n";
+    // Fora do alcance de contato, não há alvo válido no destino informado.
+    const ALVO_FORA_DO_ALCANCE: &str = "1 vandalismo 1 1 5.0 0.0\n";
     let saida = executar_ou_falhar(&["--ticks", "1"], ACEITA);
     assert!(
         saida.status.success(),
@@ -416,8 +420,6 @@ fn vandalismo_com_alvo_no_destino_e_aceito_e_destino_invalido_e_recusado() {
         texto(&saida.stderr)
     );
 
-    // Sem coordenadas, o parser do CLI recusa a linha antes do validador do núcleo.
-    const SEM_COORDENADAS: &str = "1 vandalismo 1 1\n";
     let saida = executar_ou_falhar(&["--ticks", "1"], SEM_COORDENADAS);
     assert_eq!(saida.status.code(), Some(2), "linha sem destino");
     assert!(
@@ -431,8 +433,6 @@ fn vandalismo_com_alvo_no_destino_e_aceito_e_destino_invalido_e_recusado() {
         "linha sem coordenadas"
     );
 
-    // Fora do alcance de contato, não há alvo válido no destino informado.
-    const ALVO_FORA_DO_ALCANCE: &str = "1 vandalismo 1 1 5.0 0.0\n";
     let saida = executar_ou_falhar(&["--ticks", "1"], ALVO_FORA_DO_ALCANCE);
     assert_eq!(saida.status.code(), Some(2), "alvo fora do alcance");
     assert!(
