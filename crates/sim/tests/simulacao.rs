@@ -15,9 +15,9 @@ use insurgencia_sim::{
     TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA,
     TICKS_CONSTRUCAO_PONTE, TICKS_CONTROLE_ILHA, TICKS_DURACAO_ARMADILHA, TICKS_DURACAO_BARREIRA,
     TICKS_DURACAO_ESCUDO, TICKS_DURACAO_PONTE, TICKS_IMOBILIZACAO_ARMADILHA, TICKS_INATIVIDADE_NO,
-    TICKS_LIMITE_PARTIDA, TICKS_POR_NIVEL, TICKS_PROPAGANDA, TICKS_PROPAGANDA_NO,
-    TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE, TICKS_REVERSAO_SUDITO,
-    TOTAL_PNJS_PADRAO,
+    TICKS_JANELA_SINCRONIA, TICKS_LIMITE_PARTIDA, TICKS_POR_NIVEL, TICKS_PROPAGANDA,
+    TICKS_PROPAGANDA_NO, TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE,
+    TICKS_REVERSAO_SUDITO, TOTAL_PNJS_PADRAO,
 };
 
 /// Eleva o nível do jogador ao mínimo exigido por uma ação (protótipo).
@@ -4256,4 +4256,133 @@ fn espelho_local_seed_viabiliza_vitoria_e_reflete_hash() {
 
     assert_eq!(mundo.resultado, Some(ResultadoPartida::Vitoria));
     assert_eq!(mundo.resistencia_ideologica, 0);
+}
+
+#[test]
+fn tres_sinais_de_sincronia_iniciam_desafio() {
+    let mut mundo = Mundo::new();
+    for peer_id in 1..=3 {
+        mundo.adicionar_jogador(peer_id);
+    }
+    let agendar_sinal = |mundo: &mut Mundo, peer_id: u64, seq: i64| {
+        assert!(
+            ValidacaoComandos::validar(mundo, peer_id, "sinalizar_sincronia", seq, seq, None,)
+                .is_ok()
+        );
+        mundo.agendar_comando(Comando {
+            peer_id,
+            acao: "sinalizar_sincronia".to_string(),
+            seq,
+            request_id: seq,
+            destino: None,
+        });
+    };
+
+    assert_eq!(mundo.sincronias_iniciadas, 0);
+    assert!(mundo.sinalizadores_sincronia.is_empty());
+    assert_eq!(mundo.sincronia_ticks_restantes, 0);
+
+    agendar_sinal(&mut mundo, 1, 1);
+    mundo.avancar_tick();
+    assert_eq!(mundo.sincronia_ticks_restantes, TICKS_JANELA_SINCRONIA);
+    assert_eq!(mundo.sinalizadores_sincronia.len(), 1);
+    assert!(mundo.sinalizadores_sincronia.contains(&1));
+
+    agendar_sinal(&mut mundo, 2, 2);
+    mundo.avancar_tick();
+    assert_eq!(mundo.sincronia_ticks_restantes, TICKS_JANELA_SINCRONIA - 1);
+    assert_eq!(mundo.sinalizadores_sincronia.len(), 2);
+
+    // Um peer já sinalizado não entra duas vezes na mesma janela.
+    agendar_sinal(&mut mundo, 1, 3);
+    mundo.avancar_tick();
+    assert_eq!(mundo.sinalizadores_sincronia.len(), 2);
+
+    agendar_sinal(&mut mundo, 3, 4);
+    mundo.avancar_tick();
+    assert_eq!(mundo.sincronias_iniciadas, 1);
+    assert!(mundo.sinalizadores_sincronia.is_empty());
+    assert_eq!(mundo.sincronia_ticks_restantes, 0);
+    assert_eq!(mundo.sinais.len(), 1);
+    assert_eq!(
+        mundo.sinais.front().map(String::as_str),
+        Some("sincronia_iniciada:3")
+    );
+}
+
+#[test]
+fn sinal_apos_janela_expirada_nao_inicia() {
+    let mut mundo = Mundo::new();
+    for peer_id in 1..=3 {
+        mundo.adicionar_jogador(peer_id);
+    }
+    let agendar_sinal = |mundo: &mut Mundo, peer_id: u64, seq: i64| {
+        assert!(
+            ValidacaoComandos::validar(mundo, peer_id, "sinalizar_sincronia", seq, seq, None,)
+                .is_ok()
+        );
+        mundo.agendar_comando(Comando {
+            peer_id,
+            acao: "sinalizar_sincronia".to_string(),
+            seq,
+            request_id: seq,
+            destino: None,
+        });
+    };
+
+    agendar_sinal(&mut mundo, 1, 1);
+    mundo.avancar_tick();
+    assert_eq!(mundo.sincronia_ticks_restantes, TICKS_JANELA_SINCRONIA);
+    assert_eq!(mundo.sinalizadores_sincronia.len(), 1);
+
+    // 150 decrementos fecham a janela; o 151º avanço é apenas limitado, não a fecha.
+    for _ in 0..=TICKS_JANELA_SINCRONIA {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.sincronia_ticks_restantes, 0);
+
+    agendar_sinal(&mut mundo, 2, 2);
+    mundo.avancar_tick();
+    assert_eq!(mundo.sincronia_ticks_restantes, TICKS_JANELA_SINCRONIA);
+    assert_eq!(mundo.sinalizadores_sincronia.len(), 1);
+    assert!(mundo.sinalizadores_sincronia.contains(&2));
+
+    agendar_sinal(&mut mundo, 3, 3);
+    mundo.avancar_tick();
+    assert_eq!(mundo.sincronias_iniciadas, 0);
+    assert_eq!(mundo.sinalizadores_sincronia.len(), 2);
+    assert!(mundo.sinais.is_empty());
+}
+
+#[test]
+fn hash_reflete_sincronia() {
+    let mut primeira = Mundo::new();
+    let mut segunda = Mundo::new();
+    for peer_id in 1..=3 {
+        primeira.adicionar_jogador(peer_id);
+        segunda.adicionar_jogador(peer_id);
+    }
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    primeira.sincronias_iniciadas = 2;
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+    segunda.sincronias_iniciadas = 2;
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    primeira.sincronia_ticks_restantes = TICKS_JANELA_SINCRONIA - 1;
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+    segunda.sincronia_ticks_restantes = TICKS_JANELA_SINCRONIA - 1;
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    // A iteração do BTreeSet é canônica: a ordem de inserção não altera o hash.
+    primeira.sinalizadores_sincronia.insert(3);
+    primeira.sinalizadores_sincronia.insert(1);
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+    segunda.sinalizadores_sincronia.insert(1);
+    segunda.sinalizadores_sincronia.insert(3);
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    segunda.sinalizadores_sincronia.remove(&3);
+    segunda.sinalizadores_sincronia.insert(2);
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
 }

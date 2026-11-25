@@ -37,6 +37,12 @@ const PEER_ALVO_TREINO: u64 = 2;
 /// Posição fixa do alvo de treino no plano do mapa (scaffolding não-canônico).
 const ALVO_TREINO_POSICAO: (f64, f64) = (2.0, 0.0);
 
+/// Identificador do terceiro par local usado no sinal de sincronia.
+const PEER_SINAL_3: u64 = 3;
+
+/// Posição fixa do terceiro par local no plano do mapa.
+const POSICAO_PEER_SINAL_3: (f64, f64) = (0.0, 4.0);
+
 /// Tolerância máxima, em metros, para alinhar o avatar à posição exata de um Nó.
 const TOLERANCIA_NO_M: f64 = 1.0;
 
@@ -79,6 +85,8 @@ struct ComandoLocal {
     request_id: i64,
     /// Destino pendente em pixels, acumulado até o próximo tick da simulação.
     intencao: (f32, f32),
+    /// Próximo par a emitir `sinalizar_sincronia`, rotacionado a cada aceite.
+    proximo_peer_sinal: u64,
 }
 
 /// Tempo acumulado para avançar a simulação em passos fixos.
@@ -125,6 +133,7 @@ fn main() {
                 solicitar_armadilha,
                 solicitar_analise_materialista,
                 solicitar_escudo,
+                solicitar_sincronia,
                 avancar_simulacao,
                 sincronizar_sim,
                 sincronizar_avatar,
@@ -599,6 +608,10 @@ fn configurar(
         local.posicao = pixels_para_metros(jogador.posicao);
     }
     sim.adicionar_jogador(PEER_ALVO_TREINO);
+    sim.adicionar_jogador(PEER_SINAL_3);
+    if let Some(sinalizador) = sim.jogadores.get_mut(&PEER_SINAL_3) {
+        sinalizador.posicao = POSICAO_PEER_SINAL_3;
+    }
     for (id, posicao) in PNJS_INICIAIS {
         sim.adicionar_pnj(id, posicao);
     }
@@ -612,6 +625,7 @@ fn configurar(
         seq: 0,
         request_id: 0,
         intencao: jogador.posicao,
+        proximo_peer_sinal: PEER_ID,
     });
     commands.insert_resource(Simulacao(sim));
     commands.insert_resource(AccumuladorTick(0.0));
@@ -1173,6 +1187,48 @@ fn solicitar_escudo(
     });
 }
 
+/// Agenda `sinalizar_sincronia` ao pressionar `Espaço`, sem destino.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_sincronia(
+    teclado: Res<ButtonInput<KeyCode>>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::Space) {
+        return;
+    }
+    let peer = local.proximo_peer_sinal;
+    if ValidacaoComandos::validar(
+        &simulacao.0,
+        peer,
+        "sinalizar_sincronia",
+        local.seq + 1,
+        local.request_id + 1,
+        None,
+    )
+    .is_err()
+    {
+        return;
+    }
+    local.seq += 1;
+    local.request_id += 1;
+    local.proximo_peer_sinal = match peer {
+        PEER_ID => PEER_ALVO_TREINO,
+        PEER_ALVO_TREINO => PEER_SINAL_3,
+        _ => PEER_ID,
+    };
+    simulacao.0.agendar_comando(Comando {
+        peer_id: peer,
+        acao: "sinalizar_sincronia".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: None,
+    });
+}
+
 /// Copia a posição do estado para a transformação 3D do avatar no plano do mapa.
 #[expect(
     clippy::needless_pass_by_value,
@@ -1288,6 +1344,7 @@ struct DadosHud {
     nos_convertidos: usize,
     ilhas_controladas: usize,
     sinais: usize,
+    sincronias: u64,
     resultado: String,
     construindo: String,
     coletando: String,
@@ -1352,6 +1409,7 @@ fn coletar_dados_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> DadosHud 
         resistencia: simulacao.0.resistencia_ideologica,
         nos_convertidos: simulacao.0.nos.values().filter(|no| no.convertido).count(),
         sinais: simulacao.0.sinais.len(),
+        sincronias: simulacao.0.sincronias_iniciadas,
         resultado: texto_resultado(simulacao),
         construindo,
         coletando,
@@ -1364,7 +1422,8 @@ const DICA_TECLAS: &str = concat!(
     "C para coletar materiais · G para propaganda · R para propaganda no Nó · ",
     "F para atacar o Nó · Aproxime-se do alvo e use Q para atacar · ",
     "T para atacar o PNJ mais próximo · E para armadilha (Artesão) ou analisar o PNJ ",
-    "mais próximo · Y para analisar em qualquer papel · V para erguer escudo"
+    "mais próximo · Y para analisar em qualquer papel · V para erguer escudo · ",
+    "Espaço para sinalizar sincronia"
 );
 
 /// Monta o texto do painel a partir do estado local e do espelho da simulação.
@@ -1382,7 +1441,8 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
             "Análise: {analise}\nAutogestão: {autogestao}\nBarreiras: {barreiras}\n",
             "Pontes: {pontes}\nArmadilhas: {armadilhas}\nSúditos: {suditos}\n",
             "Resistência: {resistencia}\nNós: {nos_convertidos}/3\n",
-            "Ilhas: {ilhas_controladas}\nSinais: {sinais}\nResultado: {resultado}\n",
+            "Ilhas: {ilhas_controladas}\nSinais: {sinais}\nSincronias: {sincronias}\n",
+            "Resultado: {resultado}\n",
             "Construindo: {construindo}\nColeta: {coletando}\n",
             "{dica}"
         ),
@@ -1412,6 +1472,7 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
         nos_convertidos = dados.nos_convertidos,
         ilhas_controladas = dados.ilhas_controladas,
         sinais = dados.sinais,
+        sincronias = dados.sincronias,
         resultado = dados.resultado,
         construindo = dados.construindo,
         coletando = dados.coletando,
