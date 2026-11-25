@@ -4228,3 +4228,32 @@ fn hash_reflete_armadilha_e_imobilizacao() {
     }
     assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
 }
+
+#[test]
+fn espelho_local_seed_viabiliza_vitoria_e_reflete_hash() {
+    let mut mundo = Mundo::new();
+    assert!(mundo.nos.is_empty());
+    let hash_inicial = mundo.hash_estado();
+
+    insurgencia_sim::semear_espelho_local(&mut mundo);
+    assert_eq!(mundo.nos.len(), 3);
+    assert_eq!(mundo.ilhas.len(), 4);
+    assert_eq!(mundo.suditos.len(), 1);
+    assert_ne!(mundo.hash_estado(), hash_inicial);
+
+    for (id, _) in insurgencia_sim::POSICOES_NOS_LOCAIS {
+        mundo.adicionar_jogador(id);
+    }
+    for (id, posicao) in insurgencia_sim::POSICOES_NOS_LOCAIS {
+        posicionar_jogador(&mut mundo, id, 1, posicao);
+    }
+    for (id, posicao) in insurgencia_sim::POSICOES_NOS_LOCAIS {
+        agendar_no(&mut mundo, id, "propaganda_no", 10, 10, posicao);
+    }
+    for _ in 0..(TICKS_PROPAGANDA_NO + 1) {
+        mundo.avancar_tick();
+    }
+
+    assert_eq!(mundo.resultado, Some(ResultadoPartida::Vitoria));
+    assert_eq!(mundo.resistencia_ideologica, 0);
+}

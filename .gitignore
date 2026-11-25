@@ -4,3 +4,6 @@
 
 # Runtime de orquestração (ledger e worktrees) — não versionar.
 /.specify/queue/
+
+# Artefatos de build Rust (gerados localmente/worktree).
+/target/
