@@ -2,23 +2,25 @@
 #![deny(clippy::pedantic)]
 
 use insurgencia_sim::{
-    Barreira, CodigoRecusa, Comando, Funcao, Mundo, Ponte, ResultadoPartida, ValidacaoComandos,
-    ABSORCAO_ESCUDO, ALCANCE_ANALISE_MATERIALISTA_M, ALCANCE_ARMADILHA_M, ALCANCE_ATAQUE_PNJ_M,
-    ALCANCE_ESCUDO_M, BONUS_DANO_ANALISE_PERCENT, CONTRIBUICAO_NO, CUSTO_ANALISE_MATERIALISTA,
-    CUSTO_ARMADILHA_FOLEGO, CUSTO_ARMADILHA_MATERIAIS, CUSTO_ATAQUE_FOLEGO,
-    CUSTO_BARREIRA_MATERIAIS, CUSTO_ESCUDO_FOLEGO, CUSTO_PONTE_MATERIAIS, CUSTO_VANDALISMO_FOLEGO,
-    DANO_ATAQUE, DANO_ATAQUE_PNJ, DANO_MAXIMO_NOS, DANO_VANDALISMO, FOLEGO_MAXIMO,
-    MAX_ARMADILHAS_POR_JOGADOR, MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS, NIVEL_MAXIMO,
-    PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA, PV_PNJ, PV_PONTE, RAIO_ARMADILHA_M,
-    RECARGA_ANALISE_MATERIALISTA_TICKS, RECARGA_ARMADILHA_TICKS, RECARGA_ESCUDO_TICKS,
+    acao_exige_destino, Barreira, CodigoRecusa, Comando, Funcao, Mundo, Ponte, ResultadoPartida,
+    ValidacaoComandos, ABSORCAO_ESCUDO, ACOES_PERMITIDAS, ALCANCE_ANALISE_MATERIALISTA_M,
+    ALCANCE_ARMADILHA_M, ALCANCE_ATAQUE_PNJ_M, ALCANCE_ESCUDO_M, BONUS_DANO_ANALISE_PERCENT,
+    CONTRIBUICAO_NO, CUSTO_ANALISE_MATERIALISTA, CUSTO_ARMADILHA_FOLEGO, CUSTO_ARMADILHA_MATERIAIS,
+    CUSTO_ATAQUE_FOLEGO, CUSTO_BARREIRA_MATERIAIS, CUSTO_COLETA_EFICIENTE_FOLEGO,
+    CUSTO_ESCUDO_FOLEGO, CUSTO_PONTE_MATERIAIS, CUSTO_VANDALISMO_FOLEGO, DANO_ATAQUE,
+    DANO_ATAQUE_PNJ, DANO_MAXIMO_NOS, DANO_VANDALISMO, FOLEGO_MAXIMO, MAX_ARMADILHAS_POR_JOGADOR,
+    MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS, NIVEL_MAXIMO, PONTOS_AUTOGESTAO_POR_DEFESA,
+    PV_BARREIRA, PV_PNJ, PV_PONTE, RAIO_ARMADILHA_M, RECARGA_ANALISE_MATERIALISTA_TICKS,
+    RECARGA_ARMADILHA_TICKS, RECARGA_COLETA_EFICIENTE_TICKS, RECARGA_ESCUDO_TICKS,
     RECARGA_VANDALISMO_TICKS, RESISTENCIA_CONTINUA_ESCUDO_PERCENT, RESISTENCIA_INICIAL,
     TICKS_ANALISE_MATERIALISTA, TICKS_ARMAR_ARMADILHA, TICKS_ATAQUE_PNJ,
-    TICKS_AUTOGESTAO_POR_PONTO, TICKS_COLETA, TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA,
-    TICKS_CONSTRUCAO_PONTE, TICKS_CONTROLE_ILHA, TICKS_DURACAO_ARMADILHA, TICKS_DURACAO_BARREIRA,
-    TICKS_DURACAO_ESCUDO, TICKS_DURACAO_PONTE, TICKS_IMOBILIZACAO_ARMADILHA, TICKS_INATIVIDADE_NO,
-    TICKS_JANELA_SINCRONIA, TICKS_LIMITE_PARTIDA, TICKS_POR_NIVEL, TICKS_PROPAGANDA,
-    TICKS_PROPAGANDA_NO, TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE,
-    TICKS_REVERSAO_SUDITO, TICKS_SILENCIO_VANDALISMO, TOTAL_PNJS_PADRAO,
+    TICKS_AUTOGESTAO_POR_PONTO, TICKS_BUFF_COLETA_EFICIENTE, TICKS_COLETA, TICKS_COMBATE,
+    TICKS_CONSTRUCAO_BARREIRA, TICKS_CONSTRUCAO_PONTE, TICKS_CONTROLE_ILHA,
+    TICKS_DURACAO_ARMADILHA, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_ESCUDO, TICKS_DURACAO_PONTE,
+    TICKS_IMOBILIZACAO_ARMADILHA, TICKS_INATIVIDADE_NO, TICKS_JANELA_SINCRONIA,
+    TICKS_LIMITE_PARTIDA, TICKS_POR_NIVEL, TICKS_PROPAGANDA, TICKS_PROPAGANDA_NO,
+    TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE, TICKS_REVERSAO_SUDITO,
+    TICKS_SILENCIO_VANDALISMO, TOTAL_PNJS_PADRAO,
 };
 
 /// Eleva o nível do jogador ao mínimo exigido por uma ação (protótipo).
@@ -4693,4 +4695,246 @@ fn hash_reflete_vandalismo_e_silencio() {
         atacante.vandalismo_recarga_ticks = 0;
     }
     assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+}
+
+/// Monta um comando `coleta_eficiente` com os monotônicos já preenchidos.
+#[must_use]
+fn comando_coleta_eficiente(peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) -> Comando {
+    Comando {
+        peer_id,
+        acao: "coleta_eficiente".to_string(),
+        seq,
+        request_id,
+        destino: Some(ponto),
+    }
+}
+
+/// Agenda uma ativação somente após validá-la contra o estado corrente.
+fn agendar_coleta_eficiente(
+    mundo: &mut Mundo,
+    peer_id: u64,
+    seq: i64,
+    request_id: i64,
+    ponto: (f64, f64),
+) {
+    assert!(ValidacaoComandos::validar(
+        mundo,
+        peer_id,
+        "coleta_eficiente",
+        seq,
+        request_id,
+        Some(ponto),
+    )
+    .is_ok());
+    mundo.agendar_comando(comando_coleta_eficiente(peer_id, seq, request_id, ponto));
+}
+
+#[test]
+fn coleta_eficiente_esta_na_whitelist_e_exige_destino() {
+    assert_eq!(ACOES_PERMITIDAS.len(), 16);
+    assert!(ACOES_PERMITIDAS.contains(&"coleta_eficiente"));
+    assert!(acao_exige_destino("coleta_eficiente"));
+    assert_eq!(
+        ACOES_PERMITIDAS
+            .iter()
+            .filter(|acao| acao_exige_destino(acao))
+            .count(),
+        14,
+    );
+}
+
+#[test]
+fn coleta_eficiente_conclui_em_90_ticks_e_credita_os_mesmos_recursos() {
+    const PONTO: (f64, f64) = (0.5, 0.25);
+    let mut eficiente = Mundo::new();
+    eficiente.adicionar_jogador(1);
+    agendar_mover(&mut eficiente, 1, 1, 1, PONTO);
+    eficiente.avancar_tick();
+
+    // Ativação e primeira coleta no mesmo tick: o buff já dobra o primeiro passo.
+    agendar_coleta_eficiente(&mut eficiente, 1, 2, 2, PONTO);
+    agendar_coleta(&mut eficiente, 1, 3, 3, PONTO);
+    eficiente.avancar_tick();
+    assert_eq!(eficiente.jogadores[&1].coleta_ticks, 2);
+    assert_eq!(
+        eficiente.jogadores[&1].coleta_eficiente_ticks,
+        TICKS_BUFF_COLETA_EFICIENTE,
+    );
+
+    let mut seq = 3_i64;
+    for _ in 0..(TICKS_COLETA / 2 - 1) {
+        seq += 1;
+        agendar_coleta(&mut eficiente, 1, seq, seq, PONTO);
+        eficiente.avancar_tick();
+    }
+
+    let mut normal = Mundo::new();
+    normal.adicionar_jogador(1);
+    agendar_mover(&mut normal, 1, 1, 1, PONTO);
+    normal.avancar_tick();
+    for seq in 2..=(TICKS_COLETA + 1) {
+        agendar_coleta(&mut normal, 1, seq, seq, PONTO);
+        normal.avancar_tick();
+    }
+
+    for mundo in [&eficiente, &normal] {
+        let jogador = &mundo.jogadores[&1];
+        assert_eq!(jogador.materiais, 2);
+        assert_eq!(jogador.suprimentos, 3);
+        assert_eq!(jogador.coleta_ticks, 0);
+        assert_eq!(jogador.coleta_ponto, None);
+    }
+    assert_eq!(normal.tick - eficiente.tick, TICKS_COLETA / 2);
+}
+
+#[test]
+fn segunda_ativacao_durante_o_buff_e_recusada_sem_acumular() {
+    const PONTO: (f64, f64) = (0.0, 0.0);
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    agendar_coleta_eficiente(&mut mundo, 1, 1, 1, PONTO);
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo.jogadores[&1].coleta_eficiente_ticks,
+        TICKS_BUFF_COLETA_EFICIENTE,
+    );
+    assert_eq!(
+        mundo.jogadores[&1].coleta_eficiente_recarga_ticks,
+        RECARGA_COLETA_EFICIENTE_TICKS,
+    );
+    let folego_apos_ativacao = mundo.jogadores[&1].folego;
+
+    let recusado = ValidacaoComandos::validar(&mundo, 1, "coleta_eficiente", 2, 2, Some(PONTO));
+    assert_eq!(recusado, Err(CodigoRecusa::ColetaEficienteEmRecarga));
+
+    // Um comando forjado não pode reativar nem acumular o buff em curso.
+    mundo.agendar_comando(comando_coleta_eficiente(1, 2, 2, PONTO));
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(
+        jogador.coleta_eficiente_ticks,
+        TICKS_BUFF_COLETA_EFICIENTE - 1,
+    );
+    assert_eq!(
+        jogador.coleta_eficiente_recarga_ticks,
+        RECARGA_COLETA_EFICIENTE_TICKS - 1,
+    );
+    assert_eq!(jogador.folego, folego_apos_ativacao);
+    assert_eq!(jogador.seq, 1);
+    assert_eq!(jogador.request_id, 1);
+}
+
+#[test]
+fn coleta_eficiente_recusa_destino_fora_do_ponto_do_jogador() {
+    const PONTO: (f64, f64) = (0.25, 0.5);
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    agendar_mover(&mut mundo, 1, 1, 1, PONTO);
+    mundo.avancar_tick();
+
+    let sem_destino = ValidacaoComandos::validar(&mundo, 1, "coleta_eficiente", 2, 2, None);
+    assert_eq!(sem_destino, Err(CodigoRecusa::DestinoInvalido));
+    let fora_do_ponto =
+        ValidacaoComandos::validar(&mundo, 1, "coleta_eficiente", 2, 2, Some((0.0, 0.0)));
+    assert_eq!(fora_do_ponto, Err(CodigoRecusa::DestinoInvalido));
+    let aceito = ValidacaoComandos::validar(&mundo, 1, "coleta_eficiente", 2, 2, Some(PONTO));
+    assert!(aceito.is_ok());
+}
+
+#[test]
+fn coleta_eficiente_recusa_folego_insuficiente() {
+    const PONTO: (f64, f64) = (0.0, 0.0);
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.folego = CUSTO_COLETA_EFICIENTE_FOLEGO - 1;
+    }
+
+    let recusado = ValidacaoComandos::validar(&mundo, 1, "coleta_eficiente", 1, 1, Some(PONTO));
+    assert_eq!(recusado, Err(CodigoRecusa::FolegoInsuficiente));
+
+    // Comando forjado não debita Fôlego nem ativa o buff.
+    mundo.agendar_comando(comando_coleta_eficiente(1, 1, 1, PONTO));
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.coleta_eficiente_ticks, 0);
+    assert_eq!(jogador.coleta_eficiente_recarga_ticks, 0);
+    assert_eq!(jogador.folego, CUSTO_COLETA_EFICIENTE_FOLEGO - 1);
+    assert_eq!(jogador.seq, 0);
+}
+
+#[test]
+fn coleta_eficiente_em_recarga_e_recusada_ate_o_fim_da_recarga() {
+    const PONTO: (f64, f64) = (0.0, 0.0);
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.coleta_eficiente_recarga_ticks = 1;
+    }
+
+    let recusado = ValidacaoComandos::validar(&mundo, 1, "coleta_eficiente", 1, 1, Some(PONTO));
+    assert_eq!(recusado, Err(CodigoRecusa::ColetaEficienteEmRecarga));
+
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].coleta_eficiente_recarga_ticks, 0);
+    assert!(ValidacaoComandos::validar(&mundo, 1, "coleta_eficiente", 1, 1, Some(PONTO)).is_ok());
+}
+
+#[test]
+fn coleta_eficiente_decrementa_exatamente_e_altera_o_hash() {
+    const PONTO: (f64, f64) = (0.0, 0.0);
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    agendar_coleta_eficiente(&mut mundo, 1, 1, 1, PONTO);
+    mundo.avancar_tick();
+
+    for _ in 0..TICKS_BUFF_COLETA_EFICIENTE {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].coleta_eficiente_ticks, 0);
+    assert_eq!(
+        mundo.jogadores[&1].coleta_eficiente_recarga_ticks,
+        RECARGA_COLETA_EFICIENTE_TICKS - TICKS_BUFF_COLETA_EFICIENTE,
+    );
+
+    for _ in 0..(RECARGA_COLETA_EFICIENTE_TICKS - TICKS_BUFF_COLETA_EFICIENTE) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].coleta_eficiente_recarga_ticks, 0);
+    agendar_coleta_eficiente(&mut mundo, 1, 2, 2, PONTO);
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo.jogadores[&1].coleta_eficiente_ticks,
+        TICKS_BUFF_COLETA_EFICIENTE,
+    );
+    assert_eq!(
+        mundo.jogadores[&1].coleta_eficiente_recarga_ticks,
+        RECARGA_COLETA_EFICIENTE_TICKS,
+    );
+
+    let mut base = Mundo::new();
+    base.adicionar_jogador(1);
+    let hash_base = base.hash_estado();
+    assert_eq!(hash_base.len(), 64);
+
+    let mut com_buff = Mundo::new();
+    com_buff.adicionar_jogador(1);
+    if let Some(jogador) = com_buff.jogadores.get_mut(&1) {
+        jogador.coleta_eficiente_ticks = 7;
+    }
+    assert_ne!(com_buff.hash_estado(), hash_base);
+
+    let mut em_recarga = Mundo::new();
+    em_recarga.adicionar_jogador(1);
+    if let Some(jogador) = em_recarga.jogadores.get_mut(&1) {
+        jogador.coleta_eficiente_recarga_ticks = 11;
+    }
+    assert_ne!(em_recarga.hash_estado(), hash_base);
+
+    let mut copia = Mundo::new();
+    copia.adicionar_jogador(1);
+    if let Some(jogador) = copia.jogadores.get_mut(&1) {
+        jogador.coleta_eficiente_ticks = 7;
+    }
+    assert_eq!(copia.hash_estado(), com_buff.hash_estado());
 }

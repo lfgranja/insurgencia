@@ -17,6 +17,15 @@ pub const PASSO_SEGUNDOS: f64 = 1.0 / 30.0;
 /// Ticks necessários para concluir uma coleta de materiais (6 s a 30 Hz).
 pub const TICKS_COLETA: i64 = 180;
 
+/// Custo de Fôlego de `coleta_eficiente`: `[HIPÓTESE]`/GDD §10.2:646, protótipo, não cânone.
+pub const CUSTO_COLETA_EFICIENTE_FOLEGO: i64 = 15;
+
+/// Duração do buff de `coleta_eficiente` em ticks (5 s × 30 Hz; `[HIPÓTESE]`/GDD §10.2:646).
+pub const TICKS_BUFF_COLETA_EFICIENTE: i64 = 150;
+
+/// Recarga de `coleta_eficiente` em ticks (10 s × 30 Hz; `[HIPÓTESE]`/GDD §10.2:646).
+pub const RECARGA_COLETA_EFICIENTE_TICKS: i64 = 300;
+
 /// Custo em materiais para construir uma barricada.
 pub const CUSTO_BARREIRA_MATERIAIS: i64 = 20;
 
@@ -235,6 +244,7 @@ pub const ACOES_PERMITIDAS: &[&str] = &[
     "sinalizar_sincronia",
     "sinalizar_alavanca",
     "coletar_materiais",
+    "coleta_eficiente",
     "construir_barreira",
     "atacar_forte",
     "construir_ponte",
@@ -268,7 +278,7 @@ fn nivel_minimo_para_acao(acao: &str) -> u8 {
 /// Indica se a ação exige coordenadas de destino no comando.
 ///
 /// Somente `sinalizar_sincronia` e `sinalizar_alavanca` dispensam destino;
-/// as outras 13 ações canônicas exigem coordenadas.
+/// as outras 14 ações do contrato exigem coordenadas.
 #[must_use]
 pub fn acao_exige_destino(acao: &str) -> bool {
     !matches!(acao, "sinalizar_sincronia" | "sinalizar_alavanca")
@@ -395,6 +405,10 @@ pub struct Jogador {
     pub silenciado_ticks: i64,
     /// Ticks restantes de recarga de `vandalismo`; zero quando disponível.
     pub vandalismo_recarga_ticks: i64,
+    /// Ticks restantes do buff de `coleta_eficiente`; zero quando inativo.
+    pub coleta_eficiente_ticks: i64,
+    /// Ticks restantes de recarga de `coleta_eficiente`; zero quando disponível.
+    pub coleta_eficiente_recarga_ticks: i64,
 }
 
 /// Barricada ativa no mundo, identificada por `id`.
@@ -671,6 +685,8 @@ impl Mundo {
                 imobilizado_ticks: 0,
                 silenciado_ticks: 0,
                 vandalismo_recarga_ticks: 0,
+                coleta_eficiente_ticks: 0,
+                coleta_eficiente_recarga_ticks: 0,
                 seq: 0,
                 request_id: 0,
                 funcao: Funcao::Artesao,
@@ -837,6 +853,18 @@ impl Mundo {
         }
     }
 
+    /// Decrementa em um tick o buff e a recarga de `coleta_eficiente`.
+    fn avancar_coleta_eficiente(&mut self) {
+        for jogador in self.jogadores.values_mut() {
+            jogador.coleta_eficiente_ticks =
+                jogador.coleta_eficiente_ticks.saturating_sub(1).max(0);
+            jogador.coleta_eficiente_recarga_ticks = jogador
+                .coleta_eficiente_recarga_ticks
+                .saturating_sub(1)
+                .max(0);
+        }
+    }
+
     /// Registra o sinal de um par na janela corrente de sincronia.
     ///
     /// A primeira sinalização com a janela zerada abre uma nova janela e
@@ -927,8 +955,8 @@ impl Mundo {
 
     /// Avança um tick nas fases `prepare`, `skills`, `defesa`, `ataque_pnjs`,
     /// `controle_ilhas`, `vitoria` e `finish`; a derrota é avaliada após o incremento.
-    /// `avancar_armadilhas`, `avancar_sincronias` e `avancar_vandalismos` rodam
-    /// antes de `fase_skills`.
+    /// `avancar_armadilhas`, `avancar_sincronias`, `avancar_coleta_eficiente` e
+    /// `avancar_vandalismos` rodam antes de `fase_skills`.
     pub fn avancar_tick(&mut self) {
         let convertidos_no_inicio = self.nos.values().filter(|no| no.convertido).count();
         self.fase_prepare();
@@ -937,6 +965,7 @@ impl Mundo {
         self.avancar_armadilhas();
         self.avancar_sincronias();
         self.avancar_vandalismos();
+        self.avancar_coleta_eficiente();
         self.fase_skills();
         self.fase_defesa();
         self.fase_ataque_pnjs();
@@ -954,8 +983,10 @@ impl Mundo {
     }
 
     /// Aplica os comandos selecionados ao estado dos jogadores.
+    #[expect(clippy::too_many_lines, reason = "16 ações em ordem fixa no tick")]
     fn fase_skills(&mut self) {
         let mut coleta_avancada: BTreeSet<u64> = BTreeSet::new();
+        let mut ativacoes_coleta: BTreeSet<u64> = BTreeSet::new();
         let mut construcao_avancada: BTreeSet<u64> = BTreeSet::new();
         self.avancar_construcoes_automaticas(&mut construcao_avancada);
         let mut construcao_ponte_avancada: BTreeSet<u64> = BTreeSet::new();
@@ -1023,6 +1054,9 @@ impl Mundo {
                 self.aplicar_ataque(comando, &mut ataques_realizados);
             } else if comando.acao == "coletar_materiais" {
                 self.aplicar_coleta(comando, &mut coleta_avancada);
+            } else if comando.acao == "coleta_eficiente" {
+                atualizar_monotonicos =
+                    self.aplicar_coleta_eficiente(comando, &mut ativacoes_coleta);
             } else if comando.acao == "construir_barreira" {
                 self.aplicar_construcao(comando, &mut construcao_avancada);
             } else if comando.acao == "construir_ponte" {
@@ -1574,11 +1608,44 @@ impl Mundo {
             _ => 0,
         };
         jogador.coleta_ponto = Some(ponto);
-        jogador.coleta_ticks += 1;
+        jogador.coleta_ticks += if jogador.coleta_eficiente_ticks > 0 {
+            2
+        } else {
+            1
+        };
         avancada.insert(comando.peer_id);
-        if jogador.coleta_ticks == TICKS_COLETA {
+        if jogador.coleta_ticks >= TICKS_COLETA {
             self.concluir_coleta(comando.peer_id);
         }
+    }
+
+    /// Aplica `coleta_eficiente`, no máximo uma vez por jogador a cada tick.
+    fn aplicar_coleta_eficiente(
+        &mut self,
+        comando: &Comando,
+        ativacoes: &mut BTreeSet<u64>,
+    ) -> bool {
+        if ativacoes.contains(&comando.peer_id) {
+            return false;
+        }
+        let Some(jogador) = self.jogadores.get(&comando.peer_id) else {
+            return false;
+        };
+        if validar_coleta_eficiente(self, jogador, comando.destino).is_err() {
+            return false;
+        }
+        if !ativacoes.insert(comando.peer_id) {
+            return false;
+        }
+        let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) else {
+            return false;
+        };
+        jogador.folego = jogador.folego.saturating_sub(CUSTO_COLETA_EFICIENTE_FOLEGO);
+        jogador.coleta_eficiente_ticks = TICKS_BUFF_COLETA_EFICIENTE;
+        jogador.coleta_eficiente_recarga_ticks = RECARGA_COLETA_EFICIENTE_TICKS;
+        // A unidade extra é consumida por `fase_finish` no próprio tick da ação.
+        jogador.combate_ticks = TICKS_COMBATE + 1;
+        true
     }
 
     /// Avança um tick as coletas em curso, sem depender de comandos.
@@ -1596,9 +1663,13 @@ impl Mundo {
                 jogador.coleta_ponto = None;
                 continue;
             }
-            jogador.coleta_ticks += 1;
+            jogador.coleta_ticks += if jogador.coleta_eficiente_ticks > 0 {
+                2
+            } else {
+                1
+            };
             avancada.insert(peer_id);
-            if jogador.coleta_ticks == TICKS_COLETA {
+            if jogador.coleta_ticks >= TICKS_COLETA {
                 concluidas.push(peer_id);
             }
         }
@@ -2153,7 +2224,8 @@ impl Mundo {
                         "{funcao:?}:{nivel}:{nivel_ticks}:{escudo_pv}:{escudo_ticks}:",
                         "{escudo_recarga_ticks}:{escudo_alvo:?}:{equipe}:",
                         "{armadilha_recarga_ticks}:{imobilizado_ticks}:{silenciado_ticks}:",
-                        "{vandalismo_recarga_ticks}"
+                        "{vandalismo_recarga_ticks}:{coleta_eficiente_ticks}:",
+                        "{coleta_eficiente_recarga_ticks}"
                     ),
                     peer_id = peer_id,
                     x = x,
@@ -2189,6 +2261,8 @@ impl Mundo {
                     imobilizado_ticks = jogador.imobilizado_ticks,
                     silenciado_ticks = jogador.silenciado_ticks,
                     vandalismo_recarga_ticks = jogador.vandalismo_recarga_ticks,
+                    coleta_eficiente_ticks = jogador.coleta_eficiente_ticks,
+                    coleta_eficiente_recarga_ticks = jogador.coleta_eficiente_recarga_ticks,
                 )
             })
             .collect::<Vec<_>>()
@@ -2416,14 +2490,15 @@ pub enum CodigoRecusa {
     /// A ação não pertence ao contrato.
     #[error("acao desconhecida")]
     AcaoDesconhecida,
-    /// Ação fora do nível do jogador ou bloqueada por silêncio (`[HIPÓTESE]`/protótipo).
+    /// Ação fora do nível do jogador, bloqueada por silêncio ou com buff de
+    /// `coleta_eficiente` já ativo (`[HIPÓTESE]`/protótipo).
     #[error("acao bloqueada por nivel")]
     AcaoBloqueada,
     /// `atacar_forte` ou `vandalismo` sem alvo no destino ou além do alcance de contato.
     #[error("alvo invalido")]
     AlvoInvalido,
-    /// Fôlego abaixo do custo de `atacar_forte`, `analise_materialista`, `escudo`,
-    /// `armadilha` ou `vandalismo`.
+    /// Fôlego abaixo do custo de `atacar_forte`, `coleta_eficiente`, `vandalismo`,
+    /// `analise_materialista`, `escudo` ou `armadilha`.
     #[error("folego insuficiente")]
     FolegoInsuficiente,
     /// `analise_materialista` durante a recarga de 450 ticks.
@@ -2438,6 +2513,9 @@ pub enum CodigoRecusa {
     /// `vandalismo` durante a recarga de 210 ticks (`[HIPÓTESE]`/protótipo).
     #[error("vandalismo em recarga")]
     VandalismoEmRecarga,
+    /// `coleta_eficiente` durante a recarga de 300 ticks (`[HIPÓTESE]`/GDD §10.2:646).
+    #[error("coleta eficiente em recarga")]
+    ColetaEficienteEmRecarga,
     /// Destino ausente ou fora do ponto para `mover`, `coletar_materiais`,
     /// `construir_barreira`, `construir_ponte`, `propaganda`, `propaganda_no` ou
     /// `atacar_no`; `atacar_pnj` recusa destino sem PNJ ativo ou além de 2 m do
@@ -2607,6 +2685,29 @@ fn validar_armadilha(
     Ok(())
 }
 
+/// Valida `coleta_eficiente` no ponto do jogador, com Fôlego, recarga zerada e
+/// nenhum buff ativo (sem acumulação).
+fn validar_coleta_eficiente(
+    _mundo: &Mundo,
+    jogador: &Jogador,
+    destino: Option<(f64, f64)>,
+) -> Result<(), CodigoRecusa> {
+    let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
+    if !ponto_igual(ponto, jogador.posicao) {
+        return Err(CodigoRecusa::DestinoInvalido);
+    }
+    if jogador.folego < CUSTO_COLETA_EFICIENTE_FOLEGO {
+        return Err(CodigoRecusa::FolegoInsuficiente);
+    }
+    if jogador.coleta_eficiente_recarga_ticks > 0 {
+        return Err(CodigoRecusa::ColetaEficienteEmRecarga);
+    }
+    if jogador.coleta_eficiente_ticks > 0 {
+        return Err(CodigoRecusa::AcaoBloqueada);
+    }
+    Ok(())
+}
+
 impl ValidacaoComandos {
     /// Valida um comando contra o estado autoritativo.
     ///
@@ -2626,6 +2727,8 @@ impl ValidacaoComandos {
     /// `vandalismo` exige outro jogador no destino a até 2 m, Fôlego e recarga
     /// zerada; enquanto `silenciado_ticks > 0`, sinalização, propaganda e
     /// vandalismo são recusados com `AcaoBloqueada`.
+    /// `coleta_eficiente` exige o ponto do jogador, 15 de Fôlego, recarga zerada
+    /// e nenhum buff ativo (a ativação não acumula).
     pub fn validar(
         mundo: &Mundo,
         peer_id: u64,
@@ -2677,6 +2780,10 @@ impl ValidacaoComandos {
             if !ponto_igual(ponto, jogador.posicao) {
                 return Err(CodigoRecusa::DestinoInvalido);
             }
+        }
+
+        if acao == "coleta_eficiente" {
+            validar_coleta_eficiente(mundo, jogador, destino)?;
         }
 
         if acao == "construir_barreira" {
