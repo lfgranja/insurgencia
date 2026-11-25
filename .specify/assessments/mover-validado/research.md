@@ -1,0 +1,42 @@
+# Research — Mover validado no cliente
+
+**Data**: 2026-11-24 · Evidências coladas do contrato da sessão, do código verificado no checkout e do `STATE.md`; sem reexecução de gates, build ou testes.
+
+## Evidência primária
+
+- [source: `crates/cliente/src/main.rs:618-657`, lido] `mover_jogador` ignora a autoridade: calcula `passo = direcao.normalize() * VELOCIDADE * tempo.delta_secs()` e grava `jogador.0 = deslocar(jogador.0, (passo.x, passo.y))` em pixels. Não constrói `Comando`, não chama `ValidacaoComandos::validar` e não chama `agendar_comando`. O único bloqueio é local, por `imobilizado_ticks > 0` no espelho. É a raiz do BF-012. (confidence: high)
+- [source: `crates/cliente/src/main.rs:1117-1129`, lido] `sincronizar_sim` faz `remoto.posicao = (f64::from(x), f64::from(y))` com `(x, y)` vindos de `JogadorLocal` — coordenadas de tela escritas como metros no `Mundo`. Além do unit mismatch, a direção está invertida: o espelho é tratado como destino, não como fonte. (confidence: high)
+- [source: `crates/sim/src/lib.rs:212`, lido] `LIMITE_MOVIMENTO_M: f64 = 1.0` — teto por comando `mover` já fixado na sim. (confidence: high)
+- [source: `crates/sim/src/lib.rs:2414-2445`, lido] `ValidacaoComandos::validar` recusa `SeqOuRequestReplay` antes de qualquer efeito e, no ramo `acao == "mover"`, exige `destino` e devolve `MovimentoForaDoLimite` quando a distância euclidiana até `jogador.posicao` excede 1 m. O validador é público (`lib.rs:2277`), logo o cliente pode chamá-lo sem nova API. (confidence: high)
+- [source: `crates/cliente/src/main.rs:108-128`, lido] A `.chain()` do `Update` roda `mover_jogador` (`:113`) → `sincronizar_avatar` (`:114`) → … → `sincronizar_sim` (`:126`) → `avancar_simulacao` (`:127`). Para que a posição venha do espelho, a ordem precisa virar `avancar_simulacao` → `sincronizar_sim` → `sincronizar_avatar`; caso contrário o avatar é desenhado com estado local antes do tick e a reconciliação immediatamente o sobrescreve. (confidence: high)
+- [source: `crates/cliente/src/main.rs:662-682,684-706`, lido] `solicitar_barreira`/`solicitar_coleta` já demonstram o padrão: `local.seq += 1; local.request_id += 1;` seguidos de `agendar_comando(Comando { peer_id: PEER_ID, acao, seq, request_id, destino: Some((f64::from(x), f64::from(y))) })`. Em `mover`, a ordem deve ser invertida: validar com os contadores candidatos e só incrementar no aceite, para que a recusa não queime `seq`/`request_id`. (confidence: high)
+- [source: `crates/cliente/src/lib.rs:18-21,156-187`, lido] `VELOCIDADE = 260.0` em "unidades de tela", `EstadoJogador.posicao: (f32, f32)` e `deslocar` com `limitar` confirmam que o estado local é pixels; o espelho `Mundo` é metros. A conversão `PIXELS_POR_METRO = 100.0` dá `2,6 m/s` e, a 30 Hz (`PASSO_SEGUNDOS`), `≈ 0,087 m/tick` — dentro do limite de 1 m. Constante prototípica `[HIPÓTESE]`, não cânone. (confidence: high)
+- [source: contrato da sessão, imutável] `PIXELS_POR_METRO = 100.0`; `mover_jogador` constrói `Comando { acao: "mover", destino: metros }`, valida antes de agendar e avança contadores só no aceite; `sincronizar_sim` lê o espelho e escreve `JogadorLocal` em pixels; `sincronizar_avatar` depois de `sincronizar_sim`; `avancar_simulacao` antes de `sincronizar_sim`; todos os destinos/alvos em metros via `pixels_para_metros`; score 144/3125 (4×3×3×2×2); worktree `cycle-059`, branch `feature/059-mover-validado`, base `origin/dev = 737b876`. (confidence: high)
+- [source: `.specify/memory/STATE.md:582-592`, lido] Decisão 80/20 do ciclo 059 e DoD(0.9): comportamento observável, consumidor jogador/validação, comandos de prova (`cargo test --locked -p insurgencia-cliente --lib`, `-p insurgencia-sim --test simulacao`, `-p insurgencia-servidor --test cli`, `cargo check --locked -p insurgencia-cliente --all-targets`, `./verify.sh`), BF-012 passa a `fechado`; BF-003b/BF-013 abertos. (confidence: high)
+- [source: `.specify/assessments/servidor-validacao/decision.md:25,61` e `armadilha-improvisada/{intake,shape,decision}.md`, lidos] BF-012 foi classificado **240/3125** no ciclo da paridade CLI e **144/3125** no ciclo da armadilha; o ciclo 059 adota 144/3125 como pontuação única, sem renegociar as demais. (confidence: high)
+- [source: `.specify/memory/constitution.md` via contrato, lido] v1.2.2: R1 `go`, R3 = 0 clarificações, R4 antes de R7 `1.0.0-local`, `analyze` READ-ONLY, `converge` append-only; R6/taskstoissues **N/A**, PARE se invocada, sem issue simulada nem `gh` improvisado. (confidence: high)
+
+## Interpretação
+
+O defeito é de **fronteira e unidade**, não de regra. O Núcleo já tem o limite (`lib.rs:212`), o validador (`lib.rs:2414-2445`), o tipo `Comando` e o agendamento; o cliente já tem `ComandoLocal` e usa esse caminho para todas as outras ações. O que falta é (1) converter o passo de pixels para metros, (2) pedir aceite ao validador antes de agendar e antes de incrementar contadores e (3) trocar a direção da reconciliação para espelho → local, com a ordem de sistemas coerente. A contribuição 80/20 é, portanto, **plumbing validado entre cliente e sim**, com quatro opções possíveis — `mover-validado` (escolhida, **144/3125**), mapa de 12 ilhas (BF-003b, não elegível), HUD com hash (BF-014, eliminada) e `contratos` (BF-013, eliminada). Nenhuma altera GDD canônico, CI, protocolo, Cargo, stack ou rede.
+
+## Alternativas rejeitadas (mesmo scorecard único, 144/3125 para a escolhida)
+
+1. **Mapa/rotas de 12 ilhas (BF-003b)** — rejeitada sem pontuação paralela: o **270/3125** histórico inclui o BF-003a já fechado no ciclo 058; o restante depende de decisão canônica de topologia no GDD e não é elegível neste ciclo sem autorização (`STATE.md:586`).
+2. **HUD republica `hash_estado` (BF-014)** — rejeitada (250/3125): é diagnóstico, não muda comportamento de jogo; o próprio `STATE.md:586` a eliminou por esse motivo. Não torna o movimento autoritativo.
+3. **`contratos` consumido por binários (BF-013)** — rejeitada (100/3125): sem comportamento observável para o jogador e mexe em `PROTOCOL_VERSION`/fronteira de módulo, fora do contrato 059; permanece aberta (DoD-5).
+4. **Rede autoritativa real (BF-001)** — rejeitada sem pontuação: ADR-004 bloqueia a troca até decisão da SE; a paridade local sequer foi fechada.
+5. **Promover `PIXELS_POR_METRO = 100.0` a regra canônica / alterar `LIMITE_MOVIMENTO_M`** — rejeitada sem pontuação: o contrato veta mudança de regra canônica e o limite de 1 m já é suficiente para o passo de ≈ 0,087 m/tick.
+
+## Riscos registrados (não reabertos)
+
+- **Unit mismatch pixels↔metros**: mitigado pela conversão explícita em `pixels_para_metros` aplicada a todos os destinos/alvos; nenhuma coordenada de tela entra no espelho. O valor 100 permanece `[HIPÓTESE]`.
+- **Dupla aplicação de movimento**: mitigada porque `mover_jogador` deixa de escrever `jogador.0` localmente e a posição passa a ser derivada do espelho; a reordenação dos sistemas garante uma única fonte de verdade.
+- **Queima de contador na recusa**: mitigada por validar com os contadores candidatos antes de qualquer incremento; `MovimentoForaDoLimite`/replay/imobilização não consomem `seq`/`request_id` (DoD-2).
+- **Arredondamento no limite**: `≈ 0,087 m/tick` está folgado abaixo de 1 m, mas o comportamento exato do float na fronteira fica **[NV]** até verificação pelo orquestrador.
+- **Verificação**: `./verify.sh`, jobs `gates`/`rust`, build, testes, captura visual de Bevy e R4/R7 ficam **[NV]** — nenhum foi executado por este agente.
+- **Dívida R6**: **N/A** por constituição v1.2.2; nenhuma issue simulada, nenhum `gh` improvisado. PR #76 (`dev→main`) pertence a outro owner e não é tocado; `dev→main`/deploy são exclusivos da SE.
+
+## Rastreabilidade
+
+Fatos colados como observados, sem reexecução. Nenhum comando de gate, build, git remoto, GitHub ou emissão de issue foi executado por este agente. **Score: 144/3125** (`4×3×3×2×2`) é o único do ciclo e reaparece em `intake.md`, `define.md`, `shape.md` e `decision.md`. **DoD-1..DoD-5** são idênticos nos cinco artefatos: mover validado antes de agendar; recusa sem queima de contador; posição derivada do espelho; unidades convertidas por `pixels_para_metros`; BF-012 fechado com BF-003b/BF-013 abertos. Rastros da spec 059: **FR-001** = conversão/helpers; **FR-002** = mover validado e contadores só no aceite; **FR-003** = sincronização invertida e reordenação; **FR-004** = evidência/validação/release. SC/T são definidos na spec; os comandos de prova estão em `STATE.md:590`.
