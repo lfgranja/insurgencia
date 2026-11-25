@@ -60,6 +60,11 @@ pub const TICKS_REVERSAO_SUDITO: i64 = 90;
 /// (10 s a 30 Hz; derivação de protótipo, não número canônico).
 pub const TICKS_CONTROLE_ILHA: i64 = 300;
 
+/// Ticks da janela de sincronia cooperativa (5 s × 30 Hz; `[HIPÓTESE]`/GDD
+/// §8/§12, protótipo, não cânone): três peers distintos devem sinalizar dentro
+/// da janela para iniciar o desafio.
+pub const TICKS_JANELA_SINCRONIA: u64 = 150;
+
 /// Limite de ticks da partida: 20 min a 30 Hz (`[HIPÓTESE]`/protótipo, não cânone).
 pub const TICKS_LIMITE_PARTIDA: i64 = 36_000;
 
@@ -541,6 +546,12 @@ pub struct Mundo {
     pub ilhas: BTreeMap<u64, Ilha>,
     /// Ids das ilhas distintas que emitiram `ilha_perdida`, em ordem crescente.
     pub ilhas_reconquistadas: BTreeSet<u64>,
+    /// Desafios de sincronia cooperativa iniciados no mundo (`[HIPÓTESE]`).
+    pub sincronias_iniciadas: u64,
+    /// Peers distintos que sinalizaram na janela corrente, em ordem crescente.
+    pub sinalizadores_sincronia: BTreeSet<u64>,
+    /// Ticks restantes da janela de sincronia; zero quando nenhuma está aberta.
+    pub sincronia_ticks_restantes: u64,
     /// Nós de Controle indexados por `id`, em ordem determinística.
     pub nos: BTreeMap<u64, NoControle>,
     /// Resistência Ideológica corrente (`[HIPÓTESE]`/protótipo, não cânone).
@@ -605,6 +616,9 @@ impl Mundo {
             pnjs: BTreeMap::new(),
             ilhas: BTreeMap::new(),
             ilhas_reconquistadas: BTreeSet::new(),
+            sincronias_iniciadas: 0,
+            sinalizadores_sincronia: BTreeSet::new(),
+            sincronia_ticks_restantes: 0,
             sinais: VecDeque::new(),
             ultima_recusa: None,
             nos: BTreeMap::new(),
@@ -778,6 +792,36 @@ impl Mundo {
         sudito.reversao_ticks = TICKS_REVERSAO_SUDITO;
     }
 
+    /// Decrementa em um tick a janela de sincronia, quando aberta.
+    fn avancar_sincronias(&mut self) {
+        if self.sincronia_ticks_restantes > 0 {
+            self.sincronia_ticks_restantes -= 1;
+            if self.sincronia_ticks_restantes == 0 {
+                self.sinalizadores_sincronia.clear();
+            }
+        }
+    }
+
+    /// Registra o sinal de um par na janela corrente de sincronia.
+    ///
+    /// A primeira sinalização com a janela zerada abre uma nova janela e
+    /// descarta os sinais anteriores. Três peers distintos na mesma janela
+    /// iniciam o desafio, emitem o sinal e reiniciam a janela.
+    fn registrar_sinalizacao_sincronia(&mut self, peer_id: u64) {
+        if self.sincronia_ticks_restantes == 0 {
+            self.sincronia_ticks_restantes = TICKS_JANELA_SINCRONIA;
+            self.sinalizadores_sincronia.clear();
+        }
+        self.sinalizadores_sincronia.insert(peer_id);
+        if self.sinalizadores_sincronia.len() >= 3 {
+            self.sincronias_iniciadas += 1;
+            self.sinais
+                .push_back(format!("sincronia_iniciada:{}", self.tick));
+            self.sincronia_ticks_restantes = 0;
+            self.sinalizadores_sincronia.clear();
+        }
+    }
+
     /// Decrementa em um tick as reversões em curso, em ordem estável de `id`.
     fn avancar_reversoes(&mut self) {
         let em_reversao: Vec<u64> = self
@@ -848,13 +892,14 @@ impl Mundo {
 
     /// Avança um tick nas fases `prepare`, `skills`, `defesa`, `ataque_pnjs`,
     /// `controle_ilhas`, `vitoria` e `finish`; a derrota é avaliada após o incremento.
-    /// `avancar_armadilhas` roda antes de `fase_skills`.
+    /// `avancar_armadilhas` e `avancar_sincronias` rodam antes de `fase_skills`.
     pub fn avancar_tick(&mut self) {
         let convertidos_no_inicio = self.nos.values().filter(|no| no.convertido).count();
         self.fase_prepare();
         self.avancar_analises_materialistas();
         self.avancar_escudos();
         self.avancar_armadilhas();
+        self.avancar_sincronias();
         self.fase_skills();
         self.fase_defesa();
         self.fase_ataque_pnjs();
@@ -956,6 +1001,8 @@ impl Mundo {
                 atualizar_monotonicos = self.aplicar_escudo(comando, &mut escudos_realizados);
             } else if comando.acao == "armadilha" {
                 atualizar_monotonicos = self.aplicar_armadilha(comando, &mut armadilhas_realizadas);
+            } else if comando.acao == "sinalizar_sincronia" {
+                self.registrar_sinalizacao_sincronia(comando.peer_id);
             }
             if atualizar_monotonicos {
                 if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
@@ -2206,10 +2253,18 @@ impl Mundo {
             Some(codigo) => codigo.to_string(),
             None => "nenhuma".to_owned(),
         };
+
+        let sinalizadores = self
+            .sinalizadores_sincronia
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(";");
         let entrada = format!(
             concat!(
                 "{tick}|{epoch}|{match_id}|{jogadores}|{estruturas}|",
-                "{nos}|{resistencia}|{resultado}|{ultima_recusa}",
+                "{nos}|{resistencia}|{resultado}|{ultima_recusa}|",
+                "{sincronias_iniciadas}|{sincronia_ticks_restantes}|{sinalizadores}",
             ),
             tick = self.tick,
             epoch = self.epoch,
@@ -2220,6 +2275,9 @@ impl Mundo {
             resistencia = self.resistencia_ideologica,
             resultado = resultado,
             ultima_recusa = ultima_recusa,
+            sincronias_iniciadas = self.sincronias_iniciadas,
+            sincronia_ticks_restantes = self.sincronia_ticks_restantes,
+            sinalizadores = sinalizadores,
         );
         let resumo = Sha256::digest(entrada.as_bytes());
         format!("{resumo:x}")

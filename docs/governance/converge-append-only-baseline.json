@@ -165,6 +165,10 @@
     "specs/059-mover-validado/converge.md": {
       "bytes": 8660,
       "sha256": "8c8141ff63e2d67db43bf15e02f19ddd4aa59ff7bf0df99e7a3dbf5acaa7bf51"
+    },
+    "specs/060-sincronia-cooperativa/converge.md": {
+      "bytes": 9876,
+      "sha256": "5d4e921f9c9cd6906c85df16aa4bab8694e4e35f5e48032bd8b744b84094500f"
     }
   },
   "_provenance": {
