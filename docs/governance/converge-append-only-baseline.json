@@ -161,6 +161,10 @@
     "specs/058-mirror-vitoria-local/converge.md": {
       "bytes": 7191,
       "sha256": "55d0e98266ac7d667236a49bb88487fc55057b6c07d9957b18867b668df21b4e"
+    },
+    "specs/059-mover-validado/converge.md": {
+      "bytes": 8660,
+      "sha256": "8c8141ff63e2d67db43bf15e02f19ddd4aa59ff7bf0df99e7a3dbf5acaa7bf51"
     }
   },
   "_provenance": {

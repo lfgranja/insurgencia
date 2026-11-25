@@ -19,12 +19,13 @@ use bevy::prelude::*;
 use bevy::text::FontSize;
 use bevy::window::PrimaryWindow;
 use insurgencia_cliente::{
-    aproximar_no, deslocar, estado_inicial, ilha_em, EstadoJogador, Geometria3d, Ilha, ILHAS,
-    LIMITE_X, LIMITE_Y, VELOCIDADE,
+    aproximar_no, deslocar, estado_inicial, ilha_em, metros_para_pixels, pixels_para_metros,
+    EstadoJogador, Geometria3d, Ilha, ILHAS, LIMITE_X, LIMITE_Y, VELOCIDADE,
 };
 use insurgencia_sim::{
-    Comando, Funcao, Mundo, ResultadoPartida, ALCANCE_ANALISE_MATERIALISTA_M, ALCANCE_ESCUDO_M,
-    MAX_RECONQUISTAS, NIVEL_MAXIMO, PASSO_SEGUNDOS, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA,
+    Comando, Funcao, Mundo, ResultadoPartida, ValidacaoComandos, ALCANCE_ANALISE_MATERIALISTA_M,
+    ALCANCE_ESCUDO_M, MAX_RECONQUISTAS, NIVEL_MAXIMO, PASSO_SEGUNDOS, TICKS_COLETA,
+    TICKS_CONSTRUCAO_BARREIRA,
 };
 
 /// Identificador do jogador local no espelho da simulação.
@@ -37,7 +38,7 @@ const PEER_ALVO_TREINO: u64 = 2;
 const ALVO_TREINO_POSICAO: (f64, f64) = (2.0, 0.0);
 
 /// Tolerância máxima, em metros, para alinhar o avatar à posição exata de um Nó.
-const TOLERANCIA_NO_M: f64 = 2.0;
+const TOLERANCIA_NO_M: f64 = 1.0;
 
 /// Posições fixas dos quatro guardas no protótipo (`[HIPÓTESE]`: sem mapa canônico).
 const PNJS_INICIAIS: [(u64, (f64, f64)); 4] = [
@@ -76,6 +77,8 @@ struct Simulacao(Mundo);
 struct ComandoLocal {
     seq: i64,
     request_id: i64,
+    /// Destino pendente em pixels, acumulado até o próximo tick da simulação.
+    intencao: (f32, f32),
 }
 
 /// Tempo acumulado para avançar a simulação em passos fixos.
@@ -111,7 +114,6 @@ fn main() {
             Update,
             (
                 mover_jogador,
-                sincronizar_avatar,
                 solicitar_barreira,
                 solicitar_coleta,
                 solicitar_ponte,
@@ -123,8 +125,9 @@ fn main() {
                 solicitar_armadilha,
                 solicitar_analise_materialista,
                 solicitar_escudo,
-                sincronizar_sim,
                 avancar_simulacao,
+                sincronizar_sim,
+                sincronizar_avatar,
                 atualizar_texto,
             )
                 .chain(),
@@ -592,6 +595,9 @@ fn configurar(
 
     let mut sim = Mundo::new();
     sim.adicionar_jogador(PEER_ID);
+    if let Some(local) = sim.jogadores.get_mut(&PEER_ID) {
+        local.posicao = pixels_para_metros(jogador.posicao);
+    }
     sim.adicionar_jogador(PEER_ALVO_TREINO);
     for (id, posicao) in PNJS_INICIAIS {
         sim.adicionar_pnj(id, posicao);
@@ -605,6 +611,7 @@ fn configurar(
     commands.insert_resource(ComandoLocal {
         seq: 0,
         request_id: 0,
+        intencao: jogador.posicao,
     });
     commands.insert_resource(Simulacao(sim));
     commands.insert_resource(AccumuladorTick(0.0));
@@ -618,8 +625,8 @@ fn configurar(
 fn mover_jogador(
     teclado: Res<ButtonInput<KeyCode>>,
     tempo: Res<Time>,
-    mut jogador: ResMut<JogadorLocal>,
-    simulacao: Res<Simulacao>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
 ) {
     if simulacao
         .0
@@ -651,7 +658,35 @@ fn mover_jogador(
     }
 
     let passo = direcao.normalize() * VELOCIDADE * tempo.delta_secs();
-    jogador.0 = deslocar(jogador.0, (passo.x, passo.y));
+    let deslocado = deslocar(
+        EstadoJogador {
+            posicao: local.intencao,
+        },
+        (passo.x, passo.y),
+    );
+    let destino_m = pixels_para_metros(deslocado.posicao);
+    if ValidacaoComandos::validar(
+        &simulacao.0,
+        PEER_ID,
+        "mover",
+        local.seq + 1,
+        local.request_id + 1,
+        Some(destino_m),
+    )
+    .is_err()
+    {
+        return;
+    }
+    local.intencao = deslocado.posicao;
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "mover".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(destino_m),
+    });
 }
 
 /// Agenda a construção de uma barreira no ponto atual ao pressionar `B`.
@@ -671,13 +706,12 @@ fn solicitar_barreira(
 
     local.seq += 1;
     local.request_id += 1;
-    let (x, y) = jogador.0.posicao;
     simulacao.0.agendar_comando(Comando {
         peer_id: PEER_ID,
         acao: "construir_barreira".to_owned(),
         seq: local.seq,
         request_id: local.request_id,
-        destino: Some((f64::from(x), f64::from(y))),
+        destino: Some(pixels_para_metros(jogador.0.posicao)),
     });
 }
 
@@ -698,13 +732,12 @@ fn solicitar_coleta(
 
     local.seq += 1;
     local.request_id += 1;
-    let (x, y) = jogador.0.posicao;
     simulacao.0.agendar_comando(Comando {
         peer_id: PEER_ID,
         acao: "coletar_materiais".to_owned(),
         seq: local.seq,
         request_id: local.request_id,
-        destino: Some((f64::from(x), f64::from(y))),
+        destino: Some(pixels_para_metros(jogador.0.posicao)),
     });
 }
 
@@ -725,13 +758,12 @@ fn solicitar_ponte(
 
     local.seq += 1;
     local.request_id += 1;
-    let (x, y) = jogador.0.posicao;
     simulacao.0.agendar_comando(Comando {
         peer_id: PEER_ID,
         acao: "construir_ponte".to_owned(),
         seq: local.seq,
         request_id: local.request_id,
-        destino: Some((f64::from(x), f64::from(y))),
+        destino: Some(pixels_para_metros(jogador.0.posicao)),
     });
 }
 
@@ -752,13 +784,12 @@ fn solicitar_propaganda(
 
     local.seq += 1;
     local.request_id += 1;
-    let (x, y) = jogador.0.posicao;
     simulacao.0.agendar_comando(Comando {
         peer_id: PEER_ID,
         acao: "propaganda".to_owned(),
         seq: local.seq,
         request_id: local.request_id,
-        destino: Some((f64::from(x), f64::from(y))),
+        destino: Some(pixels_para_metros(jogador.0.posicao)),
     });
 }
 
@@ -796,8 +827,8 @@ fn solicitar_ataque(
 /// mantém a comparação determinística sem raiz quadrada. As posições dos Nós são
 /// simplificação de protótipo `[HIPÓTESE]` da simulação.
 #[must_use]
-fn posicao_no_mais_proximo(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, f64)> {
-    let (x, y) = (f64::from(jogador.0), f64::from(jogador.1));
+fn posicao_no_mais_proximo(mundo: &Mundo, jogador: (f64, f64)) -> Option<(f64, f64)> {
+    let (x, y) = jogador;
     mundo
         .nos
         .values()
@@ -816,25 +847,47 @@ fn posicao_no_mais_proximo(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, f
 )]
 fn solicitar_propaganda_no(
     teclado: Res<ButtonInput<KeyCode>>,
-    mut jogador: ResMut<JogadorLocal>,
+    jogador: Res<JogadorLocal>,
     mut local: ResMut<ComandoLocal>,
     mut simulacao: ResMut<Simulacao>,
 ) {
     if !teclado.just_pressed(KeyCode::KeyR) {
         return;
     }
-    let Some(destino) = posicao_no_mais_proximo(&simulacao.0, jogador.0.posicao) else {
+    let Some(destino) =
+        posicao_no_mais_proximo(&simulacao.0, pixels_para_metros(jogador.0.posicao))
+    else {
         return;
     };
-    let Some(ancorado) = aproximar_no(jogador.0.posicao, destino, TOLERANCIA_NO_M) else {
+    let Some(ancorado) = aproximar_no(
+        pixels_para_metros(jogador.0.posicao),
+        destino,
+        TOLERANCIA_NO_M,
+    ) else {
         return;
     };
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "As posicoes dos Nos (0.5/1.5/2.5) sao exatamente representaveis em f32"
-    )]
-    let ancorado_f32 = (ancorado.0 as f32, ancorado.1 as f32);
-    jogador.0.posicao = ancorado_f32;
+    local.intencao = metros_para_pixels(ancorado);
+    if ValidacaoComandos::validar(
+        &simulacao.0,
+        PEER_ID,
+        "mover",
+        local.seq + 1,
+        local.request_id + 1,
+        Some(ancorado),
+    )
+    .is_err()
+    {
+        return;
+    }
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "mover".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(ancorado),
+    });
     local.seq += 1;
     local.request_id += 1;
     simulacao.0.agendar_comando(Comando {
@@ -853,25 +906,47 @@ fn solicitar_propaganda_no(
 )]
 fn solicitar_atacar_no(
     teclado: Res<ButtonInput<KeyCode>>,
-    mut jogador: ResMut<JogadorLocal>,
+    jogador: Res<JogadorLocal>,
     mut local: ResMut<ComandoLocal>,
     mut simulacao: ResMut<Simulacao>,
 ) {
     if !teclado.just_pressed(KeyCode::KeyF) {
         return;
     }
-    let Some(destino) = posicao_no_mais_proximo(&simulacao.0, jogador.0.posicao) else {
+    let Some(destino) =
+        posicao_no_mais_proximo(&simulacao.0, pixels_para_metros(jogador.0.posicao))
+    else {
         return;
     };
-    let Some(ancorado) = aproximar_no(jogador.0.posicao, destino, TOLERANCIA_NO_M) else {
+    let Some(ancorado) = aproximar_no(
+        pixels_para_metros(jogador.0.posicao),
+        destino,
+        TOLERANCIA_NO_M,
+    ) else {
         return;
     };
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "As posicoes dos Nos (0.5/1.5/2.5) sao exatamente representaveis em f32"
-    )]
-    let ancorado_f32 = (ancorado.0 as f32, ancorado.1 as f32);
-    jogador.0.posicao = ancorado_f32;
+    local.intencao = metros_para_pixels(ancorado);
+    if ValidacaoComandos::validar(
+        &simulacao.0,
+        PEER_ID,
+        "mover",
+        local.seq + 1,
+        local.request_id + 1,
+        Some(ancorado),
+    )
+    .is_err()
+    {
+        return;
+    }
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "mover".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(ancorado),
+    });
     local.seq += 1;
     local.request_id += 1;
     simulacao.0.agendar_comando(Comando {
@@ -887,8 +962,8 @@ fn solicitar_atacar_no(
 ///
 /// A comparação usa distância ao quadrado e `total_cmp` para permanecer determinística.
 #[must_use]
-fn posicao_pnj_mais_proximo(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, f64)> {
-    let (x, y) = (f64::from(jogador.0), f64::from(jogador.1));
+fn posicao_pnj_mais_proximo(mundo: &Mundo, jogador: (f64, f64)) -> Option<(f64, f64)> {
+    let (x, y) = jogador;
     mundo
         .pnjs
         .values()
@@ -906,8 +981,8 @@ fn posicao_pnj_mais_proximo(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, 
 /// A distância ao quadrado preserva a ordem sem raiz e `total_cmp` mantém o
 /// desempate determinístico pelo menor `id`.
 #[must_use]
-fn posicao_analise_materialista(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, f64)> {
-    let (x, y) = (f64::from(jogador.0), f64::from(jogador.1));
+fn posicao_analise_materialista(mundo: &Mundo, jogador: (f64, f64)) -> Option<(f64, f64)> {
+    let (x, y) = jogador;
     let alcance2 = ALCANCE_ANALISE_MATERIALISTA_M.powi(2);
     mundo
         .pnjs
@@ -939,7 +1014,9 @@ fn solicitar_atacar_pnj(
     if !teclado.just_pressed(KeyCode::KeyT) {
         return;
     }
-    let Some(destino) = posicao_pnj_mais_proximo(&simulacao.0, jogador.0.posicao) else {
+    let Some(destino) =
+        posicao_pnj_mais_proximo(&simulacao.0, pixels_para_metros(jogador.0.posicao))
+    else {
         return;
     };
     local.seq += 1;
@@ -981,13 +1058,12 @@ fn solicitar_armadilha(
     }
     local.seq += 1;
     local.request_id += 1;
-    let (x, y) = jogador.0.posicao;
     simulacao.0.agendar_comando(Comando {
         peer_id: PEER_ID,
         acao: "armadilha".to_owned(),
         seq: local.seq,
         request_id: local.request_id,
-        destino: Some((f64::from(x), f64::from(y))),
+        destino: Some(pixels_para_metros(jogador.0.posicao)),
     });
 }
 
@@ -1012,7 +1088,9 @@ fn solicitar_analise_materialista(
     if !contextual && !teclado.just_pressed(KeyCode::KeyY) {
         return;
     }
-    let Some(destino) = posicao_analise_materialista(&simulacao.0, jogador.0.posicao) else {
+    let Some(destino) =
+        posicao_analise_materialista(&simulacao.0, pixels_para_metros(jogador.0.posicao))
+    else {
         return;
     };
     local.seq += 1;
@@ -1033,12 +1111,12 @@ fn solicitar_analise_materialista(
 /// sem o próprio jogador ativo no espelho, não há alvo. A comparação usa
 /// distância ao quadrado e `total_cmp` para permanecer determinística.
 #[must_use]
-fn destino_escudo(mundo: &Mundo) -> Option<(f64, f64)> {
+fn destino_escudo(mundo: &Mundo, posicao_m: (f64, f64)) -> Option<(f64, f64)> {
     let origem = mundo.jogadores.get(&PEER_ID)?;
     if origem.vida <= 0 {
         return None;
     }
-    let (x, y) = origem.posicao;
+    let (x, y) = posicao_m;
     let alcance2 = ALCANCE_ESCUDO_M.powi(2);
     let aliado = mundo
         .jogadores
@@ -1061,7 +1139,7 @@ fn destino_escudo(mundo: &Mundo) -> Option<(f64, f64)> {
             da.total_cmp(&db).then_with(|| id_a.cmp(id_b))
         })
         .map(|(_, jogador)| jogador.posicao);
-    Some(aliado.unwrap_or(origem.posicao))
+    Some(aliado.unwrap_or(posicao_m))
 }
 
 /// Agenda o Escudo de Milícia no aliado ativo mais próximo ao pressionar `V`.
@@ -1074,13 +1152,14 @@ fn destino_escudo(mundo: &Mundo) -> Option<(f64, f64)> {
 )]
 fn solicitar_escudo(
     teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
     mut local: ResMut<ComandoLocal>,
     mut simulacao: ResMut<Simulacao>,
 ) {
     if !teclado.just_pressed(KeyCode::KeyV) {
         return;
     }
-    let Some(destino) = destino_escudo(&simulacao.0) else {
+    let Some(destino) = destino_escudo(&simulacao.0, pixels_para_metros(jogador.0.posicao)) else {
         return;
     };
     local.seq += 1;
@@ -1109,20 +1188,16 @@ fn sincronizar_avatar(
     }
 }
 
-/// Mantém o espelho da simulação alinhado ao estado local.
+/// Mantém o estado local alinhado à posição autoritativa do espelho.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
 )]
-fn sincronizar_sim(jogador: Res<JogadorLocal>, mut simulacao: ResMut<Simulacao>) {
-    let Some(remoto) = simulacao.0.jogadores.get_mut(&PEER_ID) else {
+fn sincronizar_sim(mut jogador: ResMut<JogadorLocal>, simulacao: Res<Simulacao>) {
+    let Some(remoto) = simulacao.0.jogadores.get(&PEER_ID) else {
         return;
     };
-    if remoto.imobilizado_ticks > 0 {
-        return;
-    }
-    let (x, y) = jogador.0.posicao;
-    remoto.posicao = (f64::from(x), f64::from(y));
+    jogador.0.posicao = metros_para_pixels(remoto.posicao);
 }
 
 /// Avança a simulação em passos fixos, com teto de quatro ticks por frame.
