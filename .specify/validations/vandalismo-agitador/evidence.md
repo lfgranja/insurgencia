@@ -31,3 +31,10 @@
 - Correções aplicadas aos achados do `/speckit.analyze`: A1/A2 (cliente: validação antes do agendamento + linha de silêncio/recarga na HUD), A4 (spec), A5/A6/A7 (sim). Nenhuma regra canônica alterada; todos os números permanecem `[HIPÓTESE]`.
 - [NV] CI remoto `gates`/`rust`, `./verify.sh` completo e captura visual da HUD — a observar no PR; nenhum verde remoto é afirmado aqui.
 
+
+## Adendo [EV] 2026-11-25T06:19:14Z — CI remoto e ACR no head final
+
+- [EV] PR https://github.com/lfgranja/insurgencia/pull/80 : CI observada no head `ea7553182b1d8d1a42264863c9a90275bc32ec3f`, run `45558969552` (`deterministic-gates`) com `gates` **success** (https://github.com/lfgranja/insurgencia/actions/runs/45558969552/job/139017778708) e `rust` **success** (https://github.com/lfgranja/insurgencia/actions/runs/45558969552/job/139017778507, `verify.sh: ALL STAGES OK`, 5m43s). Este adendo é documental; o head final conterá apenas esta evidência, sem mudança de código.
+- [EV] ACR independente postada no PR por `AcrReviewer` (1 rodada): 1 CRITICAL determinístico (clippy `items_after_statements`) corrigido em `ea75531`, 1 LOW (contagem da release) corrigido no mesmo commit, nenhum HIGH; pare advisory. URL: https://github.com/lfgranja/insurgencia/pull/80 .
+- Passo 8 do roteiro passa a **PASS [EV]**; os passos 1–7 permanecem conforme os adendos anteriores. Esta é evidência de CI apenas neste head — promoção `dev→main` e deploy continuam competência SWE e não foram executados.
+
