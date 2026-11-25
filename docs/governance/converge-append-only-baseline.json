@@ -153,6 +153,22 @@
     "specs/056-servidor-validacao/converge.md": {
       "bytes": 9974,
       "sha256": "e27655b96c54e00f5de776f505c1c1df1b92a08a26d19dee5701d71d1861fbcc"
+    },
+    "specs/057-armadilha-improvisada/converge.md": {
+      "bytes": 11398,
+      "sha256": "cd151aa570143b71724d5ad10ca06aa9ac592254b0c76c4d2790a7d848919725"
+    },
+    "specs/058-mirror-vitoria-local/converge.md": {
+      "bytes": 7191,
+      "sha256": "55d0e98266ac7d667236a49bb88487fc55057b6c07d9957b18867b668df21b4e"
+    },
+    "specs/059-mover-validado/converge.md": {
+      "bytes": 8660,
+      "sha256": "8c8141ff63e2d67db43bf15e02f19ddd4aa59ff7bf0df99e7a3dbf5acaa7bf51"
+    },
+    "specs/060-sincronia-cooperativa/converge.md": {
+      "bytes": 9876,
+      "sha256": "5d4e921f9c9cd6906c85df16aa4bab8694e4e35f5e48032bd8b744b84094500f"
     }
   },
   "_provenance": {

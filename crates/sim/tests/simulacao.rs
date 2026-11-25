@@ -2,19 +2,25 @@
 #![deny(clippy::pedantic)]
 
 use insurgencia_sim::{
-    Barreira, CodigoRecusa, Comando, Funcao, Mundo, Ponte, ResultadoPartida, ValidacaoComandos,
-    ABSORCAO_ESCUDO, ALCANCE_ANALISE_MATERIALISTA_M, ALCANCE_ATAQUE_PNJ_M, ALCANCE_ESCUDO_M,
-    BONUS_DANO_ANALISE_PERCENT, CONTRIBUICAO_NO, CUSTO_ANALISE_MATERIALISTA, CUSTO_ATAQUE_FOLEGO,
-    CUSTO_BARREIRA_MATERIAIS, CUSTO_ESCUDO_FOLEGO, CUSTO_PONTE_MATERIAIS, DANO_ATAQUE,
-    DANO_ATAQUE_PNJ, DANO_MAXIMO_NOS, FOLEGO_MAXIMO, MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS,
-    NIVEL_MAXIMO, PONTOS_AUTOGESTAO_POR_DEFESA, PV_BARREIRA, PV_PNJ, PV_PONTE,
-    RECARGA_ANALISE_MATERIALISTA_TICKS, RECARGA_ESCUDO_TICKS, RESISTENCIA_CONTINUA_ESCUDO_PERCENT,
-    RESISTENCIA_INICIAL, TICKS_ANALISE_MATERIALISTA, TICKS_ATAQUE_PNJ, TICKS_AUTOGESTAO_POR_PONTO,
-    TICKS_COLETA, TICKS_COMBATE, TICKS_CONSTRUCAO_BARREIRA, TICKS_CONSTRUCAO_PONTE,
-    TICKS_CONTROLE_ILHA, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_ESCUDO, TICKS_DURACAO_PONTE,
-    TICKS_INATIVIDADE_NO, TICKS_LIMITE_PARTIDA, TICKS_POR_NIVEL, TICKS_PROPAGANDA,
-    TICKS_PROPAGANDA_NO, TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE,
-    TICKS_REVERSAO_SUDITO, TOTAL_PNJS_PADRAO,
+    acao_exige_destino, Barreira, CodigoRecusa, Comando, Funcao, Mundo, Ponte, ResultadoPartida,
+    ValidacaoComandos, ABSORCAO_ESCUDO, ACOES_PERMITIDAS, ALCANCE_ANALISE_MATERIALISTA_M,
+    ALCANCE_ARMADILHA_M, ALCANCE_ATAQUE_PNJ_M, ALCANCE_ESCUDO_M, BONUS_DANO_ANALISE_PERCENT,
+    CONTRIBUICAO_NO, CUSTO_ANALISE_MATERIALISTA, CUSTO_ARMADILHA_FOLEGO, CUSTO_ARMADILHA_MATERIAIS,
+    CUSTO_ATAQUE_FOLEGO, CUSTO_BARREIRA_MATERIAIS, CUSTO_COLETA_EFICIENTE_FOLEGO,
+    CUSTO_ESCUDO_FOLEGO, CUSTO_PONTE_MATERIAIS, CUSTO_VANDALISMO_FOLEGO, DANO_ATAQUE,
+    DANO_ATAQUE_PNJ, DANO_MAXIMO_NOS, DANO_VANDALISMO, FOLEGO_MAXIMO, MAX_ARMADILHAS_POR_JOGADOR,
+    MAX_BARREIRAS_POR_JOGADOR, MAX_RECONQUISTAS, NIVEL_MAXIMO, PONTOS_AUTOGESTAO_POR_DEFESA,
+    PV_BARREIRA, PV_PNJ, PV_PONTE, RAIO_ARMADILHA_M, RECARGA_ANALISE_MATERIALISTA_TICKS,
+    RECARGA_ARMADILHA_TICKS, RECARGA_COLETA_EFICIENTE_TICKS, RECARGA_ESCUDO_TICKS,
+    RECARGA_VANDALISMO_TICKS, RESISTENCIA_CONTINUA_ESCUDO_PERCENT, RESISTENCIA_INICIAL,
+    TICKS_ANALISE_MATERIALISTA, TICKS_ARMAR_ARMADILHA, TICKS_ATAQUE_PNJ,
+    TICKS_AUTOGESTAO_POR_PONTO, TICKS_BUFF_COLETA_EFICIENTE, TICKS_COLETA, TICKS_COMBATE,
+    TICKS_CONSTRUCAO_BARREIRA, TICKS_CONSTRUCAO_PONTE, TICKS_CONTROLE_ILHA,
+    TICKS_DURACAO_ARMADILHA, TICKS_DURACAO_BARREIRA, TICKS_DURACAO_ESCUDO, TICKS_DURACAO_PONTE,
+    TICKS_IMOBILIZACAO_ARMADILHA, TICKS_INATIVIDADE_NO, TICKS_JANELA_SINCRONIA,
+    TICKS_LIMITE_PARTIDA, TICKS_POR_NIVEL, TICKS_PROPAGANDA, TICKS_PROPAGANDA_NO,
+    TICKS_REGENERACAO_COMBATE, TICKS_REGENERACAO_FORA_COMBATE, TICKS_REVERSAO_SUDITO,
+    TICKS_SILENCIO_VANDALISMO, TOTAL_PNJS_PADRAO,
 };
 
 /// Eleva o nível do jogador ao mínimo exigido por uma ação (protótipo).
@@ -3882,4 +3888,1053 @@ fn hash_estado_cobre_escudo() {
         jogador.escudo_alvo = Some(2);
     }
     assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+}
+
+/// Monta um comando `armadilha` com os monotônicos já preenchidos.
+#[must_use]
+fn comando_armadilha(peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) -> Comando {
+    Comando {
+        peer_id,
+        acao: "armadilha".to_string(),
+        seq,
+        request_id,
+        destino: Some(ponto),
+    }
+}
+
+/// Agenda uma armadilha somente após validá-la contra o estado corrente.
+fn agendar_armadilha(
+    mundo: &mut Mundo,
+    peer_id: u64,
+    seq: i64,
+    request_id: i64,
+    ponto: (f64, f64),
+) {
+    assert!(
+        ValidacaoComandos::validar(mundo, peer_id, "armadilha", seq, request_id, Some(ponto),)
+            .is_ok()
+    );
+    mundo.agendar_comando(comando_armadilha(peer_id, seq, request_id, ponto));
+}
+
+#[test]
+fn armadilha_custa_25_folego_e_5_materiais() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 3);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.materiais = 10;
+    }
+    assert_eq!(CUSTO_ARMADILHA_FOLEGO, 25);
+    assert_eq!(CUSTO_ARMADILHA_MATERIAIS, 5);
+
+    agendar_armadilha(&mut mundo, 1, 1, 1, (0.0, 0.0));
+    mundo.avancar_tick();
+
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.folego, FOLEGO_MAXIMO - CUSTO_ARMADILHA_FOLEGO);
+    assert_eq!(jogador.materiais, 10 - CUSTO_ARMADILHA_MATERIAIS);
+    assert_eq!(jogador.seq, 1);
+    assert_eq!(jogador.request_id, 1);
+    assert_eq!(jogador.armadilha_recarga_ticks, RECARGA_ARMADILHA_TICKS);
+    assert_eq!(jogador.imobilizado_ticks, 0);
+    assert_eq!(mundo.armadilhas.len(), 1);
+    assert_eq!(mundo.proxima_armadilha_id, 2);
+    let armadilha = &mundo.armadilhas[&1];
+    assert_eq!(armadilha.id, 1);
+    assert_eq!(armadilha.dono, 1);
+    assert!(armadilha.posicao.0.abs() < 1e-12);
+    assert!(armadilha.posicao.1.abs() < 1e-12);
+    assert_eq!(armadilha.ticks_armar, TICKS_ARMAR_ARMADILHA);
+    assert_eq!(armadilha.ticks_restantes, TICKS_DURACAO_ARMADILHA);
+
+    // A recarga própria bloqueia uma segunda armadilha no mesmo instante.
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "armadilha", 2, 2, Some((0.0, 0.0))),
+        Err(CodigoRecusa::ArmadilhaEmRecarga)
+    );
+    // A ordem de validação mantém Fôlego e Materiais antes da recarga.
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.folego = CUSTO_ARMADILHA_FOLEGO - 1;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "armadilha", 2, 2, Some((0.0, 0.0))),
+        Err(CodigoRecusa::FolegoInsuficiente)
+    );
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.folego = CUSTO_ARMADILHA_FOLEGO;
+        jogador.materiais = CUSTO_ARMADILHA_MATERIAIS - 1;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "armadilha", 2, 2, Some((0.0, 0.0))),
+        Err(CodigoRecusa::SaldoInsuficiente)
+    );
+}
+
+#[test]
+fn armadilha_recusa_destino_alem_de_3_m() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 3);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.materiais = 20;
+    }
+    assert!((ALCANCE_ARMADILHA_M - 3.0).abs() < 1e-12);
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "armadilha", 1, 1, None),
+        Err(CodigoRecusa::DestinoInvalido)
+    );
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "armadilha", 1, 1, Some((3.0001, 0.0))),
+        Err(CodigoRecusa::DestinoInvalido)
+    );
+    assert!(ValidacaoComandos::validar(
+        &mundo,
+        1,
+        "armadilha",
+        1,
+        1,
+        Some((ALCANCE_ARMADILHA_M, 0.0)),
+    )
+    .is_ok());
+
+    // Um comando enfileirado diretamente fora do alcance não cobra nem cria armadilha.
+    mundo.agendar_comando(comando_armadilha(1, 1, 1, (3.0001, 0.0)));
+    mundo.avancar_tick();
+    assert!(mundo.armadilhas.is_empty());
+    assert_eq!(mundo.proxima_armadilha_id, 1);
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(mundo.jogadores[&1].folego, FOLEGO_MAXIMO);
+    assert_eq!(mundo.jogadores[&1].materiais, 20);
+}
+
+#[test]
+fn armadilha_imobiliza_inimigo_por_60_ticks_e_poupa_aliados() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    mundo.adicionar_jogador(3);
+    garantir_nivel(&mut mundo, 1, 3);
+    garantir_nivel(&mut mundo, 2, 3);
+    garantir_nivel(&mut mundo, 3, 3);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.equipe = 1;
+        jogador.materiais = 10;
+    }
+    if let Some(jogador) = mundo.jogadores.get_mut(&2) {
+        jogador.equipe = 1;
+        jogador.posicao = (RAIO_ARMADILHA_M / 2.0, 0.0);
+    }
+    if let Some(jogador) = mundo.jogadores.get_mut(&3) {
+        jogador.equipe = 2;
+        jogador.posicao = (-RAIO_ARMADILHA_M / 2.0, 0.0);
+    }
+    assert!((RAIO_ARMADILHA_M - 1.0).abs() < 1e-12);
+    assert_eq!(TICKS_IMOBILIZACAO_ARMADILHA, 60);
+
+    agendar_armadilha(&mut mundo, 1, 1, 1, (0.0, 0.0));
+    mundo.avancar_tick();
+    assert_eq!(mundo.armadilhas.len(), 1);
+    for _ in 0..(TICKS_ARMAR_ARMADILHA - 1) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.armadilhas[&1].ticks_armar, 1);
+    assert_eq!(mundo.jogadores[&3].imobilizado_ticks, 0);
+    // No trigésimo tick de arme o inimigo pisa; o aliado da mesma equipe passa.
+    mundo.avancar_tick();
+    assert!(mundo.armadilhas.is_empty());
+    assert_eq!(
+        mundo.jogadores[&3].imobilizado_ticks,
+        TICKS_IMOBILIZACAO_ARMADILHA
+    );
+    assert_eq!(mundo.jogadores[&2].imobilizado_ticks, 0);
+
+    // Enquanto imobilizado, `mover` não muda posição nem monotônicos.
+    agendar_mover(&mut mundo, 3, 1, 1, (0.0, 0.0));
+    mundo.avancar_tick();
+    assert!((mundo.jogadores[&3].posicao.0 + RAIO_ARMADILHA_M / 2.0).abs() < 1e-12);
+    assert_eq!(mundo.jogadores[&3].seq, 0);
+    assert_eq!(mundo.jogadores[&3].request_id, 0);
+    assert_eq!(
+        mundo.jogadores[&3].imobilizado_ticks,
+        TICKS_IMOBILIZACAO_ARMADILHA - 1
+    );
+
+    for _ in 0..(TICKS_IMOBILIZACAO_ARMADILHA - 2) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&3].imobilizado_ticks, 1);
+    agendar_mover(&mut mundo, 3, 2, 2, (0.0, 0.0));
+    mundo.avancar_tick();
+    assert!(mundo.jogadores[&3].posicao.0.abs() < 1e-12);
+    assert_eq!(mundo.jogadores[&3].seq, 2);
+    assert_eq!(mundo.jogadores[&3].request_id, 2);
+    assert_eq!(mundo.jogadores[&3].imobilizado_ticks, 0);
+    assert_eq!(mundo.jogadores[&2].imobilizado_ticks, 0);
+    assert!((mundo.jogadores[&2].posicao.0 - RAIO_ARMADILHA_M / 2.0).abs() < 1e-12);
+}
+
+#[test]
+fn armadilha_expira_apos_1800_ticks_e_limite_de_tres() {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    garantir_nivel(&mut mundo, 1, 3);
+    let mut seq = 1;
+    for ponto in [(0.0, 0.0), (2.0, 0.0), (-2.0, 0.0)] {
+        if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+            jogador.folego = FOLEGO_MAXIMO;
+            jogador.materiais = 20;
+            jogador.armadilha_recarga_ticks = 0;
+        }
+        agendar_armadilha(&mut mundo, 1, seq, seq, ponto);
+        mundo.avancar_tick();
+        seq += 1;
+    }
+    assert_eq!(TICKS_DURACAO_ARMADILHA, 1800);
+    assert_eq!(MAX_ARMADILHAS_POR_JOGADOR, 3);
+    assert_eq!(mundo.armadilhas.len(), MAX_ARMADILHAS_POR_JOGADOR);
+    assert_eq!(mundo.proxima_armadilha_id, 4);
+    for id in 1..=3 {
+        assert_eq!(mundo.armadilhas[&id].dono, 1);
+    }
+
+    // Com recarga zerada e recursos suficientes, o limite de três ainda recusa.
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.folego = FOLEGO_MAXIMO;
+        jogador.materiais = 20;
+        jogador.armadilha_recarga_ticks = 0;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "armadilha", seq, seq, Some((0.0, 0.0))),
+        Err(CodigoRecusa::SaldoInsuficiente)
+    );
+    mundo.agendar_comando(comando_armadilha(1, seq, seq, (0.0, 0.0)));
+    mundo.avancar_tick();
+    assert_eq!(mundo.armadilhas.len(), MAX_ARMADILHAS_POR_JOGADOR);
+    assert_eq!(mundo.proxima_armadilha_id, 4);
+
+    // Sem inimigo em raio, a armadilha expira exatamente 1800 ticks depois.
+    let mut expiracao = Mundo::new();
+    expiracao.adicionar_jogador(1);
+    garantir_nivel(&mut expiracao, 1, 3);
+    if let Some(jogador) = expiracao.jogadores.get_mut(&1) {
+        jogador.materiais = 10;
+    }
+    agendar_armadilha(&mut expiracao, 1, 1, 1, (0.0, 0.0));
+    expiracao.avancar_tick();
+    assert_eq!(
+        expiracao.armadilhas[&1].ticks_restantes,
+        TICKS_DURACAO_ARMADILHA
+    );
+    for _ in 0..(TICKS_DURACAO_ARMADILHA - 1) {
+        expiracao.avancar_tick();
+    }
+    assert_eq!(expiracao.armadilhas.len(), 1);
+    assert_eq!(expiracao.armadilhas[&1].ticks_restantes, 1);
+    expiracao.avancar_tick();
+    assert!(expiracao.armadilhas.is_empty());
+}
+
+#[test]
+fn hash_reflete_armadilha_e_imobilizacao() {
+    let mut primeiro = Mundo::new();
+    primeiro.adicionar_jogador(1);
+    garantir_nivel(&mut primeiro, 1, 3);
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.materiais = 20;
+    }
+    let mut segundo = Mundo::new();
+    segundo.adicionar_jogador(1);
+    garantir_nivel(&mut segundo, 1, 3);
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.materiais = 20;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    agendar_armadilha(&mut primeiro, 1, 1, 1, (0.0, 0.0));
+    primeiro.avancar_tick();
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    agendar_armadilha(&mut segundo, 1, 1, 1, (0.0, 0.0));
+    segundo.avancar_tick();
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.equipe = 2;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.equipe = 2;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.armadilha_recarga_ticks = 123;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.armadilha_recarga_ticks = 123;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(jogador) = primeiro.jogadores.get_mut(&1) {
+        jogador.imobilizado_ticks = TICKS_IMOBILIZACAO_ARMADILHA;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(jogador) = segundo.jogadores.get_mut(&1) {
+        jogador.imobilizado_ticks = TICKS_IMOBILIZACAO_ARMADILHA;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(armadilha) = primeiro.armadilhas.get_mut(&1) {
+        armadilha.ticks_armar = 7;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(armadilha) = segundo.armadilhas.get_mut(&1) {
+        armadilha.ticks_armar = 7;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(armadilha) = primeiro.armadilhas.get_mut(&1) {
+        armadilha.ticks_restantes = 1000;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(armadilha) = segundo.armadilhas.get_mut(&1) {
+        armadilha.ticks_restantes = 1000;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(armadilha) = primeiro.armadilhas.get_mut(&1) {
+        armadilha.posicao = (1.0, 1.0);
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(armadilha) = segundo.armadilhas.get_mut(&1) {
+        armadilha.posicao = (1.0, 1.0);
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(armadilha) = primeiro.armadilhas.get_mut(&1) {
+        armadilha.dono = 9;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(armadilha) = segundo.armadilhas.get_mut(&1) {
+        armadilha.dono = 9;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+
+    if let Some(armadilha) = primeiro.armadilhas.get_mut(&1) {
+        armadilha.id = 42;
+    }
+    assert_ne!(primeiro.hash_estado(), segundo.hash_estado());
+    if let Some(armadilha) = segundo.armadilhas.get_mut(&1) {
+        armadilha.id = 42;
+    }
+    assert_eq!(primeiro.hash_estado(), segundo.hash_estado());
+}
+
+#[test]
+fn espelho_local_seed_viabiliza_vitoria_e_reflete_hash() {
+    let mut mundo = Mundo::new();
+    assert!(mundo.nos.is_empty());
+    let hash_inicial = mundo.hash_estado();
+
+    insurgencia_sim::semear_espelho_local(&mut mundo);
+    assert_eq!(mundo.nos.len(), 3);
+    assert_eq!(mundo.ilhas.len(), 4);
+    assert_eq!(mundo.suditos.len(), 1);
+    assert_ne!(mundo.hash_estado(), hash_inicial);
+
+    for (id, _) in insurgencia_sim::POSICOES_NOS_LOCAIS {
+        mundo.adicionar_jogador(id);
+    }
+    for (id, posicao) in insurgencia_sim::POSICOES_NOS_LOCAIS {
+        posicionar_jogador(&mut mundo, id, 1, posicao);
+    }
+    for (id, posicao) in insurgencia_sim::POSICOES_NOS_LOCAIS {
+        agendar_no(&mut mundo, id, "propaganda_no", 10, 10, posicao);
+    }
+    for _ in 0..=TICKS_PROPAGANDA_NO {
+        mundo.avancar_tick();
+    }
+
+    assert_eq!(mundo.resultado, Some(ResultadoPartida::Vitoria));
+    assert_eq!(mundo.resistencia_ideologica, 0);
+}
+
+#[test]
+fn tres_sinais_de_sincronia_iniciam_desafio() {
+    let mut mundo = Mundo::new();
+    for peer_id in 1..=3 {
+        mundo.adicionar_jogador(peer_id);
+    }
+    let agendar_sinal = |mundo: &mut Mundo, peer_id: u64, seq: i64| {
+        assert!(
+            ValidacaoComandos::validar(mundo, peer_id, "sinalizar_sincronia", seq, seq, None,)
+                .is_ok()
+        );
+        mundo.agendar_comando(Comando {
+            peer_id,
+            acao: "sinalizar_sincronia".to_string(),
+            seq,
+            request_id: seq,
+            destino: None,
+        });
+    };
+
+    assert_eq!(mundo.sincronias_iniciadas, 0);
+    assert!(mundo.sinalizadores_sincronia.is_empty());
+    assert_eq!(mundo.sincronia_ticks_restantes, 0);
+
+    agendar_sinal(&mut mundo, 1, 1);
+    mundo.avancar_tick();
+    assert_eq!(mundo.sincronia_ticks_restantes, TICKS_JANELA_SINCRONIA);
+    assert_eq!(mundo.sinalizadores_sincronia.len(), 1);
+    assert!(mundo.sinalizadores_sincronia.contains(&1));
+
+    agendar_sinal(&mut mundo, 2, 2);
+    mundo.avancar_tick();
+    assert_eq!(mundo.sincronia_ticks_restantes, TICKS_JANELA_SINCRONIA - 1);
+    assert_eq!(mundo.sinalizadores_sincronia.len(), 2);
+
+    // Um peer já sinalizado não entra duas vezes na mesma janela.
+    agendar_sinal(&mut mundo, 1, 3);
+    mundo.avancar_tick();
+    assert_eq!(mundo.sinalizadores_sincronia.len(), 2);
+
+    agendar_sinal(&mut mundo, 3, 4);
+    mundo.avancar_tick();
+    assert_eq!(mundo.sincronias_iniciadas, 1);
+    assert!(mundo.sinalizadores_sincronia.is_empty());
+    assert_eq!(mundo.sincronia_ticks_restantes, 0);
+    assert_eq!(mundo.sinais.len(), 1);
+    assert_eq!(
+        mundo.sinais.front().map(String::as_str),
+        Some("sincronia_iniciada:3")
+    );
+}
+
+#[test]
+fn sinal_apos_janela_expirada_nao_inicia() {
+    let mut mundo = Mundo::new();
+    for peer_id in 1..=3 {
+        mundo.adicionar_jogador(peer_id);
+    }
+    let agendar_sinal = |mundo: &mut Mundo, peer_id: u64, seq: i64| {
+        assert!(
+            ValidacaoComandos::validar(mundo, peer_id, "sinalizar_sincronia", seq, seq, None,)
+                .is_ok()
+        );
+        mundo.agendar_comando(Comando {
+            peer_id,
+            acao: "sinalizar_sincronia".to_string(),
+            seq,
+            request_id: seq,
+            destino: None,
+        });
+    };
+
+    agendar_sinal(&mut mundo, 1, 1);
+    mundo.avancar_tick();
+    assert_eq!(mundo.sincronia_ticks_restantes, TICKS_JANELA_SINCRONIA);
+    assert_eq!(mundo.sinalizadores_sincronia.len(), 1);
+
+    // 150 decrementos fecham a janela; o 151º avanço é apenas limitado, não a fecha.
+    for _ in 0..=TICKS_JANELA_SINCRONIA {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.sincronia_ticks_restantes, 0);
+
+    agendar_sinal(&mut mundo, 2, 2);
+    mundo.avancar_tick();
+    assert_eq!(mundo.sincronia_ticks_restantes, TICKS_JANELA_SINCRONIA);
+    assert_eq!(mundo.sinalizadores_sincronia.len(), 1);
+    assert!(mundo.sinalizadores_sincronia.contains(&2));
+
+    agendar_sinal(&mut mundo, 3, 3);
+    mundo.avancar_tick();
+    assert_eq!(mundo.sincronias_iniciadas, 0);
+    assert_eq!(mundo.sinalizadores_sincronia.len(), 2);
+    assert!(mundo.sinais.is_empty());
+}
+
+#[test]
+fn hash_reflete_sincronia() {
+    let mut primeira = Mundo::new();
+    let mut segunda = Mundo::new();
+    for peer_id in 1..=3 {
+        primeira.adicionar_jogador(peer_id);
+        segunda.adicionar_jogador(peer_id);
+    }
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    primeira.sincronias_iniciadas = 2;
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+    segunda.sincronias_iniciadas = 2;
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    primeira.sincronia_ticks_restantes = TICKS_JANELA_SINCRONIA - 1;
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+    segunda.sincronia_ticks_restantes = TICKS_JANELA_SINCRONIA - 1;
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    // A iteração do BTreeSet é canônica: a ordem de inserção não altera o hash.
+    primeira.sinalizadores_sincronia.insert(3);
+    primeira.sinalizadores_sincronia.insert(1);
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+    segunda.sinalizadores_sincronia.insert(1);
+    segunda.sinalizadores_sincronia.insert(3);
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    segunda.sinalizadores_sincronia.remove(&3);
+    segunda.sinalizadores_sincronia.insert(2);
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+}
+
+/// Monta um mundo com atacante na origem e vítima a 1 m, em `(1.0, 0.0)`.
+#[must_use]
+fn mundo_para_vandalismo() -> Mundo {
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    mundo.adicionar_jogador(2);
+    if let Some(vitima) = mundo.jogadores.get_mut(&2) {
+        vitima.posicao = (1.0, 0.0);
+    }
+    mundo
+}
+
+/// Monta um comando `vandalismo` com os monotônicos já preenchidos.
+#[must_use]
+fn comando_vandalismo(peer_id: u64, seq: i64, request_id: i64, destino: (f64, f64)) -> Comando {
+    Comando {
+        peer_id,
+        acao: "vandalismo".to_string(),
+        seq,
+        request_id,
+        destino: Some(destino),
+    }
+}
+
+/// Agenda um vandalismo somente após validá-lo contra o estado corrente.
+fn agendar_vandalismo(
+    mundo: &mut Mundo,
+    peer_id: u64,
+    seq: i64,
+    request_id: i64,
+    destino: (f64, f64),
+) {
+    assert!(ValidacaoComandos::validar(
+        mundo,
+        peer_id,
+        "vandalismo",
+        seq,
+        request_id,
+        Some(destino),
+    )
+    .is_ok());
+    mundo.agendar_comando(comando_vandalismo(peer_id, seq, request_id, destino));
+}
+
+/// Agenda `sinalizar_sincronia` somente após validá-lo.
+fn agendar_sinal(mundo: &mut Mundo, peer_id: u64, seq: i64) {
+    assert!(
+        ValidacaoComandos::validar(mundo, peer_id, "sinalizar_sincronia", seq, seq, None,).is_ok()
+    );
+    mundo.agendar_comando(Comando {
+        peer_id,
+        acao: "sinalizar_sincronia".to_string(),
+        seq,
+        request_id: seq,
+        destino: None,
+    });
+}
+
+#[test]
+fn vandalismo_causa_dano_silencio_e_cancela_canalizacao() {
+    let mut mundo = mundo_para_vandalismo();
+    mundo.adicionar_sudito(9, (1.0, 0.0));
+    mundo.adicionar_no(4, (1.0, 0.0));
+    if let Some(vitima) = mundo.jogadores.get_mut(&2) {
+        vitima.vida = 200;
+        vitima.coleta_ticks = 5;
+        vitima.coleta_ponto = Some((1.0, 0.0));
+        vitima.construcao_ticks = 7;
+        vitima.construcao_ponto = Some((1.0, 0.0));
+        vitima.ponte_ticks = 9;
+        vitima.ponte_ponto = Some((1.0, 0.0));
+        vitima.propaganda_alvo = Some(9);
+        vitima.no_alvo = Some(4);
+    }
+    if let Some(sudito) = mundo.suditos.get_mut(&9) {
+        sudito.propaganda_ticks = 20;
+    }
+
+    agendar_vandalismo(&mut mundo, 1, 1, 1, (1.0, 0.0));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.jogadores[&2].vida, 200_i64 - DANO_VANDALISMO);
+    assert_eq!(
+        mundo.jogadores[&2].silenciado_ticks,
+        TICKS_SILENCIO_VANDALISMO
+    );
+    assert_eq!(
+        mundo.jogadores[&1].vandalismo_recarga_ticks,
+        RECARGA_VANDALISMO_TICKS,
+    );
+    assert_eq!(
+        mundo.jogadores[&1].folego,
+        FOLEGO_MAXIMO - CUSTO_VANDALISMO_FOLEGO,
+    );
+    assert_eq!(mundo.jogadores[&1].seq, 1);
+    assert_eq!(mundo.jogadores[&1].request_id, 1);
+
+    let vitima = &mundo.jogadores[&2];
+    assert_eq!(vitima.coleta_ticks, 0);
+    assert_eq!(vitima.coleta_ponto, None);
+    assert_eq!(vitima.construcao_ticks, 0);
+    assert_eq!(vitima.construcao_ponto, None);
+    assert_eq!(vitima.ponte_ticks, 0);
+    assert_eq!(vitima.ponte_ponto, None);
+    assert_eq!(vitima.propaganda_alvo, None);
+    assert_eq!(vitima.no_alvo, None);
+    assert_eq!(mundo.suditos[&9].propaganda_ticks, 0);
+}
+
+#[test]
+fn vandalismo_recusa_alvo_fora_do_alcance() {
+    let mut mundo = mundo_para_vandalismo();
+    let destino = (3.0, 0.0);
+    if let Some(vitima) = mundo.jogadores.get_mut(&2) {
+        vitima.posicao = destino;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "vandalismo", 1, 1, Some(destino)),
+        Err(CodigoRecusa::AlvoInvalido),
+    );
+
+    mundo.agendar_comando(comando_vandalismo(1, 1, 1, destino));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+    assert_eq!(mundo.jogadores[&2].silenciado_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(mundo.jogadores[&1].vandalismo_recarga_ticks, 0);
+}
+
+#[test]
+fn vandalismo_recusa_folego_insuficiente() {
+    let mut mundo = mundo_para_vandalismo();
+    if let Some(atacante) = mundo.jogadores.get_mut(&1) {
+        atacante.folego = CUSTO_VANDALISMO_FOLEGO - 1;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "vandalismo", 1, 1, Some((1.0, 0.0))),
+        Err(CodigoRecusa::FolegoInsuficiente),
+    );
+
+    mundo.agendar_comando(comando_vandalismo(1, 1, 1, (1.0, 0.0)));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+    assert_eq!(mundo.jogadores[&2].silenciado_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(mundo.jogadores[&1].vandalismo_recarga_ticks, 0);
+}
+
+#[test]
+fn vandalismo_recusa_durante_recarga() {
+    let mut mundo = mundo_para_vandalismo();
+    if let Some(atacante) = mundo.jogadores.get_mut(&1) {
+        atacante.vandalismo_recarga_ticks = RECARGA_VANDALISMO_TICKS;
+    }
+    assert_eq!(
+        CodigoRecusa::VandalismoEmRecarga.to_string(),
+        "vandalismo em recarga",
+    );
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "vandalismo", 1, 1, Some((1.0, 0.0))),
+        Err(CodigoRecusa::VandalismoEmRecarga),
+    );
+
+    mundo.agendar_comando(comando_vandalismo(1, 1, 1, (1.0, 0.0)));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+    assert_eq!(mundo.jogadores[&2].silenciado_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(
+        mundo.jogadores[&1].vandalismo_recarga_ticks,
+        RECARGA_VANDALISMO_TICKS - 1,
+    );
+}
+
+#[test]
+fn vandalismo_recusa_durante_silencio() {
+    let mut mundo = mundo_para_vandalismo();
+    if let Some(atacante) = mundo.jogadores.get_mut(&1) {
+        atacante.silenciado_ticks = TICKS_SILENCIO_VANDALISMO;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "vandalismo", 1, 1, Some((1.0, 0.0))),
+        Err(CodigoRecusa::AcaoBloqueada),
+    );
+
+    mundo.agendar_comando(comando_vandalismo(1, 1, 1, (1.0, 0.0)));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+    assert_eq!(mundo.jogadores[&2].silenciado_ticks, 0);
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(mundo.jogadores[&1].vandalismo_recarga_ticks, 0);
+    assert_eq!(mundo.ultima_recusa, Some(CodigoRecusa::AcaoBloqueada));
+    assert_eq!(
+        mundo.jogadores[&1].silenciado_ticks,
+        TICKS_SILENCIO_VANDALISMO - 1,
+    );
+}
+
+#[test]
+fn vandalismo_limite_de_alcance_2m01() {
+    let mut mundo = mundo_para_vandalismo();
+    // Fronteira exata: 2,01 m está além de `ALCANCE_CONTATO_M` (2 m).
+    let destino = (2.01, 0.0);
+    if let Some(vitima) = mundo.jogadores.get_mut(&2) {
+        vitima.posicao = destino;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "vandalismo", 1, 1, Some(destino)),
+        Err(CodigoRecusa::AlvoInvalido),
+    );
+
+    mundo.agendar_comando(comando_vandalismo(1, 1, 1, destino));
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.jogadores[&2].vida, 100);
+    assert_eq!(mundo.jogadores[&2].silenciado_ticks, 0);
+    assert_eq!(mundo.jogadores[&2].posicao, destino);
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(mundo.jogadores[&1].folego, FOLEGO_MAXIMO);
+    assert_eq!(mundo.jogadores[&1].vandalismo_recarga_ticks, 0);
+    assert_eq!(mundo.ultima_recusa, None);
+}
+
+#[test]
+fn jogador_silenciado_nao_sinaliza_sincronia() {
+    let mut mundo = Mundo::new();
+    for peer_id in 1..=3 {
+        mundo.adicionar_jogador(peer_id);
+    }
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.silenciado_ticks = TICKS_SILENCIO_VANDALISMO;
+    }
+    assert_eq!(
+        ValidacaoComandos::validar(&mundo, 1, "sinalizar_sincronia", 1, 1, None),
+        Err(CodigoRecusa::AcaoBloqueada),
+    );
+
+    mundo.agendar_comando(Comando {
+        peer_id: 1,
+        acao: "sinalizar_sincronia".to_string(),
+        seq: 2,
+        request_id: 2,
+        destino: None,
+    });
+    agendar_sinal(&mut mundo, 2, 1);
+    agendar_sinal(&mut mundo, 3, 1);
+    mundo.avancar_tick();
+
+    assert_eq!(mundo.sincronias_iniciadas, 0);
+    assert!(mundo.sinais.is_empty());
+    assert_eq!(mundo.sinalizadores_sincronia.len(), 2);
+    assert!(!mundo.sinalizadores_sincronia.contains(&1));
+    assert_eq!(mundo.jogadores[&1].seq, 0);
+    assert_eq!(mundo.jogadores[&1].request_id, 0);
+    assert_eq!(mundo.ultima_recusa, Some(CodigoRecusa::AcaoBloqueada));
+    assert_eq!(
+        mundo.jogadores[&1].silenciado_ticks,
+        TICKS_SILENCIO_VANDALISMO - 1,
+    );
+
+    for _ in 1..TICKS_SILENCIO_VANDALISMO {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].silenciado_ticks, 0);
+    assert!(ValidacaoComandos::validar(&mundo, 1, "sinalizar_sincronia", 1, 1, None).is_ok());
+}
+
+#[test]
+fn hash_reflete_vandalismo_e_silencio() {
+    let mut primeira = mundo_para_vandalismo();
+    let mut segunda = mundo_para_vandalismo();
+    for mundo in [&mut primeira, &mut segunda] {
+        agendar_vandalismo(mundo, 1, 1, 1, (1.0, 0.0));
+        mundo.avancar_tick();
+    }
+
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+    assert_eq!(
+        primeira.jogadores[&2].silenciado_ticks,
+        TICKS_SILENCIO_VANDALISMO,
+    );
+
+    if let Some(vitima) = segunda.jogadores.get_mut(&2) {
+        vitima.silenciado_ticks = 0;
+    }
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+
+    if let Some(vitima) = segunda.jogadores.get_mut(&2) {
+        vitima.silenciado_ticks = TICKS_SILENCIO_VANDALISMO;
+    }
+    assert_eq!(primeira.hash_estado(), segunda.hash_estado());
+
+    if let Some(atacante) = segunda.jogadores.get_mut(&1) {
+        atacante.vandalismo_recarga_ticks = 0;
+    }
+    assert_ne!(primeira.hash_estado(), segunda.hash_estado());
+}
+
+/// Monta um comando `coleta_eficiente` com os monotônicos já preenchidos.
+#[must_use]
+fn comando_coleta_eficiente(peer_id: u64, seq: i64, request_id: i64, ponto: (f64, f64)) -> Comando {
+    Comando {
+        peer_id,
+        acao: "coleta_eficiente".to_string(),
+        seq,
+        request_id,
+        destino: Some(ponto),
+    }
+}
+
+/// Agenda uma ativação somente após validá-la contra o estado corrente.
+fn agendar_coleta_eficiente(
+    mundo: &mut Mundo,
+    peer_id: u64,
+    seq: i64,
+    request_id: i64,
+    ponto: (f64, f64),
+) {
+    assert!(ValidacaoComandos::validar(
+        mundo,
+        peer_id,
+        "coleta_eficiente",
+        seq,
+        request_id,
+        Some(ponto),
+    )
+    .is_ok());
+    mundo.agendar_comando(comando_coleta_eficiente(peer_id, seq, request_id, ponto));
+}
+
+#[test]
+fn coleta_eficiente_esta_na_whitelist_e_exige_destino() {
+    assert_eq!(ACOES_PERMITIDAS.len(), 16);
+    assert!(ACOES_PERMITIDAS.contains(&"coleta_eficiente"));
+    assert!(acao_exige_destino("coleta_eficiente"));
+    assert_eq!(
+        ACOES_PERMITIDAS
+            .iter()
+            .filter(|acao| acao_exige_destino(acao))
+            .count(),
+        14,
+    );
+}
+
+#[test]
+fn coleta_eficiente_conclui_em_90_ticks_e_credita_os_mesmos_recursos() {
+    const PONTO: (f64, f64) = (0.5, 0.25);
+    let mut eficiente = Mundo::new();
+    eficiente.adicionar_jogador(1);
+    agendar_mover(&mut eficiente, 1, 1, 1, PONTO);
+    eficiente.avancar_tick();
+
+    // Ativação e primeira coleta no mesmo tick: o buff já dobra o primeiro passo.
+    agendar_coleta_eficiente(&mut eficiente, 1, 2, 2, PONTO);
+    agendar_coleta(&mut eficiente, 1, 3, 3, PONTO);
+    eficiente.avancar_tick();
+    assert_eq!(eficiente.jogadores[&1].coleta_ticks, 2);
+    assert_eq!(
+        eficiente.jogadores[&1].coleta_eficiente_ticks,
+        TICKS_BUFF_COLETA_EFICIENTE,
+    );
+
+    let mut seq = 3_i64;
+    for _ in 0..(TICKS_COLETA / 2 - 1) {
+        seq += 1;
+        agendar_coleta(&mut eficiente, 1, seq, seq, PONTO);
+        eficiente.avancar_tick();
+    }
+
+    let mut normal = Mundo::new();
+    normal.adicionar_jogador(1);
+    agendar_mover(&mut normal, 1, 1, 1, PONTO);
+    normal.avancar_tick();
+    for seq in 2..=(TICKS_COLETA + 1) {
+        agendar_coleta(&mut normal, 1, seq, seq, PONTO);
+        normal.avancar_tick();
+    }
+
+    for mundo in [&eficiente, &normal] {
+        let jogador = &mundo.jogadores[&1];
+        assert_eq!(jogador.materiais, 2);
+        assert_eq!(jogador.suprimentos, 3);
+        assert_eq!(jogador.coleta_ticks, 0);
+        assert_eq!(jogador.coleta_ponto, None);
+    }
+    assert_eq!(normal.tick - eficiente.tick, TICKS_COLETA / 2);
+}
+
+#[test]
+fn segunda_ativacao_durante_o_buff_e_recusada_sem_acumular() {
+    const PONTO: (f64, f64) = (0.0, 0.0);
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    agendar_coleta_eficiente(&mut mundo, 1, 1, 1, PONTO);
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo.jogadores[&1].coleta_eficiente_ticks,
+        TICKS_BUFF_COLETA_EFICIENTE,
+    );
+    assert_eq!(
+        mundo.jogadores[&1].coleta_eficiente_recarga_ticks,
+        RECARGA_COLETA_EFICIENTE_TICKS,
+    );
+    let folego_apos_ativacao = mundo.jogadores[&1].folego;
+
+    let recusado = ValidacaoComandos::validar(&mundo, 1, "coleta_eficiente", 2, 2, Some(PONTO));
+    assert_eq!(recusado, Err(CodigoRecusa::ColetaEficienteEmRecarga));
+
+    // Um comando forjado não pode reativar nem acumular o buff em curso.
+    mundo.agendar_comando(comando_coleta_eficiente(1, 2, 2, PONTO));
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(
+        jogador.coleta_eficiente_ticks,
+        TICKS_BUFF_COLETA_EFICIENTE - 1,
+    );
+    assert_eq!(
+        jogador.coleta_eficiente_recarga_ticks,
+        RECARGA_COLETA_EFICIENTE_TICKS - 1,
+    );
+    assert_eq!(jogador.folego, folego_apos_ativacao);
+    assert_eq!(jogador.seq, 1);
+    assert_eq!(jogador.request_id, 1);
+}
+
+#[test]
+fn coleta_eficiente_recusa_destino_fora_do_ponto_do_jogador() {
+    const PONTO: (f64, f64) = (0.25, 0.5);
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    agendar_mover(&mut mundo, 1, 1, 1, PONTO);
+    mundo.avancar_tick();
+
+    let sem_destino = ValidacaoComandos::validar(&mundo, 1, "coleta_eficiente", 2, 2, None);
+    assert_eq!(sem_destino, Err(CodigoRecusa::DestinoInvalido));
+    let fora_do_ponto =
+        ValidacaoComandos::validar(&mundo, 1, "coleta_eficiente", 2, 2, Some((0.0, 0.0)));
+    assert_eq!(fora_do_ponto, Err(CodigoRecusa::DestinoInvalido));
+    let aceito = ValidacaoComandos::validar(&mundo, 1, "coleta_eficiente", 2, 2, Some(PONTO));
+    assert!(aceito.is_ok());
+}
+
+#[test]
+fn coleta_eficiente_recusa_folego_insuficiente() {
+    const PONTO: (f64, f64) = (0.0, 0.0);
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.folego = CUSTO_COLETA_EFICIENTE_FOLEGO - 1;
+    }
+
+    let recusado = ValidacaoComandos::validar(&mundo, 1, "coleta_eficiente", 1, 1, Some(PONTO));
+    assert_eq!(recusado, Err(CodigoRecusa::FolegoInsuficiente));
+
+    // Comando forjado não debita Fôlego nem ativa o buff.
+    mundo.agendar_comando(comando_coleta_eficiente(1, 1, 1, PONTO));
+    mundo.avancar_tick();
+    let jogador = &mundo.jogadores[&1];
+    assert_eq!(jogador.coleta_eficiente_ticks, 0);
+    assert_eq!(jogador.coleta_eficiente_recarga_ticks, 0);
+    assert_eq!(jogador.folego, CUSTO_COLETA_EFICIENTE_FOLEGO - 1);
+    assert_eq!(jogador.seq, 0);
+}
+
+#[test]
+fn coleta_eficiente_em_recarga_e_recusada_ate_o_fim_da_recarga() {
+    const PONTO: (f64, f64) = (0.0, 0.0);
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    if let Some(jogador) = mundo.jogadores.get_mut(&1) {
+        jogador.coleta_eficiente_recarga_ticks = 1;
+    }
+
+    let recusado = ValidacaoComandos::validar(&mundo, 1, "coleta_eficiente", 1, 1, Some(PONTO));
+    assert_eq!(recusado, Err(CodigoRecusa::ColetaEficienteEmRecarga));
+
+    mundo.avancar_tick();
+    assert_eq!(mundo.jogadores[&1].coleta_eficiente_recarga_ticks, 0);
+    assert!(ValidacaoComandos::validar(&mundo, 1, "coleta_eficiente", 1, 1, Some(PONTO)).is_ok());
+}
+
+#[test]
+fn coleta_eficiente_decrementa_exatamente_e_altera_o_hash() {
+    const PONTO: (f64, f64) = (0.0, 0.0);
+    let mut mundo = Mundo::new();
+    mundo.adicionar_jogador(1);
+    agendar_coleta_eficiente(&mut mundo, 1, 1, 1, PONTO);
+    mundo.avancar_tick();
+
+    for _ in 0..TICKS_BUFF_COLETA_EFICIENTE {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].coleta_eficiente_ticks, 0);
+    assert_eq!(
+        mundo.jogadores[&1].coleta_eficiente_recarga_ticks,
+        RECARGA_COLETA_EFICIENTE_TICKS - TICKS_BUFF_COLETA_EFICIENTE,
+    );
+
+    for _ in 0..(RECARGA_COLETA_EFICIENTE_TICKS - TICKS_BUFF_COLETA_EFICIENTE) {
+        mundo.avancar_tick();
+    }
+    assert_eq!(mundo.jogadores[&1].coleta_eficiente_recarga_ticks, 0);
+    agendar_coleta_eficiente(&mut mundo, 1, 2, 2, PONTO);
+    mundo.avancar_tick();
+    assert_eq!(
+        mundo.jogadores[&1].coleta_eficiente_ticks,
+        TICKS_BUFF_COLETA_EFICIENTE,
+    );
+    assert_eq!(
+        mundo.jogadores[&1].coleta_eficiente_recarga_ticks,
+        RECARGA_COLETA_EFICIENTE_TICKS,
+    );
+
+    let mut base = Mundo::new();
+    base.adicionar_jogador(1);
+    let hash_base = base.hash_estado();
+    assert_eq!(hash_base.len(), 64);
+
+    let mut com_buff = Mundo::new();
+    com_buff.adicionar_jogador(1);
+    if let Some(jogador) = com_buff.jogadores.get_mut(&1) {
+        jogador.coleta_eficiente_ticks = 7;
+    }
+    assert_ne!(com_buff.hash_estado(), hash_base);
+
+    let mut em_recarga = Mundo::new();
+    em_recarga.adicionar_jogador(1);
+    if let Some(jogador) = em_recarga.jogadores.get_mut(&1) {
+        jogador.coleta_eficiente_recarga_ticks = 11;
+    }
+    assert_ne!(em_recarga.hash_estado(), hash_base);
+
+    let mut copia = Mundo::new();
+    copia.adicionar_jogador(1);
+    if let Some(jogador) = copia.jogadores.get_mut(&1) {
+        jogador.coleta_eficiente_ticks = 7;
+    }
+    assert_eq!(copia.hash_estado(), com_buff.hash_estado());
 }

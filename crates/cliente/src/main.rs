@@ -19,12 +19,13 @@ use bevy::prelude::*;
 use bevy::text::FontSize;
 use bevy::window::PrimaryWindow;
 use insurgencia_cliente::{
-    deslocar, estado_inicial, ilha_em, EstadoJogador, Geometria3d, Ilha, ILHAS, LIMITE_X, LIMITE_Y,
-    VELOCIDADE,
+    aproximar_no, deslocar, estado_inicial, ilha_em, metros_para_pixels, pixels_para_metros,
+    EstadoJogador, Geometria3d, Ilha, ILHAS, LIMITE_X, LIMITE_Y, VELOCIDADE,
 };
 use insurgencia_sim::{
-    Comando, Mundo, ResultadoPartida, ALCANCE_ANALISE_MATERIALISTA_M, ALCANCE_ESCUDO_M,
-    MAX_RECONQUISTAS, NIVEL_MAXIMO, PASSO_SEGUNDOS, TICKS_COLETA, TICKS_CONSTRUCAO_BARREIRA,
+    Comando, Funcao, Mundo, ResultadoPartida, ValidacaoComandos, ALCANCE_ANALISE_MATERIALISTA_M,
+    ALCANCE_ESCUDO_M, MAX_RECONQUISTAS, NIVEL_MAXIMO, PASSO_SEGUNDOS, TICKS_COLETA,
+    TICKS_CONSTRUCAO_BARREIRA,
 };
 
 /// Identificador do jogador local no espelho da simulação.
@@ -35,6 +36,15 @@ const PEER_ALVO_TREINO: u64 = 2;
 
 /// Posição fixa do alvo de treino no plano do mapa (scaffolding não-canônico).
 const ALVO_TREINO_POSICAO: (f64, f64) = (2.0, 0.0);
+
+/// Identificador do terceiro par local usado no sinal de sincronia.
+const PEER_SINAL_3: u64 = 3;
+
+/// Posição fixa do terceiro par local no plano do mapa.
+const POSICAO_PEER_SINAL_3: (f64, f64) = (0.0, 4.0);
+
+/// Tolerância máxima, em metros, para alinhar o avatar à posição exata de um Nó.
+const TOLERANCIA_NO_M: f64 = 1.0;
 
 /// Posições fixas dos quatro guardas no protótipo (`[HIPÓTESE]`: sem mapa canônico).
 const PNJS_INICIAIS: [(u64, (f64, f64)); 4] = [
@@ -73,6 +83,10 @@ struct Simulacao(Mundo);
 struct ComandoLocal {
     seq: i64,
     request_id: i64,
+    /// Destino pendente em pixels, acumulado até o próximo tick da simulação.
+    intencao: (f32, f32),
+    /// Próximo par a emitir `sinalizar_sincronia`, rotacionado a cada aceite.
+    proximo_peer_sinal: u64,
 }
 
 /// Tempo acumulado para avançar a simulação em passos fixos.
@@ -108,19 +122,23 @@ fn main() {
             Update,
             (
                 mover_jogador,
-                sincronizar_avatar,
                 solicitar_barreira,
                 solicitar_coleta,
+                solicitar_coleta_eficiente,
                 solicitar_ponte,
                 solicitar_propaganda,
                 solicitar_ataque,
+                solicitar_vandalismo,
                 solicitar_propaganda_no,
                 solicitar_atacar_no,
                 solicitar_atacar_pnj,
+                solicitar_armadilha,
                 solicitar_analise_materialista,
                 solicitar_escudo,
-                sincronizar_sim,
+                solicitar_sincronia,
                 avancar_simulacao,
+                sincronizar_sim,
+                sincronizar_avatar,
                 atualizar_texto,
             )
                 .chain(),
@@ -588,10 +606,19 @@ fn configurar(
 
     let mut sim = Mundo::new();
     sim.adicionar_jogador(PEER_ID);
+    if let Some(local) = sim.jogadores.get_mut(&PEER_ID) {
+        local.posicao = pixels_para_metros(jogador.posicao);
+    }
     sim.adicionar_jogador(PEER_ALVO_TREINO);
+    sim.adicionar_jogador(PEER_SINAL_3);
+    if let Some(sinalizador) = sim.jogadores.get_mut(&PEER_SINAL_3) {
+        sinalizador.posicao = POSICAO_PEER_SINAL_3;
+    }
     for (id, posicao) in PNJS_INICIAIS {
         sim.adicionar_pnj(id, posicao);
     }
+    // Semente estática prototípica: ilhas, súditos e nós tornam a vitória observável no cliente.
+    insurgencia_sim::semear_espelho_local(&mut sim);
     if let Some(alvo) = sim.jogadores.get_mut(&PEER_ALVO_TREINO) {
         alvo.posicao = ALVO_TREINO_POSICAO;
     }
@@ -599,6 +626,8 @@ fn configurar(
     commands.insert_resource(ComandoLocal {
         seq: 0,
         request_id: 0,
+        intencao: jogador.posicao,
+        proximo_peer_sinal: PEER_ID,
     });
     commands.insert_resource(Simulacao(sim));
     commands.insert_resource(AccumuladorTick(0.0));
@@ -612,8 +641,17 @@ fn configurar(
 fn mover_jogador(
     teclado: Res<ButtonInput<KeyCode>>,
     tempo: Res<Time>,
-    mut jogador: ResMut<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
 ) {
+    if simulacao
+        .0
+        .jogadores
+        .get(&PEER_ID)
+        .is_some_and(|remoto| remoto.imobilizado_ticks > 0)
+    {
+        return;
+    }
     let mut horizontal = 0.0_f32;
     let mut vertical = 0.0_f32;
 
@@ -636,7 +674,35 @@ fn mover_jogador(
     }
 
     let passo = direcao.normalize() * VELOCIDADE * tempo.delta_secs();
-    jogador.0 = deslocar(jogador.0, (passo.x, passo.y));
+    let deslocado = deslocar(
+        EstadoJogador {
+            posicao: local.intencao,
+        },
+        (passo.x, passo.y),
+    );
+    let destino_m = pixels_para_metros(deslocado.posicao);
+    if ValidacaoComandos::validar(
+        &simulacao.0,
+        PEER_ID,
+        "mover",
+        local.seq + 1,
+        local.request_id + 1,
+        Some(destino_m),
+    )
+    .is_err()
+    {
+        return;
+    }
+    local.intencao = deslocado.posicao;
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "mover".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(destino_m),
+    });
 }
 
 /// Agenda a construção de uma barreira no ponto atual ao pressionar `B`.
@@ -656,13 +722,12 @@ fn solicitar_barreira(
 
     local.seq += 1;
     local.request_id += 1;
-    let (x, y) = jogador.0.posicao;
     simulacao.0.agendar_comando(Comando {
         peer_id: PEER_ID,
         acao: "construir_barreira".to_owned(),
         seq: local.seq,
         request_id: local.request_id,
-        destino: Some((f64::from(x), f64::from(y))),
+        destino: Some(pixels_para_metros(jogador.0.posicao)),
     });
 }
 
@@ -683,13 +748,52 @@ fn solicitar_coleta(
 
     local.seq += 1;
     local.request_id += 1;
-    let (x, y) = jogador.0.posicao;
     simulacao.0.agendar_comando(Comando {
         peer_id: PEER_ID,
         acao: "coletar_materiais".to_owned(),
         seq: local.seq,
         request_id: local.request_id,
-        destino: Some((f64::from(x), f64::from(y))),
+        destino: Some(pixels_para_metros(jogador.0.posicao)),
+    });
+}
+
+/// Agenda a coleta eficiente no ponto atual ao pressionar `K`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_coleta_eficiente(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyK) {
+        return;
+    }
+
+    let destino = pixels_para_metros(jogador.0.posicao);
+    if ValidacaoComandos::validar(
+        &simulacao.0,
+        PEER_ID,
+        "coleta_eficiente",
+        local.seq + 1,
+        local.request_id + 1,
+        Some(destino),
+    )
+    .is_err()
+    {
+        return;
+    }
+
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "coleta_eficiente".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(destino),
     });
 }
 
@@ -710,13 +814,12 @@ fn solicitar_ponte(
 
     local.seq += 1;
     local.request_id += 1;
-    let (x, y) = jogador.0.posicao;
     simulacao.0.agendar_comando(Comando {
         peer_id: PEER_ID,
         acao: "construir_ponte".to_owned(),
         seq: local.seq,
         request_id: local.request_id,
-        destino: Some((f64::from(x), f64::from(y))),
+        destino: Some(pixels_para_metros(jogador.0.posicao)),
     });
 }
 
@@ -737,13 +840,12 @@ fn solicitar_propaganda(
 
     local.seq += 1;
     local.request_id += 1;
-    let (x, y) = jogador.0.posicao;
     simulacao.0.agendar_comando(Comando {
         peer_id: PEER_ID,
         acao: "propaganda".to_owned(),
         seq: local.seq,
         request_id: local.request_id,
-        destino: Some((f64::from(x), f64::from(y))),
+        destino: Some(pixels_para_metros(jogador.0.posicao)),
     });
 }
 
@@ -775,14 +877,54 @@ fn solicitar_ataque(
     });
 }
 
+/// Agenda vandalismo ao alvo de treino ao pressionar `H`.
+///
+/// Ação de protótipo `[HIPÓTESE]` do Agitador; o alvo é o mesmo scaffolding
+/// não-canônico de `ALVO_TREINO_POSICAO`, dentro do alcance de contato de 2 m.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_vandalismo(
+    teclado: Res<ButtonInput<KeyCode>>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyH) {
+        return;
+    }
+
+    if ValidacaoComandos::validar(
+        &simulacao.0,
+        PEER_ID,
+        "vandalismo",
+        local.seq + 1,
+        local.request_id + 1,
+        Some(ALVO_TREINO_POSICAO),
+    )
+    .is_err()
+    {
+        return;
+    }
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "vandalismo".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(ALVO_TREINO_POSICAO),
+    });
+}
+
 /// Devolve a posição do Nó mais próximo do jogador, com desempate pelo menor `id`.
 ///
 /// A distância euclidiana ao quadrado preserva a ordem da distância e `total_cmp`
 /// mantém a comparação determinística sem raiz quadrada. As posições dos Nós são
 /// simplificação de protótipo `[HIPÓTESE]` da simulação.
 #[must_use]
-fn posicao_no_mais_proximo(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, f64)> {
-    let (x, y) = (f64::from(jogador.0), f64::from(jogador.1));
+fn posicao_no_mais_proximo(mundo: &Mundo, jogador: (f64, f64)) -> Option<(f64, f64)> {
+    let (x, y) = jogador;
     mundo
         .nos
         .values()
@@ -808,9 +950,40 @@ fn solicitar_propaganda_no(
     if !teclado.just_pressed(KeyCode::KeyR) {
         return;
     }
-    let Some(destino) = posicao_no_mais_proximo(&simulacao.0, jogador.0.posicao) else {
+    let Some(destino) =
+        posicao_no_mais_proximo(&simulacao.0, pixels_para_metros(jogador.0.posicao))
+    else {
         return;
     };
+    let Some(ancorado) = aproximar_no(
+        pixels_para_metros(jogador.0.posicao),
+        destino,
+        TOLERANCIA_NO_M,
+    ) else {
+        return;
+    };
+    local.intencao = metros_para_pixels(ancorado);
+    if ValidacaoComandos::validar(
+        &simulacao.0,
+        PEER_ID,
+        "mover",
+        local.seq + 1,
+        local.request_id + 1,
+        Some(ancorado),
+    )
+    .is_err()
+    {
+        return;
+    }
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "mover".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(ancorado),
+    });
     local.seq += 1;
     local.request_id += 1;
     simulacao.0.agendar_comando(Comando {
@@ -836,9 +1009,40 @@ fn solicitar_atacar_no(
     if !teclado.just_pressed(KeyCode::KeyF) {
         return;
     }
-    let Some(destino) = posicao_no_mais_proximo(&simulacao.0, jogador.0.posicao) else {
+    let Some(destino) =
+        posicao_no_mais_proximo(&simulacao.0, pixels_para_metros(jogador.0.posicao))
+    else {
         return;
     };
+    let Some(ancorado) = aproximar_no(
+        pixels_para_metros(jogador.0.posicao),
+        destino,
+        TOLERANCIA_NO_M,
+    ) else {
+        return;
+    };
+    local.intencao = metros_para_pixels(ancorado);
+    if ValidacaoComandos::validar(
+        &simulacao.0,
+        PEER_ID,
+        "mover",
+        local.seq + 1,
+        local.request_id + 1,
+        Some(ancorado),
+    )
+    .is_err()
+    {
+        return;
+    }
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "mover".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(ancorado),
+    });
     local.seq += 1;
     local.request_id += 1;
     simulacao.0.agendar_comando(Comando {
@@ -854,8 +1058,8 @@ fn solicitar_atacar_no(
 ///
 /// A comparação usa distância ao quadrado e `total_cmp` para permanecer determinística.
 #[must_use]
-fn posicao_pnj_mais_proximo(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, f64)> {
-    let (x, y) = (f64::from(jogador.0), f64::from(jogador.1));
+fn posicao_pnj_mais_proximo(mundo: &Mundo, jogador: (f64, f64)) -> Option<(f64, f64)> {
+    let (x, y) = jogador;
     mundo
         .pnjs
         .values()
@@ -873,8 +1077,8 @@ fn posicao_pnj_mais_proximo(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, 
 /// A distância ao quadrado preserva a ordem sem raiz e `total_cmp` mantém o
 /// desempate determinístico pelo menor `id`.
 #[must_use]
-fn posicao_analise_materialista(mundo: &Mundo, jogador: (f32, f32)) -> Option<(f64, f64)> {
-    let (x, y) = (f64::from(jogador.0), f64::from(jogador.1));
+fn posicao_analise_materialista(mundo: &Mundo, jogador: (f64, f64)) -> Option<(f64, f64)> {
+    let (x, y) = jogador;
     let alcance2 = ALCANCE_ANALISE_MATERIALISTA_M.powi(2);
     mundo
         .pnjs
@@ -906,7 +1110,9 @@ fn solicitar_atacar_pnj(
     if !teclado.just_pressed(KeyCode::KeyT) {
         return;
     }
-    let Some(destino) = posicao_pnj_mais_proximo(&simulacao.0, jogador.0.posicao) else {
+    let Some(destino) =
+        posicao_pnj_mais_proximo(&simulacao.0, pixels_para_metros(jogador.0.posicao))
+    else {
         return;
     };
     local.seq += 1;
@@ -920,10 +1126,50 @@ fn solicitar_atacar_pnj(
     });
 }
 
-/// Agenda `analise_materialista` no PNJ ativo mais próximo ao pressionar `E`.
+/// Informa se o papel do jogador local é Artesão no espelho autoritativo.
+#[must_use]
+fn jogador_e_artesao(mundo: &Mundo) -> bool {
+    mundo
+        .jogadores
+        .get(&PEER_ID)
+        .is_none_or(|jogador| jogador.funcao == Funcao::Artesao)
+}
+
+/// Agenda `armadilha` na própria posição ao pressionar `E` sendo Artesão.
 ///
-/// Sem alvo dentro de 12 m, nenhum comando é agendado e os contadores locais
-/// permanecem intactos; o núcleo valida Fôlego, nível e recarga.
+/// O núcleo valida nível, alcance, Fôlego, Materiais e recarga; aqui apenas
+/// montamos o comando com `seq` e `request_id` monotônicos locais.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_armadilha(
+    teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::KeyE) || !jogador_e_artesao(&simulacao.0) {
+        return;
+    }
+    local.seq += 1;
+    local.request_id += 1;
+    simulacao.0.agendar_comando(Comando {
+        peer_id: PEER_ID,
+        acao: "armadilha".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: Some(pixels_para_metros(jogador.0.posicao)),
+    });
+}
+
+/// Agenda `analise_materialista` no PNJ ativo mais próximo ao pressionar `Y`,
+/// ou `E` quando o jogador não é Artesão.
+///
+/// `E` permanece contextual — Artesão arma armadilha — enquanto `Y` força a
+/// análise em qualquer papel, inclusive no simulador, onde todos começam como
+/// Artesão. Sem alvo dentro de 12 m, nenhum comando é agendado e os contadores
+/// locais permanecem intactos; o núcleo valida Fôlego, nível e recarga.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
@@ -934,10 +1180,13 @@ fn solicitar_analise_materialista(
     mut local: ResMut<ComandoLocal>,
     mut simulacao: ResMut<Simulacao>,
 ) {
-    if !teclado.just_pressed(KeyCode::KeyE) {
+    let contextual = teclado.just_pressed(KeyCode::KeyE) && !jogador_e_artesao(&simulacao.0);
+    if !contextual && !teclado.just_pressed(KeyCode::KeyY) {
         return;
     }
-    let Some(destino) = posicao_analise_materialista(&simulacao.0, jogador.0.posicao) else {
+    let Some(destino) =
+        posicao_analise_materialista(&simulacao.0, pixels_para_metros(jogador.0.posicao))
+    else {
         return;
     };
     local.seq += 1;
@@ -958,12 +1207,12 @@ fn solicitar_analise_materialista(
 /// sem o próprio jogador ativo no espelho, não há alvo. A comparação usa
 /// distância ao quadrado e `total_cmp` para permanecer determinística.
 #[must_use]
-fn destino_escudo(mundo: &Mundo) -> Option<(f64, f64)> {
+fn destino_escudo(mundo: &Mundo, posicao_m: (f64, f64)) -> Option<(f64, f64)> {
     let origem = mundo.jogadores.get(&PEER_ID)?;
     if origem.vida <= 0 {
         return None;
     }
-    let (x, y) = origem.posicao;
+    let (x, y) = posicao_m;
     let alcance2 = ALCANCE_ESCUDO_M.powi(2);
     let aliado = mundo
         .jogadores
@@ -986,7 +1235,7 @@ fn destino_escudo(mundo: &Mundo) -> Option<(f64, f64)> {
             da.total_cmp(&db).then_with(|| id_a.cmp(id_b))
         })
         .map(|(_, jogador)| jogador.posicao);
-    Some(aliado.unwrap_or(origem.posicao))
+    Some(aliado.unwrap_or(posicao_m))
 }
 
 /// Agenda o Escudo de Milícia no aliado ativo mais próximo ao pressionar `V`.
@@ -999,13 +1248,14 @@ fn destino_escudo(mundo: &Mundo) -> Option<(f64, f64)> {
 )]
 fn solicitar_escudo(
     teclado: Res<ButtonInput<KeyCode>>,
+    jogador: Res<JogadorLocal>,
     mut local: ResMut<ComandoLocal>,
     mut simulacao: ResMut<Simulacao>,
 ) {
     if !teclado.just_pressed(KeyCode::KeyV) {
         return;
     }
-    let Some(destino) = destino_escudo(&simulacao.0) else {
+    let Some(destino) = destino_escudo(&simulacao.0, pixels_para_metros(jogador.0.posicao)) else {
         return;
     };
     local.seq += 1;
@@ -1016,6 +1266,48 @@ fn solicitar_escudo(
         seq: local.seq,
         request_id: local.request_id,
         destino: Some(destino),
+    });
+}
+
+/// Agenda `sinalizar_sincronia` ao pressionar `Espaço`, sem destino.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
+)]
+fn solicitar_sincronia(
+    teclado: Res<ButtonInput<KeyCode>>,
+    mut local: ResMut<ComandoLocal>,
+    mut simulacao: ResMut<Simulacao>,
+) {
+    if !teclado.just_pressed(KeyCode::Space) {
+        return;
+    }
+    let peer = local.proximo_peer_sinal;
+    if ValidacaoComandos::validar(
+        &simulacao.0,
+        peer,
+        "sinalizar_sincronia",
+        local.seq + 1,
+        local.request_id + 1,
+        None,
+    )
+    .is_err()
+    {
+        return;
+    }
+    local.seq += 1;
+    local.request_id += 1;
+    local.proximo_peer_sinal = match peer {
+        PEER_ID => PEER_ALVO_TREINO,
+        PEER_ALVO_TREINO => PEER_SINAL_3,
+        _ => PEER_ID,
+    };
+    simulacao.0.agendar_comando(Comando {
+        peer_id: peer,
+        acao: "sinalizar_sincronia".to_owned(),
+        seq: local.seq,
+        request_id: local.request_id,
+        destino: None,
     });
 }
 
@@ -1034,17 +1326,16 @@ fn sincronizar_avatar(
     }
 }
 
-/// Mantém o espelho da simulação alinhado ao estado local.
+/// Mantém o estado local alinhado à posição autoritativa do espelho.
 #[expect(
     clippy::needless_pass_by_value,
     reason = "Bevy 0.20 SystemParam exige Res<T> por valor; &Res<T> nao implementa SystemParam"
 )]
-fn sincronizar_sim(jogador: Res<JogadorLocal>, mut simulacao: ResMut<Simulacao>) {
-    let Some(remoto) = simulacao.0.jogadores.get_mut(&PEER_ID) else {
+fn sincronizar_sim(mut jogador: ResMut<JogadorLocal>, simulacao: Res<Simulacao>) {
+    let Some(remoto) = simulacao.0.jogadores.get(&PEER_ID) else {
         return;
     };
-    let (x, y) = jogador.0.posicao;
-    remoto.posicao = (f64::from(x), f64::from(y));
+    jogador.0.posicao = metros_para_pixels(remoto.posicao);
 }
 
 /// Avança a simulação em passos fixos, com teto de quatro ticks por frame.
@@ -1110,68 +1401,127 @@ fn contar_pnjs_analisados(simulacao: &Simulacao) -> usize {
         .count()
 }
 
-/// Dica de teclas exibida no rodapé da HUD; `V` ergue o escudo.
+/// Valores exibidos no painel, coletados do espelho autoritativo e do jogador.
+struct DadosHud {
+    x: f32,
+    y: f32,
+    ilha: &'static str,
+    funcao: &'static str,
+    nivel: u8,
+    suprimentos: i64,
+    materiais: i64,
+    folego: i64,
+    escudo_pv: i64,
+    escudo_ticks: i64,
+    silenciado_ticks: i64,
+    vandalismo_recarga_ticks: i64,
+    coleta_eficiente_ticks: i64,
+    coleta_eficiente_recarga_ticks: i64,
+    vida: i64,
+    vida_alvo: i64,
+    pnjs: usize,
+    analise: usize,
+    autogestao: i64,
+    barreiras: usize,
+    pontes: usize,
+    armadilhas: usize,
+    suditos: usize,
+    resistencia: i64,
+    nos_convertidos: usize,
+    ilhas_controladas: usize,
+    sinais: usize,
+    sincronias: u64,
+    resultado: String,
+    construindo: String,
+    coletando: String,
+}
+
+/// Reúne em uma passagem os dados exibidos pela HUD, sem efeitos colaterais.
+#[must_use]
+fn coletar_dados_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> DadosHud {
+    let (x, y) = jogador.0.posicao;
+    let remoto = simulacao.0.jogadores.get(&PEER_ID);
+    let (construindo, coletando) = texto_progresso(simulacao);
+    DadosHud {
+        x,
+        y,
+        ilha: ilha_em((x, y)).map_or("nenhuma", |atual| atual.nome),
+        funcao: remoto.map_or("Artesão", |j| j.funcao.nome()),
+        nivel: remoto.map_or(1, |j| j.nivel),
+        suprimentos: remoto.map_or(0, |j| j.suprimentos),
+        materiais: remoto.map_or(0, |j| j.materiais),
+        folego: remoto.map_or(0, |j| j.folego),
+        escudo_pv: remoto.map_or(0, |j| j.escudo_pv),
+        escudo_ticks: remoto.map_or(0, |j| j.escudo_ticks),
+        silenciado_ticks: remoto.map_or(0, |j| j.silenciado_ticks),
+        vandalismo_recarga_ticks: remoto.map_or(0, |j| j.vandalismo_recarga_ticks),
+        coleta_eficiente_ticks: remoto.map_or(0, |j| j.coleta_eficiente_ticks),
+        coleta_eficiente_recarga_ticks: remoto.map_or(0, |j| j.coleta_eficiente_recarga_ticks),
+        vida: remoto.map_or(0, |j| j.vida),
+        vida_alvo: simulacao
+            .0
+            .jogadores
+            .get(&PEER_ALVO_TREINO)
+            .map_or(0, |alvo| alvo.vida),
+        pnjs: simulacao.0.pnjs.values().filter(|pnj| pnj.ativo).count(),
+        analise: contar_pnjs_analisados(simulacao),
+        autogestao: remoto.map_or(0, |j| j.pontos_autogestao),
+        barreiras: simulacao
+            .0
+            .barreiras
+            .values()
+            .filter(|barreira| barreira.dono == PEER_ID)
+            .count(),
+        pontes: simulacao
+            .0
+            .pontes
+            .values()
+            .filter(|ponte| ponte.dono == PEER_ID)
+            .count(),
+        armadilhas: simulacao
+            .0
+            .armadilhas
+            .values()
+            .filter(|armadilha| armadilha.dono == PEER_ID)
+            .count(),
+        suditos: simulacao
+            .0
+            .suditos
+            .values()
+            .filter(|sudito| sudito.convertido)
+            .count(),
+        ilhas_controladas: simulacao
+            .0
+            .ilhas
+            .values()
+            .filter(|ilha| ilha.controlada)
+            .count(),
+        resistencia: simulacao.0.resistencia_ideologica,
+        nos_convertidos: simulacao.0.nos.values().filter(|no| no.convertido).count(),
+        sinais: simulacao.0.sinais.len(),
+        sincronias: simulacao.0.sincronias_iniciadas,
+        resultado: texto_resultado(simulacao),
+        construindo,
+        coletando,
+    }
+}
+
+/// Dica de teclas exibida no rodapé da HUD; `Y` força análise e `V` ergue o escudo.
 const DICA_TECLAS: &str = concat!(
     "WASD ou setas para mover · B para construir barreira · P para construir ponte · ",
     "C para coletar materiais · G para propaganda · R para propaganda no Nó · ",
     "F para atacar o Nó · Aproxime-se do alvo e use Q para atacar · ",
-    "T para atacar o PNJ mais próximo · E para analisar o PNJ mais próximo · V para erguer escudo"
+    "H para vandalismo (Agitador, protótipo) · ",
+    "K para coleta eficiente (Camponês, protótipo) · ",
+    "T para atacar o PNJ mais próximo · E para armadilha (Artesão) ou analisar o PNJ ",
+    "mais próximo · Y para analisar em qualquer papel · V para erguer escudo · ",
+    "Espaço para sinalizar sincronia"
 );
 
 /// Monta o texto do painel a partir do estado local e do espelho da simulação.
 #[must_use]
 fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
-    let (x, y) = jogador.0.posicao;
-    let ilha = if let Some(atual) = ilha_em((x, y)) {
-        atual.nome
-    } else {
-        "nenhuma"
-    };
-    let remoto = simulacao.0.jogadores.get(&PEER_ID);
-    let materiais = remoto.map_or(0, |j| j.materiais);
-    let suprimentos = remoto.map_or(0, |j| j.suprimentos);
-    let autogestao = remoto.map_or(0, |j| j.pontos_autogestao);
-    let folego = remoto.map_or(0, |j| j.folego);
-    let (escudo_pv, escudo_ticks) = remoto.map_or((0, 0), |j| (j.escudo_pv, j.escudo_ticks));
-    let vida = remoto.map_or(0, |j| j.vida);
-    let vida_alvo = if let Some(alvo) = simulacao.0.jogadores.get(&PEER_ALVO_TREINO) {
-        alvo.vida
-    } else {
-        0
-    };
-    let pnjs = simulacao.0.pnjs.values().filter(|pnj| pnj.ativo).count();
-    let analise = contar_pnjs_analisados(simulacao);
-    let funcao = remoto.map_or("Artesão", |j| j.funcao.nome());
-    let nivel = remoto.map_or(1, |j| j.nivel);
-    let barreiras = simulacao
-        .0
-        .barreiras
-        .values()
-        .filter(|barreira| barreira.dono == PEER_ID)
-        .count();
-    let pontes = simulacao
-        .0
-        .pontes
-        .values()
-        .filter(|ponte| ponte.dono == PEER_ID)
-        .count();
-    let suditos = simulacao
-        .0
-        .suditos
-        .values()
-        .filter(|sudito| sudito.convertido)
-        .count();
-    let ilhas_controladas = simulacao
-        .0
-        .ilhas
-        .values()
-        .filter(|ilha| ilha.controlada)
-        .count();
-    let sinais = simulacao.0.sinais.len();
-    let nos_convertidos = simulacao.0.nos.values().filter(|no| no.convertido).count();
-    let resistencia = simulacao.0.resistencia_ideologica;
-    let resultado = texto_resultado(simulacao);
-    let (construindo, coletando) = texto_progresso(simulacao);
+    let dados = coletar_dados_hud(jogador, simulacao);
     format!(
         concat!(
             "INSURGÊNCIA — low-poly\nPosicao: ({x:.0}, {y:.0})\nIlha: {ilha}\n",
@@ -1179,42 +1529,51 @@ fn texto_hud(jogador: &JogadorLocal, simulacao: &Simulacao) -> String {
             "Limites: X +/-{LIMITE_X:.0} · Y +/-{LIMITE_Y:.0}\n",
             "Suprimentos: {suprimentos}\nMateriais: {materiais}\n",
             "Fôlego: {folego}\nEscudo: {escudo_pv} ({escudo_ticks})\n",
+            "Vandalismo: recarga {recarga} · silêncio {silencio}\n",
             "Vida: {vida}\nAlvo: {vida_alvo}\nPNJs: {pnjs}\n",
             "Análise: {analise}\nAutogestão: {autogestao}\nBarreiras: {barreiras}\n",
-            "Pontes: {pontes}\nSúditos: {suditos}\n",
+            "Pontes: {pontes}\nArmadilhas: {armadilhas}\nSúditos: {suditos}\n",
             "Resistência: {resistencia}\nNós: {nos_convertidos}/3\n",
-            "Ilhas: {ilhas_controladas}\nSinais: {sinais}\nResultado: {resultado}\n",
+            "Ilhas: {ilhas_controladas}\nSinais: {sinais}\nSincronias: {sincronias}\n",
+            "Resultado: {resultado}\n",
             "Construindo: {construindo}\nColeta: {coletando}\n",
+            "Coleta eficiente: {buff} (recarga {rec})\n",
             "{dica}"
         ),
-        x = x,
-        y = y,
-        ilha = ilha,
-        funcao = funcao,
-        nivel = nivel,
+        x = dados.x,
+        y = dados.y,
+        ilha = dados.ilha,
+        funcao = dados.funcao,
+        nivel = dados.nivel,
         NIVEL_MAXIMO = NIVEL_MAXIMO,
         LIMITE_X = LIMITE_X,
         LIMITE_Y = LIMITE_Y,
-        suprimentos = suprimentos,
-        materiais = materiais,
-        folego = folego,
-        escudo_pv = escudo_pv,
-        escudo_ticks = escudo_ticks,
-        vida = vida,
-        vida_alvo = vida_alvo,
-        pnjs = pnjs,
-        analise = analise,
-        autogestao = autogestao,
-        barreiras = barreiras,
-        pontes = pontes,
-        suditos = suditos,
-        resistencia = resistencia,
-        nos_convertidos = nos_convertidos,
-        ilhas_controladas = ilhas_controladas,
-        sinais = sinais,
-        resultado = resultado,
-        construindo = construindo,
-        coletando = coletando,
+        suprimentos = dados.suprimentos,
+        materiais = dados.materiais,
+        folego = dados.folego,
+        escudo_pv = dados.escudo_pv,
+        escudo_ticks = dados.escudo_ticks,
+        recarga = dados.vandalismo_recarga_ticks,
+        silencio = dados.silenciado_ticks,
+        vida = dados.vida,
+        vida_alvo = dados.vida_alvo,
+        pnjs = dados.pnjs,
+        analise = dados.analise,
+        autogestao = dados.autogestao,
+        barreiras = dados.barreiras,
+        pontes = dados.pontes,
+        armadilhas = dados.armadilhas,
+        suditos = dados.suditos,
+        resistencia = dados.resistencia,
+        nos_convertidos = dados.nos_convertidos,
+        ilhas_controladas = dados.ilhas_controladas,
+        sinais = dados.sinais,
+        sincronias = dados.sincronias,
+        resultado = dados.resultado,
+        construindo = dados.construindo,
+        coletando = dados.coletando,
+        buff = dados.coleta_eficiente_ticks,
+        rec = dados.coleta_eficiente_recarga_ticks,
         dica = DICA_TECLAS,
     )
 }

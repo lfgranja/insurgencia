@@ -17,6 +17,15 @@ pub const PASSO_SEGUNDOS: f64 = 1.0 / 30.0;
 /// Ticks necessários para concluir uma coleta de materiais (6 s a 30 Hz).
 pub const TICKS_COLETA: i64 = 180;
 
+/// Custo de Fôlego de `coleta_eficiente`: `[HIPÓTESE]`/GDD §10.2:646, protótipo, não cânone.
+pub const CUSTO_COLETA_EFICIENTE_FOLEGO: i64 = 15;
+
+/// Duração do buff de `coleta_eficiente` em ticks (5 s × 30 Hz; `[HIPÓTESE]`/GDD §10.2:646).
+pub const TICKS_BUFF_COLETA_EFICIENTE: i64 = 150;
+
+/// Recarga de `coleta_eficiente` em ticks (10 s × 30 Hz; `[HIPÓTESE]`/GDD §10.2:646).
+pub const RECARGA_COLETA_EFICIENTE_TICKS: i64 = 300;
+
 /// Custo em materiais para construir uma barricada.
 pub const CUSTO_BARREIRA_MATERIAIS: i64 = 20;
 
@@ -59,6 +68,11 @@ pub const TICKS_REVERSAO_SUDITO: i64 = 90;
 /// Ticks contínuos de presença de Súdito convertido para controlar uma ilha
 /// (10 s a 30 Hz; derivação de protótipo, não número canônico).
 pub const TICKS_CONTROLE_ILHA: i64 = 300;
+
+/// Ticks da janela de sincronia cooperativa (5 s × 30 Hz; `[HIPÓTESE]`/GDD
+/// §8/§12, protótipo, não cânone): três peers distintos devem sinalizar dentro
+/// da janela para iniciar o desafio.
+pub const TICKS_JANELA_SINCRONIA: u64 = 150;
 
 /// Limite de ticks da partida: 20 min a 30 Hz (`[HIPÓTESE]`/protótipo, não cânone).
 pub const TICKS_LIMITE_PARTIDA: i64 = 36_000;
@@ -138,6 +152,17 @@ pub const CUSTO_ATAQUE_FORTE: i64 = CUSTO_ATAQUE_FOLEGO;
 
 /// Nome alternativo do dano na spec 047 (`[HIPÓTESE]`/protótipo, não cânone).
 pub const DANO_ATAQUE_FORTE: i64 = DANO_ATAQUE;
+/// Custo de Fôlego de `vandalismo` (`[HIPÓTESE]`/protótipo, não cânone).
+pub const CUSTO_VANDALISMO_FOLEGO: i64 = 20;
+
+/// Dano de `vandalismo` (`[HIPÓTESE]`/protótipo, não cânone).
+pub const DANO_VANDALISMO: i64 = 120;
+
+/// Ticks de silêncio imposto por `vandalismo` (`[HIPÓTESE]`/protótipo, não cânone).
+pub const TICKS_SILENCIO_VANDALISMO: i64 = 45;
+
+/// Recarga de `vandalismo` em ticks (`[HIPÓTESE]`/protótipo, não cânone).
+pub const RECARGA_VANDALISMO_TICKS: i64 = 210;
 
 /// Custo de Fôlego de `analise_materialista` (`[HIPÓTESE]`/GDD §10.2:554-559, protótipo).
 pub const CUSTO_ANALISE_MATERIALISTA: i64 = 20;
@@ -181,6 +206,33 @@ pub const ALCANCE_ESCUDO_M: f64 = 3.0;
 /// percentual não é aplicado neste corte (fora da `DoD`).
 pub const RESISTENCIA_CONTINUA_ESCUDO_PERCENT: i64 = 15;
 
+/// Custo de Fôlego de `armadilha` (`[HIPÓTESE]`/GDD §10.3:588, não cânone).
+pub const CUSTO_ARMADILHA_FOLEGO: i64 = 25;
+
+/// Custo de Materiais de `armadilha` (`[HIPÓTESE]`/GDD §10.3:588, não cânone).
+pub const CUSTO_ARMADILHA_MATERIAIS: i64 = 5;
+
+/// Alcance de `armadilha`, em metros (`[HIPÓTESE]`/GDD §10.3:588).
+pub const ALCANCE_ARMADILHA_M: f64 = 3.0;
+
+/// Ticks de arme da armadilha (1 s × 30 Hz; `[HIPÓTESE]`/protótipo).
+pub const TICKS_ARMAR_ARMADILHA: i64 = 30;
+
+/// Raio de ativação da armadilha, em metros (`[HIPÓTESE]`/GDD §10.3:588).
+pub const RAIO_ARMADILHA_M: f64 = 1.0;
+
+/// Ticks de imobilização causada pela armadilha (2 s × 30 Hz; `[HIPÓTESE]`).
+pub const TICKS_IMOBILIZACAO_ARMADILHA: i64 = 60;
+
+/// Duração da armadilha em ticks (60 s × 30 Hz; `[HIPÓTESE]`/protótipo).
+pub const TICKS_DURACAO_ARMADILHA: i64 = 1800;
+
+/// Número máximo de armadilhas ativas por jogador (`[HIPÓTESE]`/GDD §10.3).
+pub const MAX_ARMADILHAS_POR_JOGADOR: usize = 3;
+
+/// Recarga de `armadilha` em ticks (14 s × 30 Hz; `[HIPÓTESE]`/GDD §10.3).
+pub const RECARGA_ARMADILHA_TICKS: i64 = 420;
+
 /// Distância máxima de um comando `mover`, em metros.
 const LIMITE_MOVIMENTO_M: f64 = 1.0;
 
@@ -192,6 +244,7 @@ pub const ACOES_PERMITIDAS: &[&str] = &[
     "sinalizar_sincronia",
     "sinalizar_alavanca",
     "coletar_materiais",
+    "coleta_eficiente",
     "construir_barreira",
     "atacar_forte",
     "construir_ponte",
@@ -201,6 +254,8 @@ pub const ACOES_PERMITIDAS: &[&str] = &[
     "atacar_pnj",
     "analise_materialista",
     "escudo",
+    "armadilha",
+    "vandalismo",
 ];
 
 /// Compara dois pontos sem depender de tolerância de arredondamento.
@@ -214,7 +269,7 @@ fn ponto_igual(a: (f64, f64), b: (f64, f64)) -> bool {
 fn nivel_minimo_para_acao(acao: &str) -> u8 {
     match acao {
         "construir_barreira" | "construir_ponte" | "escudo" => 2,
-        "propaganda" | "propaganda_no" | "analise_materialista" => 3,
+        "propaganda" | "propaganda_no" | "analise_materialista" | "armadilha" => 3,
         "atacar_no" => 6,
         _ => 1,
     }
@@ -223,10 +278,18 @@ fn nivel_minimo_para_acao(acao: &str) -> u8 {
 /// Indica se a ação exige coordenadas de destino no comando.
 ///
 /// Somente `sinalizar_sincronia` e `sinalizar_alavanca` dispensam destino;
-/// as outras 11 ações canônicas exigem coordenadas.
+/// as outras 14 ações do contrato exigem coordenadas.
 #[must_use]
 pub fn acao_exige_destino(acao: &str) -> bool {
     !matches!(acao, "sinalizar_sincronia" | "sinalizar_alavanca")
+}
+
+/// Ações bloqueadas enquanto o jogador está silenciado (`[HIPÓTESE]`/protótipo).
+fn acao_bloqueada_por_silencio(acao: &str) -> bool {
+    matches!(
+        acao,
+        "sinalizar_sincronia" | "propaganda" | "propaganda_no" | "vandalismo"
+    )
 }
 
 /// Origem do alvo de Nó fixado no jogador.
@@ -332,6 +395,20 @@ pub struct Jogador {
     pub escudo_recarga_ticks: i64,
     /// `peer_id` do jogador protegido pelo escudo ativo; `None` quando expirado.
     pub escudo_alvo: Option<u64>,
+    /// Equipe do jogador; armadilhas não ativam aliados da mesma equipe.
+    pub equipe: u8,
+    /// Ticks restantes de recarga de `armadilha`; zero quando disponível.
+    pub armadilha_recarga_ticks: i64,
+    /// Ticks restantes de imobilização; enquanto positivo, `mover` é ignorado.
+    pub imobilizado_ticks: i64,
+    /// Ticks restantes de silêncio; bloqueia sinalização, propaganda e vandalismo.
+    pub silenciado_ticks: i64,
+    /// Ticks restantes de recarga de `vandalismo`; zero quando disponível.
+    pub vandalismo_recarga_ticks: i64,
+    /// Ticks restantes do buff de `coleta_eficiente`; zero quando inativo.
+    pub coleta_eficiente_ticks: i64,
+    /// Ticks restantes de recarga de `coleta_eficiente`; zero quando disponível.
+    pub coleta_eficiente_recarga_ticks: i64,
 }
 
 /// Barricada ativa no mundo, identificada por `id`.
@@ -363,6 +440,21 @@ pub struct Ponte {
     /// Pontos de vida restantes; zero ou menos destrói a ponte.
     pub pv: i64,
     /// Ticks restantes de duração; zero expira a ponte.
+    pub ticks_restantes: i64,
+}
+
+/// Armadilha improvisada ativa no mundo, identificada por `id`.
+#[derive(Clone, Debug)]
+pub struct Armadilha {
+    /// Identificador monotônico da armadilha.
+    pub id: u64,
+    /// `peer_id` do jogador que armou a armadilha.
+    pub dono: u64,
+    /// Posição no plano `(x, y)` onde a armadilha foi armada.
+    pub posicao: (f64, f64),
+    /// Ticks restantes de arme; zero permite a ativação por inimigo.
+    pub ticks_armar: i64,
+    /// Ticks restantes de duração; zero expira a armadilha.
     pub ticks_restantes: i64,
 }
 
@@ -452,8 +544,8 @@ pub struct Comando {
     pub seq: i64,
     /// Identificador de requisição monotônico do comando.
     pub request_id: i64,
-    /// Destino opcional, usado por `mover`, `coletar_materiais`,
-    /// `construir_barreira`, `construir_ponte`, `propaganda` e `escudo`.
+    /// Destino opcional, usado por `mover`, `coletar_materiais`, `construir_barreira`,
+    /// `construir_ponte`, `propaganda`, `escudo` e `armadilha`.
     pub destino: Option<(f64, f64)>,
 }
 
@@ -480,6 +572,10 @@ pub struct Mundo {
     pub pontes: BTreeMap<u64, Ponte>,
     /// Próximo identificador de ponte, começando em um.
     pub proxima_ponte_id: u64,
+    /// Armadilhas ativas indexadas por `id`, em ordem determinística.
+    pub armadilhas: BTreeMap<u64, Armadilha>,
+    /// Próximo identificador de armadilha, começando em um.
+    pub proxima_armadilha_id: u64,
     /// Súditos indexados por `id`.
     pub suditos: BTreeMap<u64, Sudito>,
     /// PNJs defensores indexados por `id`, em ordem determinística.
@@ -488,6 +584,12 @@ pub struct Mundo {
     pub ilhas: BTreeMap<u64, Ilha>,
     /// Ids das ilhas distintas que emitiram `ilha_perdida`, em ordem crescente.
     pub ilhas_reconquistadas: BTreeSet<u64>,
+    /// Desafios de sincronia cooperativa iniciados no mundo (`[HIPÓTESE]`).
+    pub sincronias_iniciadas: u64,
+    /// Peers distintos que sinalizaram na janela corrente, em ordem crescente.
+    pub sinalizadores_sincronia: BTreeSet<u64>,
+    /// Ticks restantes da janela de sincronia; zero quando nenhuma está aberta.
+    pub sincronia_ticks_restantes: u64,
     /// Nós de Controle indexados por `id`, em ordem determinística.
     pub nos: BTreeMap<u64, NoControle>,
     /// Resistência Ideológica corrente (`[HIPÓTESE]`/protótipo, não cânone).
@@ -508,6 +610,29 @@ impl Default for Mundo {
     }
 }
 
+/// Posições dos três Nós de Controle do espelho local (`[HIPÓTESE]`/protótipo,
+/// não cânone). Coincidem com as posições usadas pelos testes de simulação para
+/// que a vitória seja alcançável sem depender da engine.
+pub const POSICOES_NOS_LOCAIS: [(u64, (f64, f64)); 3] =
+    [(1, (0.5, 0.0)), (2, (1.5, 0.0)), (3, (2.5, 0.0))];
+
+/// Semeia um espelho local mínimo no `Mundo` (`[HIPÓTESE]`/protótipo, não cânone):
+/// quatro ilhas, um Súdito na posição derivada `(0.0, 236.0)` e os três Nós de
+/// Controle em `POSICOES_NOS_LOCAIS`.
+///
+/// Complementa `Mundo::adicionar_ilha`, `Mundo::adicionar_sudito` e
+/// `Mundo::adicionar_no` para que o cliente Bevy possa alcançar a vitória sem o
+/// mapa completo de 12 ilhas. O estado semeado é refletido por `hash_estado`.
+pub fn semear_espelho_local(mundo: &mut Mundo) {
+    for id in 1..=4 {
+        mundo.adicionar_ilha(id);
+    }
+    mundo.adicionar_sudito(1, (0.0, 236.0));
+    for (id, posicao) in POSICOES_NOS_LOCAIS {
+        mundo.adicionar_no(id, posicao);
+    }
+}
+
 impl Mundo {
     /// Cria um mundo zerado, com `epoch` e `match_id` iguais a um.
     #[must_use]
@@ -523,10 +648,15 @@ impl Mundo {
             proxima_barreira_id: 1,
             pontes: BTreeMap::new(),
             proxima_ponte_id: 1,
+            armadilhas: BTreeMap::new(),
+            proxima_armadilha_id: 1,
             suditos: BTreeMap::new(),
             pnjs: BTreeMap::new(),
             ilhas: BTreeMap::new(),
             ilhas_reconquistadas: BTreeSet::new(),
+            sincronias_iniciadas: 0,
+            sinalizadores_sincronia: BTreeSet::new(),
+            sincronia_ticks_restantes: 0,
             sinais: VecDeque::new(),
             ultima_recusa: None,
             nos: BTreeMap::new(),
@@ -550,6 +680,13 @@ impl Mundo {
                 escudo_ticks: 0,
                 escudo_recarga_ticks: 0,
                 escudo_alvo: None,
+                equipe: 0,
+                armadilha_recarga_ticks: 0,
+                imobilizado_ticks: 0,
+                silenciado_ticks: 0,
+                vandalismo_recarga_ticks: 0,
+                coleta_eficiente_ticks: 0,
+                coleta_eficiente_recarga_ticks: 0,
                 seq: 0,
                 request_id: 0,
                 funcao: Funcao::Artesao,
@@ -697,6 +834,57 @@ impl Mundo {
         sudito.reversao_ticks = TICKS_REVERSAO_SUDITO;
     }
 
+    /// Decrementa em um tick a janela de sincronia, quando aberta.
+    fn avancar_sincronias(&mut self) {
+        if self.sincronia_ticks_restantes > 0 {
+            self.sincronia_ticks_restantes -= 1;
+            if self.sincronia_ticks_restantes == 0 {
+                self.sinalizadores_sincronia.clear();
+            }
+        }
+    }
+
+    /// Decrementa em um tick o silêncio e a recarga de vandalismo de cada jogador.
+    fn avancar_vandalismos(&mut self) {
+        for jogador in self.jogadores.values_mut() {
+            jogador.silenciado_ticks = jogador.silenciado_ticks.saturating_sub(1).max(0);
+            jogador.vandalismo_recarga_ticks =
+                jogador.vandalismo_recarga_ticks.saturating_sub(1).max(0);
+        }
+    }
+
+    /// Decrementa em um tick o buff e a recarga de `coleta_eficiente`.
+    fn avancar_coleta_eficiente(&mut self) {
+        for jogador in self.jogadores.values_mut() {
+            jogador.coleta_eficiente_ticks =
+                jogador.coleta_eficiente_ticks.saturating_sub(1).max(0);
+            jogador.coleta_eficiente_recarga_ticks = jogador
+                .coleta_eficiente_recarga_ticks
+                .saturating_sub(1)
+                .max(0);
+        }
+    }
+
+    /// Registra o sinal de um par na janela corrente de sincronia.
+    ///
+    /// A primeira sinalização com a janela zerada abre uma nova janela e
+    /// descarta os sinais anteriores. Três peers distintos na mesma janela
+    /// iniciam o desafio, emitem o sinal e reiniciam a janela.
+    fn registrar_sinalizacao_sincronia(&mut self, peer_id: u64) {
+        if self.sincronia_ticks_restantes == 0 {
+            self.sincronia_ticks_restantes = TICKS_JANELA_SINCRONIA;
+            self.sinalizadores_sincronia.clear();
+        }
+        self.sinalizadores_sincronia.insert(peer_id);
+        if self.sinalizadores_sincronia.len() >= 3 {
+            self.sincronias_iniciadas += 1;
+            self.sinais
+                .push_back(format!("sincronia_iniciada:{}", self.tick));
+            self.sincronia_ticks_restantes = 0;
+            self.sinalizadores_sincronia.clear();
+        }
+    }
+
     /// Decrementa em um tick as reversões em curso, em ordem estável de `id`.
     fn avancar_reversoes(&mut self) {
         let em_reversao: Vec<u64> = self
@@ -767,11 +955,17 @@ impl Mundo {
 
     /// Avança um tick nas fases `prepare`, `skills`, `defesa`, `ataque_pnjs`,
     /// `controle_ilhas`, `vitoria` e `finish`; a derrota é avaliada após o incremento.
+    /// `avancar_armadilhas`, `avancar_sincronias`, `avancar_coleta_eficiente` e
+    /// `avancar_vandalismos` rodam antes de `fase_skills`.
     pub fn avancar_tick(&mut self) {
         let convertidos_no_inicio = self.nos.values().filter(|no| no.convertido).count();
         self.fase_prepare();
         self.avancar_analises_materialistas();
         self.avancar_escudos();
+        self.avancar_armadilhas();
+        self.avancar_sincronias();
+        self.avancar_vandalismos();
+        self.avancar_coleta_eficiente();
         self.fase_skills();
         self.fase_defesa();
         self.fase_ataque_pnjs();
@@ -789,8 +983,10 @@ impl Mundo {
     }
 
     /// Aplica os comandos selecionados ao estado dos jogadores.
+    #[expect(clippy::too_many_lines, reason = "16 ações em ordem fixa no tick")]
     fn fase_skills(&mut self) {
         let mut coleta_avancada: BTreeSet<u64> = BTreeSet::new();
+        let mut ativacoes_coleta: BTreeSet<u64> = BTreeSet::new();
         let mut construcao_avancada: BTreeSet<u64> = BTreeSet::new();
         self.avancar_construcoes_automaticas(&mut construcao_avancada);
         let mut construcao_ponte_avancada: BTreeSet<u64> = BTreeSet::new();
@@ -805,6 +1001,8 @@ impl Mundo {
         let mut ataques_realizados: BTreeSet<u64> = BTreeSet::new();
         let mut analises_realizadas: BTreeSet<u64> = BTreeSet::new();
         let mut escudos_realizados: BTreeSet<u64> = BTreeSet::new();
+        let mut armadilhas_realizadas: BTreeSet<u64> = BTreeSet::new();
+        let mut vandalismos_realizados: BTreeSet<u64> = BTreeSet::new();
 
         for comando in &comandos {
             let mut atualizar_monotonicos = true;
@@ -817,6 +1015,19 @@ impl Mundo {
             };
             if jogador.nivel < nivel_minimo_para_acao(&comando.acao) {
                 self.ultima_recusa = Some(CodigoRecusa::AcaoBloqueada);
+                continue;
+            }
+            if jogador.silenciado_ticks > 0 && acao_bloqueada_por_silencio(&comando.acao) {
+                self.ultima_recusa = Some(CodigoRecusa::AcaoBloqueada);
+                continue;
+            }
+            // Imobilizado não se move: nem a posição nem os monotônicos avançam.
+            if comando.acao == "mover"
+                && self
+                    .jogadores
+                    .get(&comando.peer_id)
+                    .is_some_and(|jogador| jogador.imobilizado_ticks > 0)
+            {
                 continue;
             }
             if comando.acao == "mover" {
@@ -843,6 +1054,9 @@ impl Mundo {
                 self.aplicar_ataque(comando, &mut ataques_realizados);
             } else if comando.acao == "coletar_materiais" {
                 self.aplicar_coleta(comando, &mut coleta_avancada);
+            } else if comando.acao == "coleta_eficiente" {
+                atualizar_monotonicos =
+                    self.aplicar_coleta_eficiente(comando, &mut ativacoes_coleta);
             } else if comando.acao == "construir_barreira" {
                 self.aplicar_construcao(comando, &mut construcao_avancada);
             } else if comando.acao == "construir_ponte" {
@@ -861,6 +1075,13 @@ impl Mundo {
                     self.aplicar_analise_materialista(comando, &mut analises_realizadas);
             } else if comando.acao == "escudo" {
                 atualizar_monotonicos = self.aplicar_escudo(comando, &mut escudos_realizados);
+            } else if comando.acao == "armadilha" {
+                atualizar_monotonicos = self.aplicar_armadilha(comando, &mut armadilhas_realizadas);
+            } else if comando.acao == "vandalismo" {
+                atualizar_monotonicos =
+                    self.aplicar_vandalismo(comando, &mut vandalismos_realizados);
+            } else if comando.acao == "sinalizar_sincronia" {
+                self.registrar_sinalizacao_sincronia(comando.peer_id);
             }
             if atualizar_monotonicos {
                 if let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) {
@@ -918,6 +1139,78 @@ impl Mundo {
         if let Some(vitima) = self.jogadores.get_mut(&alvo) {
             vitima.combate_ticks = TICKS_COMBATE + 1;
         }
+    }
+
+    /// Aplica no máximo um `vandalismo` por atacante a cada tick.
+    ///
+    /// Exige outro jogador exatamente em `destino`, a até `ALCANCE_CONTATO_M`,
+    /// Fôlego suficiente e recarga zerada. A vítima sofre `DANO_VANDALISMO`,
+    /// fica silenciada e perde qualquer canalização em curso. Retorna `true`
+    /// somente quando o dano foi aplicado, para que os monotônicos avancem só
+    /// com comandos aceitos.
+    fn aplicar_vandalismo(&mut self, comando: &Comando, vandalismos: &mut BTreeSet<u64>) -> bool {
+        let Some(destino) = comando.destino else {
+            return false;
+        };
+        let Some((origem, folego, recarga, silenciado)) =
+            self.jogadores.get(&comando.peer_id).map(|jogador| {
+                (
+                    jogador.posicao,
+                    jogador.folego,
+                    jogador.vandalismo_recarga_ticks,
+                    jogador.silenciado_ticks,
+                )
+            })
+        else {
+            return false;
+        };
+        if silenciado > 0 || recarga > 0 {
+            return false;
+        }
+        let alvo = self
+            .jogadores
+            .iter()
+            .find(|(&peer_id, jogador)| {
+                peer_id != comando.peer_id && ponto_igual(jogador.posicao, destino)
+            })
+            .map(|(&peer_id, _)| peer_id);
+        let Some(alvo) = alvo else {
+            return false;
+        };
+        if (destino.0 - origem.0).hypot(destino.1 - origem.1) > ALCANCE_CONTATO_M
+            || folego < CUSTO_VANDALISMO_FOLEGO
+        {
+            return false;
+        }
+        // A cota só é consumida por um vandalismo válido: um comando recusado não
+        // pode suprimir um vandalismo válido do mesmo atacante neste tick.
+        if !vandalismos.insert(comando.peer_id) {
+            return false;
+        }
+        if let Some(atacante) = self.jogadores.get_mut(&comando.peer_id) {
+            atacante.folego = atacante.folego.saturating_sub(CUSTO_VANDALISMO_FOLEGO);
+            atacante.vandalismo_recarga_ticks = RECARGA_VANDALISMO_TICKS;
+            // A unidade extra é consumida por `fase_finish` no próprio tick da ação.
+            atacante.combate_ticks = TICKS_COMBATE + 1;
+        }
+        let _ = self.aplicar_dano_a_jogador(alvo, DANO_VANDALISMO);
+        if let Some(vitima) = self.jogadores.get_mut(&alvo) {
+            vitima.silenciado_ticks = TICKS_SILENCIO_VANDALISMO;
+            vitima.combate_ticks = TICKS_COMBATE + 1;
+            vitima.coleta_ticks = 0;
+            vitima.coleta_ponto = None;
+            vitima.construcao_ticks = 0;
+            vitima.construcao_ponto = None;
+            vitima.ponte_ticks = 0;
+            vitima.ponte_ponto = None;
+            if let Some(id) = vitima.propaganda_alvo.take() {
+                if let Some(sudito) = self.suditos.get_mut(&id) {
+                    sudito.propaganda_ticks = 0;
+                }
+            }
+            vitima.no_alvo = None;
+        }
+        true
     }
 
     /// Aplica no máximo um `atacar_pnj` por atacante a cada tick.
@@ -1043,6 +1336,59 @@ impl Mundo {
         true
     }
 
+    /// Arma uma armadilha no destino, no máximo uma vez por conjurador por tick.
+    ///
+    /// Exige `destino` a até `ALCANCE_ARMADILHA_M` (3 m), Fôlego e Materiais
+    /// suficientes, recarga zerada e menos de `MAX_ARMADILHAS_POR_JOGADOR`
+    /// armadilhas ativas do conjurador. Retorna `true` somente quando a
+    /// armadilha foi criada, para que os monotônicos avancem só em comando aceito.
+    fn aplicar_armadilha(&mut self, comando: &Comando, armadilhas: &mut BTreeSet<u64>) -> bool {
+        let Some(destino) = comando.destino else {
+            return false;
+        };
+        let Some(jogador) = self.jogadores.get(&comando.peer_id) else {
+            return false;
+        };
+        let distancia = (destino.0 - jogador.posicao.0).hypot(destino.1 - jogador.posicao.1);
+        if distancia > ALCANCE_ARMADILHA_M
+            || jogador.folego < CUSTO_ARMADILHA_FOLEGO
+            || jogador.materiais < CUSTO_ARMADILHA_MATERIAIS
+            || jogador.armadilha_recarga_ticks > 0
+            || self
+                .armadilhas
+                .values()
+                .filter(|armadilha| armadilha.dono == comando.peer_id)
+                .count()
+                >= MAX_ARMADILHAS_POR_JOGADOR
+        {
+            return false;
+        }
+        // A cota só é consumida depois de todas as guardas, como em `aplicar_escudo`.
+        if !armadilhas.insert(comando.peer_id) {
+            return false;
+        }
+        let id = self.proxima_armadilha_id;
+        self.proxima_armadilha_id = self.proxima_armadilha_id.saturating_add(1);
+        self.armadilhas.insert(
+            id,
+            Armadilha {
+                id,
+                dono: comando.peer_id,
+                posicao: destino,
+                ticks_armar: TICKS_ARMAR_ARMADILHA,
+                ticks_restantes: TICKS_DURACAO_ARMADILHA,
+            },
+        );
+        if let Some(conjurador) = self.jogadores.get_mut(&comando.peer_id) {
+            conjurador.folego = conjurador.folego.saturating_sub(CUSTO_ARMADILHA_FOLEGO);
+            conjurador.materiais = conjurador
+                .materiais
+                .saturating_sub(CUSTO_ARMADILHA_MATERIAIS);
+            conjurador.armadilha_recarga_ticks = RECARGA_ARMADILHA_TICKS;
+        }
+        true
+    }
+
     /// Decrementa uma vez por tick marcas e recargas, em ordem estável de
     /// `id` dos PNJs e `peer_id` dos jogadores (`[HIPÓTESE]`/protótipo).
     fn avancar_analises_materialistas(&mut self) {
@@ -1075,6 +1421,65 @@ impl Mundo {
             jogador.escudo_recarga_ticks = recarga_anterior.saturating_sub(1).max(0);
             if recarga_anterior > 0 && jogador.escudo_recarga_ticks == 0 {
                 jogador.escudo_alvo = None;
+            }
+        }
+    }
+
+    /// Decrementa arme, duração, recarga e imobilização em um tick e dispara
+    /// armadilhas prontas contra inimigos a até `RAIO_ARMADILHA_M`.
+    ///
+    /// A ordem é a de `id` das armadilhas e de `peer_id` dos jogadores. Aliados
+    /// (mesma `equipe` do dono) atravessam a armadilha sem ativá-la; ao disparar,
+    /// a armadilha é removida e o inimigo fica imobilizado por 60 ticks.
+    fn avancar_armadilhas(&mut self) {
+        for jogador in self.jogadores.values_mut() {
+            jogador.armadilha_recarga_ticks =
+                jogador.armadilha_recarga_ticks.saturating_sub(1).max(0);
+            jogador.imobilizado_ticks = jogador.imobilizado_ticks.saturating_sub(1).max(0);
+        }
+        let ids: Vec<u64> = self.armadilhas.keys().copied().collect();
+        let mut disparos: Vec<(u64, Option<u64>)> = Vec::new();
+        for id in ids {
+            let Some(armadilha) = self.armadilhas.get_mut(&id) else {
+                continue;
+            };
+            if armadilha.ticks_restantes > 0 {
+                armadilha.ticks_restantes -= 1;
+            }
+            if armadilha.ticks_restantes == 0 {
+                disparos.push((id, None));
+                continue;
+            }
+            if armadilha.ticks_armar > 0 {
+                armadilha.ticks_armar -= 1;
+                if armadilha.ticks_armar > 0 {
+                    continue;
+                }
+            }
+            let Some(equipe_dono) = self.jogadores.get(&armadilha.dono).map(|j| j.equipe) else {
+                continue;
+            };
+            let posicao = armadilha.posicao;
+            let vitima = self
+                .jogadores
+                .iter()
+                .find(|(&peer_id, jogador)| {
+                    peer_id != armadilha.dono
+                        && jogador.equipe != equipe_dono
+                        && (jogador.posicao.0 - posicao.0).hypot(jogador.posicao.1 - posicao.1)
+                            <= RAIO_ARMADILHA_M
+                })
+                .map(|(&peer_id, _)| peer_id);
+            if let Some(peer_id) = vitima {
+                disparos.push((id, Some(peer_id)));
+            }
+        }
+        for (id, vitima) in disparos {
+            self.armadilhas.remove(&id);
+            if let Some(peer_id) = vitima {
+                if let Some(jogador) = self.jogadores.get_mut(&peer_id) {
+                    jogador.imobilizado_ticks = TICKS_IMOBILIZACAO_ARMADILHA;
+                }
             }
         }
     }
@@ -1203,11 +1608,44 @@ impl Mundo {
             _ => 0,
         };
         jogador.coleta_ponto = Some(ponto);
-        jogador.coleta_ticks += 1;
+        jogador.coleta_ticks += if jogador.coleta_eficiente_ticks > 0 {
+            2
+        } else {
+            1
+        };
         avancada.insert(comando.peer_id);
-        if jogador.coleta_ticks == TICKS_COLETA {
+        if jogador.coleta_ticks >= TICKS_COLETA {
             self.concluir_coleta(comando.peer_id);
         }
+    }
+
+    /// Aplica `coleta_eficiente`, no máximo uma vez por jogador a cada tick.
+    fn aplicar_coleta_eficiente(
+        &mut self,
+        comando: &Comando,
+        ativacoes: &mut BTreeSet<u64>,
+    ) -> bool {
+        if ativacoes.contains(&comando.peer_id) {
+            return false;
+        }
+        let Some(jogador) = self.jogadores.get(&comando.peer_id) else {
+            return false;
+        };
+        if validar_coleta_eficiente(self, jogador, comando.destino).is_err() {
+            return false;
+        }
+        if !ativacoes.insert(comando.peer_id) {
+            return false;
+        }
+        let Some(jogador) = self.jogadores.get_mut(&comando.peer_id) else {
+            return false;
+        };
+        jogador.folego = jogador.folego.saturating_sub(CUSTO_COLETA_EFICIENTE_FOLEGO);
+        jogador.coleta_eficiente_ticks = TICKS_BUFF_COLETA_EFICIENTE;
+        jogador.coleta_eficiente_recarga_ticks = RECARGA_COLETA_EFICIENTE_TICKS;
+        // A unidade extra é consumida por `fase_finish` no próprio tick da ação.
+        jogador.combate_ticks = TICKS_COMBATE + 1;
+        true
     }
 
     /// Avança um tick as coletas em curso, sem depender de comandos.
@@ -1225,9 +1663,13 @@ impl Mundo {
                 jogador.coleta_ponto = None;
                 continue;
             }
-            jogador.coleta_ticks += 1;
+            jogador.coleta_ticks += if jogador.coleta_eficiente_ticks > 0 {
+                2
+            } else {
+                1
+            };
             avancada.insert(peer_id);
-            if jogador.coleta_ticks == TICKS_COLETA {
+            if jogador.coleta_ticks >= TICKS_COLETA {
                 concluidas.push(peer_id);
             }
         }
@@ -1780,7 +2222,10 @@ impl Mundo {
                         "{ponte_ponto:?}:{propaganda_alvo:?}:{folego}:{folego_ticks}:",
                         "{combate_ticks}:{analise_recarga_ticks}:{no_alvo:?}:{no_acao_no:?}:",
                         "{funcao:?}:{nivel}:{nivel_ticks}:{escudo_pv}:{escudo_ticks}:",
-                        "{escudo_recarga_ticks}:{escudo_alvo:?}"
+                        "{escudo_recarga_ticks}:{escudo_alvo:?}:{equipe}:",
+                        "{armadilha_recarga_ticks}:{imobilizado_ticks}:{silenciado_ticks}:",
+                        "{vandalismo_recarga_ticks}:{coleta_eficiente_ticks}:",
+                        "{coleta_eficiente_recarga_ticks}"
                     ),
                     peer_id = peer_id,
                     x = x,
@@ -1811,16 +2256,23 @@ impl Mundo {
                     escudo_ticks = jogador.escudo_ticks,
                     escudo_recarga_ticks = jogador.escudo_recarga_ticks,
                     escudo_alvo = jogador.escudo_alvo,
+                    equipe = jogador.equipe,
+                    armadilha_recarga_ticks = jogador.armadilha_recarga_ticks,
+                    imobilizado_ticks = jogador.imobilizado_ticks,
+                    silenciado_ticks = jogador.silenciado_ticks,
+                    vandalismo_recarga_ticks = jogador.vandalismo_recarga_ticks,
+                    coleta_eficiente_ticks = jogador.coleta_eficiente_ticks,
+                    coleta_eficiente_recarga_ticks = jogador.coleta_eficiente_recarga_ticks,
                 )
             })
             .collect::<Vec<_>>()
             .join(";")
     }
 
-    /// Serializa barricadas, pontes, súditos, ilhas, reconquistas e sinais.
-    fn serializar_estruturas(&self) -> String {
-        let barreiras: String = self
-            .barreiras
+    /// Serializa as barricadas para o hash canônico.
+    #[must_use]
+    fn serializar_barreiras(&self) -> String {
+        self.barreiras
             .values()
             .map(|barreira| {
                 let (x, y) = barreira.posicao;
@@ -1832,9 +2284,13 @@ impl Mundo {
                 format!("{id}:{dono}:{x}:{y}:{pv}:{ticks}:{defesa}")
             })
             .collect::<Vec<_>>()
-            .join(";");
-        let pontes: String = self
-            .pontes
+            .join(";")
+    }
+
+    /// Serializa as pontes para o hash canônico.
+    #[must_use]
+    fn serializar_pontes(&self) -> String {
+        self.pontes
             .values()
             .map(|ponte| {
                 let (x, y) = ponte.posicao;
@@ -1845,9 +2301,30 @@ impl Mundo {
                 format!("{id}:{dono}:{x}:{y}:{pv}:{ticks}")
             })
             .collect::<Vec<_>>()
-            .join(";");
-        let suditos: String = self
-            .suditos
+            .join(";")
+    }
+
+    /// Serializa as armadilhas para o hash canônico.
+    #[must_use]
+    fn serializar_armadilhas(&self) -> String {
+        self.armadilhas
+            .values()
+            .map(|armadilha| {
+                let (x, y) = armadilha.posicao;
+                let id = armadilha.id;
+                let dono = armadilha.dono;
+                let arme = armadilha.ticks_armar;
+                let ticks = armadilha.ticks_restantes;
+                format!("{id}:{dono}:{x}:{y}:{arme}:{ticks}")
+            })
+            .collect::<Vec<_>>()
+            .join(";")
+    }
+
+    /// Serializa os súditos para o hash canônico.
+    #[must_use]
+    fn serializar_suditos(&self) -> String {
+        self.suditos
             .values()
             .map(|sudito| {
                 let (x, y) = sudito.posicao;
@@ -1862,9 +2339,13 @@ impl Mundo {
                 )
             })
             .collect::<Vec<_>>()
-            .join(";");
-        let pnjs: String = self
-            .pnjs
+            .join(";")
+    }
+
+    /// Serializa os PNJs para o hash canônico.
+    #[must_use]
+    fn serializar_pnjs(&self) -> String {
+        self.pnjs
             .values()
             .map(|pnj| {
                 let (x, y) = pnj.posicao;
@@ -1876,26 +2357,64 @@ impl Mundo {
                 format!("{id}:{x}:{y}:{pv}:{ativo}:{ticks}:{marca}")
             })
             .collect::<Vec<_>>()
-            .join(";");
-        let ilhas: String = self
-            .ilhas
+            .join(";")
+    }
+
+    /// Serializa as ilhas para o hash canônico.
+    #[must_use]
+    fn serializar_ilhas(&self) -> String {
+        self.ilhas
             .values()
             .map(|ilha| format!("{}:{}:{}", ilha.id, ilha.controlada, ilha.controle_ticks))
             .collect::<Vec<_>>()
-            .join(";");
-        let ilhas_reconquistadas: String = self
-            .ilhas_reconquistadas
+            .join(";")
+    }
+
+    /// Serializa as ilhas reconquistadas para o hash canônico.
+    #[must_use]
+    fn serializar_ilhas_reconquistadas(&self) -> String {
+        self.ilhas_reconquistadas
             .iter()
             .map(std::string::ToString::to_string)
             .collect::<Vec<_>>()
-            .join(";");
-        let sinais: String = self
-            .sinais
+            .join(";")
+    }
+
+    /// Serializa os sinais para o hash canônico.
+    #[must_use]
+    fn serializar_sinais(&self) -> String {
+        self.sinais
             .iter()
             .map(String::as_str)
             .collect::<Vec<_>>()
-            .join(";");
-        format!("{barreiras}|{pontes}|{suditos}|{pnjs}|{ilhas}|{ilhas_reconquistadas}|{sinais}")
+            .join(";")
+    }
+
+    /// Serializa barricadas, pontes, armadilhas, súditos, ilhas, reconquistas e sinais.
+    fn serializar_estruturas(&self) -> String {
+        let barreiras = self.serializar_barreiras();
+        let pontes = self.serializar_pontes();
+        let armadilhas = self.serializar_armadilhas();
+        let suditos = self.serializar_suditos();
+        let pnjs = self.serializar_pnjs();
+        let ilhas = self.serializar_ilhas();
+        let ilhas_reconquistadas = self.serializar_ilhas_reconquistadas();
+        let sinais = self.serializar_sinais();
+
+        format!(
+            concat!(
+                "{barreiras}|{pontes}|{armadilhas}|{suditos}|{pnjs}|",
+                "{ilhas}|{ilhas_reconquistadas}|{sinais}"
+            ),
+            barreiras = barreiras,
+            pontes = pontes,
+            armadilhas = armadilhas,
+            suditos = suditos,
+            pnjs = pnjs,
+            ilhas = ilhas,
+            ilhas_reconquistadas = ilhas_reconquistadas,
+            sinais = sinais,
+        )
     }
 
     /// Calcula o hash SHA-256 canônico do estado corrente.
@@ -1928,10 +2447,18 @@ impl Mundo {
             Some(codigo) => codigo.to_string(),
             None => "nenhuma".to_owned(),
         };
+
+        let sinalizadores = self
+            .sinalizadores_sincronia
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(";");
         let entrada = format!(
             concat!(
                 "{tick}|{epoch}|{match_id}|{jogadores}|{estruturas}|",
-                "{nos}|{resistencia}|{resultado}|{ultima_recusa}",
+                "{nos}|{resistencia}|{resultado}|{ultima_recusa}|",
+                "{sincronias_iniciadas}|{sincronia_ticks_restantes}|{sinalizadores}",
             ),
             tick = self.tick,
             epoch = self.epoch,
@@ -1942,6 +2469,9 @@ impl Mundo {
             resistencia = self.resistencia_ideologica,
             resultado = resultado,
             ultima_recusa = ultima_recusa,
+            sincronias_iniciadas = self.sincronias_iniciadas,
+            sincronia_ticks_restantes = self.sincronia_ticks_restantes,
+            sinalizadores = sinalizadores,
         );
         let resumo = Sha256::digest(entrada.as_bytes());
         format!("{resumo:x}")
@@ -1960,13 +2490,15 @@ pub enum CodigoRecusa {
     /// A ação não pertence ao contrato.
     #[error("acao desconhecida")]
     AcaoDesconhecida,
-    /// Ação fora do nível do jogador (`[HIPÓTESE]`/protótipo, não cânone).
+    /// Ação fora do nível do jogador, bloqueada por silêncio ou com buff de
+    /// `coleta_eficiente` já ativo (`[HIPÓTESE]`/protótipo).
     #[error("acao bloqueada por nivel")]
     AcaoBloqueada,
-    /// `atacar_forte` sem alvo no destino ou além do alcance de contato.
+    /// `atacar_forte` ou `vandalismo` sem alvo no destino ou além do alcance de contato.
     #[error("alvo invalido")]
     AlvoInvalido,
-    /// Fôlego abaixo do custo de `atacar_forte`, `analise_materialista` ou `escudo`.
+    /// Fôlego abaixo do custo de `atacar_forte`, `coleta_eficiente`, `vandalismo`,
+    /// `analise_materialista`, `escudo` ou `armadilha`.
     #[error("folego insuficiente")]
     FolegoInsuficiente,
     /// `analise_materialista` durante a recarga de 450 ticks.
@@ -1975,17 +2507,27 @@ pub enum CodigoRecusa {
     /// `escudo` durante a recarga de 420 ticks (`[HIPÓTESE]`/protótipo, não cânone).
     #[error("escudo em recarga")]
     EscudoEmRecarga,
+    /// `armadilha` durante a recarga de 420 ticks (`[HIPÓTESE]`/GDD §10.3).
+    #[error("armadilha em recarga")]
+    ArmadilhaEmRecarga,
+    /// `vandalismo` durante a recarga de 210 ticks (`[HIPÓTESE]`/protótipo).
+    #[error("vandalismo em recarga")]
+    VandalismoEmRecarga,
+    /// `coleta_eficiente` durante a recarga de 300 ticks (`[HIPÓTESE]`/GDD §10.2:646).
+    #[error("coleta eficiente em recarga")]
+    ColetaEficienteEmRecarga,
     /// Destino ausente ou fora do ponto para `mover`, `coletar_materiais`,
     /// `construir_barreira`, `construir_ponte`, `propaganda`, `propaganda_no` ou
     /// `atacar_no`; `atacar_pnj` recusa destino sem PNJ ativo ou além de 2 m do
-    /// jogador. `analise_materialista` recusa destino sem PNJ ativo ou além de 12 m.
-    /// Nó inativo também recusa `atacar_no`.
+    /// jogador. `analise_materialista` recusa destino sem PNJ ativo ou além de 12 m,
+    /// e `armadilha` recusa destino além de 3 m. Nó inativo também recusa `atacar_no`.
     #[error("destino ausente ou fora do ponto")]
     DestinoInvalido,
     /// Deslocamento acima de `LIMITE_MOVIMENTO_M`.
     #[error("movimento fora do limite")]
     MovimentoForaDoLimite,
-    /// Materiais abaixo do custo de uma barricada ou ponte.
+    /// Materiais abaixo do custo de uma barricada, ponte ou armadilha; também
+    /// recusa uma quarta armadilha ativa do mesmo conjurador.
     #[error("materiais insuficientes")]
     SaldoInsuficiente,
 }
@@ -2015,6 +2557,36 @@ fn validar_ataque_forte(
     }
     if jogador.folego < CUSTO_ATAQUE_FOLEGO {
         return Err(CodigoRecusa::FolegoInsuficiente);
+    }
+    Ok(())
+}
+
+/// Valida `vandalismo` quanto a alvo, alcance, Fôlego, recarga e silêncio.
+fn validar_vandalismo(
+    mundo: &Mundo,
+    jogador: &Jogador,
+    destino: Option<(f64, f64)>,
+) -> Result<(), CodigoRecusa> {
+    let ponto = destino.ok_or(CodigoRecusa::AlvoInvalido)?;
+    let alvo_no_ponto = mundo
+        .jogadores
+        .values()
+        .any(|alvo| !std::ptr::eq(alvo, jogador) && ponto_igual(alvo.posicao, ponto));
+    if !alvo_no_ponto {
+        return Err(CodigoRecusa::AlvoInvalido);
+    }
+    let (origem_x, origem_y) = jogador.posicao;
+    if (ponto.0 - origem_x).hypot(ponto.1 - origem_y) > ALCANCE_CONTATO_M {
+        return Err(CodigoRecusa::AlvoInvalido);
+    }
+    if jogador.folego < CUSTO_VANDALISMO_FOLEGO {
+        return Err(CodigoRecusa::FolegoInsuficiente);
+    }
+    if jogador.vandalismo_recarga_ticks > 0 {
+        return Err(CodigoRecusa::VandalismoEmRecarga);
+    }
+    if jogador.silenciado_ticks > 0 {
+        return Err(CodigoRecusa::AcaoBloqueada);
     }
     Ok(())
 }
@@ -2080,6 +2652,62 @@ fn validar_escudo(
     Ok(())
 }
 
+/// Valida `armadilha` na ordem destino/alcance, Fôlego, Materiais e recarga.
+fn validar_armadilha(
+    mundo: &Mundo,
+    peer_id: u64,
+    jogador: &Jogador,
+    destino: Option<(f64, f64)>,
+) -> Result<(), CodigoRecusa> {
+    let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
+    let distancia = (ponto.0 - jogador.posicao.0).hypot(ponto.1 - jogador.posicao.1);
+    if distancia > ALCANCE_ARMADILHA_M {
+        return Err(CodigoRecusa::DestinoInvalido);
+    }
+    if jogador.folego < CUSTO_ARMADILHA_FOLEGO {
+        return Err(CodigoRecusa::FolegoInsuficiente);
+    }
+    if jogador.materiais < CUSTO_ARMADILHA_MATERIAIS {
+        return Err(CodigoRecusa::SaldoInsuficiente);
+    }
+    if jogador.armadilha_recarga_ticks > 0 {
+        return Err(CodigoRecusa::ArmadilhaEmRecarga);
+    }
+    if mundo
+        .armadilhas
+        .values()
+        .filter(|armadilha| armadilha.dono == peer_id)
+        .count()
+        >= MAX_ARMADILHAS_POR_JOGADOR
+    {
+        return Err(CodigoRecusa::SaldoInsuficiente);
+    }
+    Ok(())
+}
+
+/// Valida `coleta_eficiente` no ponto do jogador, com Fôlego, recarga zerada e
+/// nenhum buff ativo (sem acumulação).
+fn validar_coleta_eficiente(
+    _mundo: &Mundo,
+    jogador: &Jogador,
+    destino: Option<(f64, f64)>,
+) -> Result<(), CodigoRecusa> {
+    let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
+    if !ponto_igual(ponto, jogador.posicao) {
+        return Err(CodigoRecusa::DestinoInvalido);
+    }
+    if jogador.folego < CUSTO_COLETA_EFICIENTE_FOLEGO {
+        return Err(CodigoRecusa::FolegoInsuficiente);
+    }
+    if jogador.coleta_eficiente_recarga_ticks > 0 {
+        return Err(CodigoRecusa::ColetaEficienteEmRecarga);
+    }
+    if jogador.coleta_eficiente_ticks > 0 {
+        return Err(CodigoRecusa::AcaoBloqueada);
+    }
+    Ok(())
+}
+
 impl ValidacaoComandos {
     /// Valida um comando contra o estado autoritativo.
     ///
@@ -2094,7 +2722,13 @@ impl ValidacaoComandos {
     /// em `destino`, até 12 m de distância, Fôlego e recarga zerada.
     /// `propaganda_no`/`atacar_no` exigem Nó no ponto do jogador e não exigem
     /// saldo ou Fôlego. `escudo` exige um jogador no destino a até 3 m, Fôlego
-    /// suficiente e recarga zerada.
+    /// suficiente e recarga zerada. `armadilha` exige destino a até 3 m, Fôlego,
+    /// Materiais, recarga zerada e no máximo três armadilhas ativas por jogador.
+    /// `vandalismo` exige outro jogador no destino a até 2 m, Fôlego e recarga
+    /// zerada; enquanto `silenciado_ticks > 0`, sinalização, propaganda e
+    /// vandalismo são recusados com `AcaoBloqueada`.
+    /// `coleta_eficiente` exige o ponto do jogador, 15 de Fôlego, recarga zerada
+    /// e nenhum buff ativo (a ativação não acumula).
     pub fn validar(
         mundo: &Mundo,
         peer_id: u64,
@@ -2121,6 +2755,10 @@ impl ValidacaoComandos {
             return Err(CodigoRecusa::AcaoBloqueada);
         }
 
+        if jogador.silenciado_ticks > 0 && acao_bloqueada_por_silencio(acao) {
+            return Err(CodigoRecusa::AcaoBloqueada);
+        }
+
         if acao == "mover" {
             let (x, y) = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
             let (origem_x, origem_y) = jogador.posicao;
@@ -2133,11 +2771,19 @@ impl ValidacaoComandos {
             validar_ataque_forte(mundo, peer_id, jogador, destino)?;
         }
 
+        if acao == "vandalismo" {
+            validar_vandalismo(mundo, jogador, destino)?;
+        }
+
         if acao == "coletar_materiais" {
             let ponto = destino.ok_or(CodigoRecusa::DestinoInvalido)?;
             if !ponto_igual(ponto, jogador.posicao) {
                 return Err(CodigoRecusa::DestinoInvalido);
             }
+        }
+
+        if acao == "coleta_eficiente" {
+            validar_coleta_eficiente(mundo, jogador, destino)?;
         }
 
         if acao == "construir_barreira" {
@@ -2183,6 +2829,9 @@ impl ValidacaoComandos {
 
         if acao == "escudo" {
             validar_escudo(mundo, jogador, destino)?;
+        }
+        if acao == "armadilha" {
+            validar_armadilha(mundo, peer_id, jogador, destino)?;
         }
 
         if acao == "analise_materialista" {

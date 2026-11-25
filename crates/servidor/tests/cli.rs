@@ -18,6 +18,7 @@ const ENTRADA_VALIDA: &str = concat!(
     "\n7 mover 1 1 0.25 0.0\n",
     "8 sinalizar_sincronia 1 1\n",
     "9 coletar_materiais 1 1 0 0\n",
+    "10 coleta_eficiente 1 1 0.0 0.0\n",
     "\n",
 );
 
@@ -192,7 +193,7 @@ fn primeira_linha_com_stdin_vazia_e_o_estado_inicial() {
 }
 
 #[test]
-fn todas_as_treze_acoes_do_sim_sao_aceitas_pela_whitelist_do_cli() {
+fn todas_as_dezesseis_acoes_do_sim_sao_aceitas_pela_whitelist_do_cli() {
     const RECUSAS: &[CodigoRecusa] = &[
         CodigoRecusa::SeqOuRequestReplay,
         CodigoRecusa::AcaoBloqueada,
@@ -201,11 +202,13 @@ fn todas_as_treze_acoes_do_sim_sao_aceitas_pela_whitelist_do_cli() {
         CodigoRecusa::AnaliseEmRecarga,
         CodigoRecusa::EscudoEmRecarga,
         CodigoRecusa::DestinoInvalido,
+        CodigoRecusa::VandalismoEmRecarga,
+        CodigoRecusa::ColetaEficienteEmRecarga,
         CodigoRecusa::MovimentoForaDoLimite,
         CodigoRecusa::SaldoInsuficiente,
     ];
 
-    assert_eq!(ACOES_PERMITIDAS.len(), 13);
+    assert_eq!(ACOES_PERMITIDAS.len(), 16);
     for acao in ACOES_PERMITIDAS {
         let linha = if acao_exige_destino(acao) {
             format!("7 {acao} 1 1 0.0 0.0\n")
@@ -231,14 +234,18 @@ fn todas_as_treze_acoes_do_sim_sao_aceitas_pela_whitelist_do_cli() {
 
 #[test]
 fn acoes_com_destino_exigem_coordenadas_finitas_e_rejeitam_coordenadas_extras() {
-    assert_eq!(ACOES_PERMITIDAS.len(), 13);
+    assert_eq!(ACOES_PERMITIDAS.len(), 16);
     let com_destino = ACOES_PERMITIDAS
         .iter()
         .filter(|acao| acao_exige_destino(acao))
         .count();
-    assert_eq!(com_destino, 11);
+    assert_eq!(com_destino, 14);
     assert!(!acao_exige_destino("sinalizar_sincronia"));
     assert!(!acao_exige_destino("sinalizar_alavanca"));
+    assert!(
+        ACOES_PERMITIDAS.contains(&"coleta_eficiente"),
+        "ação coleta_eficiente ausente da whitelist"
+    );
 
     for caso in [
         ("7 mover 1 1", "linha 1: ação exige coordenadas x e y\n"),
@@ -383,5 +390,113 @@ fn hash_inicial_com_stdin_vazia_permanece_igual_ao_estado_inicial() {
         texto(&saida.stdout),
         format!("{esperado}\n"),
         "hash inicial divergente do estado inicial"
+    );
+}
+
+#[test]
+fn vandalismo_com_alvo_no_destino_e_aceito_e_destino_invalido_e_recusado() {
+    // Os peers nascem em (0.0, 0.0); a segunda linha registra o alvo nesse ponto.
+    const ACEITA: &str = concat!("2 mover 1 1 0.0 0.0\n", "1 vandalismo 1 1 0.0 0.0\n",);
+    // Sem coordenadas, o parser do CLI recusa a linha antes do validador do núcleo.
+    const SEM_COORDENADAS: &str = "1 vandalismo 1 1\n";
+    // Fora do alcance de contato, não há alvo válido no destino informado.
+    const ALVO_FORA_DO_ALCANCE: &str = "1 vandalismo 1 1 5.0 0.0\n";
+    let saida = executar_ou_falhar(&["--ticks", "1"], ACEITA);
+    assert!(
+        saida.status.success(),
+        "vandalismo com alvo no destino recusado: {}",
+        texto(&saida.stderr)
+    );
+
+    let stdout = texto(&saida.stdout);
+    let linhas: Vec<&str> = stdout.lines().collect();
+    assert_eq!(linhas.len(), 1, "esperada uma linha: {stdout}");
+    let campos: Vec<&str> = linhas[0].split('\t').collect();
+    assert_eq!(campos.len(), 2, "linha sem dois campos: {}", linhas[0]);
+    assert_eq!(campos[0], "0", "tick inesperado: {}", linhas[0]);
+    let hash = campos[1];
+    assert_eq!(hash.len(), 64, "hash com tamanho inesperado: {hash}");
+    assert!(
+        hash.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "hash não hexadecimal: {hash}"
+    );
+    assert!(
+        saida.stderr.is_empty(),
+        "stderr inesperada: {}",
+        texto(&saida.stderr)
+    );
+
+    let saida = executar_ou_falhar(&["--ticks", "1"], SEM_COORDENADAS);
+    assert_eq!(saida.status.code(), Some(2), "linha sem destino");
+    assert!(
+        saida.stdout.is_empty(),
+        "stdout deveria estar vazia: {}",
+        texto(&saida.stdout)
+    );
+    assert_eq!(
+        texto(&saida.stderr),
+        "linha 1: ação exige coordenadas x e y\n",
+        "linha sem coordenadas"
+    );
+
+    let saida = executar_ou_falhar(&["--ticks", "1"], ALVO_FORA_DO_ALCANCE);
+    assert_eq!(saida.status.code(), Some(2), "alvo fora do alcance");
+    assert!(
+        saida.stdout.is_empty(),
+        "stdout deveria estar vazia: {}",
+        texto(&saida.stdout)
+    );
+    assert_eq!(
+        texto(&saida.stderr),
+        format!("linha 1: {}\n", CodigoRecusa::AlvoInvalido),
+        "alvo ausente no destino"
+    );
+}
+
+#[test]
+fn coleta_eficiente_aceita_no_ponto_atual_e_recusa_outro_destino() {
+    const ACEITA: &str = "1 coleta_eficiente 1 1 0.0 0.0\n";
+    const DESTINO_DIFERENTE: &str = "1 coleta_eficiente 1 1 0.5 0.5\n";
+
+    let saida = executar_ou_falhar(&["--ticks", "1"], ACEITA);
+    assert!(
+        saida.status.success(),
+        "coleta eficiente recusada: {}",
+        texto(&saida.stderr)
+    );
+    assert!(
+        saida.stderr.is_empty(),
+        "stderr inesperada: {}",
+        texto(&saida.stderr)
+    );
+
+    let stdout = texto(&saida.stdout);
+    let linhas: Vec<&str> = stdout.lines().collect();
+    assert_eq!(linhas.len(), 1, "esperada uma linha: {stdout}");
+    let campos: Vec<&str> = linhas[0].split('\t').collect();
+    assert_eq!(campos.len(), 2, "linha sem dois campos: {}", linhas[0]);
+    assert_eq!(campos[0], "0", "tick inesperado: {}", linhas[0]);
+    let hash = campos[1];
+    assert_eq!(hash.len(), 64, "hash com tamanho inesperado: {hash}");
+    assert!(
+        hash.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "hash não hexadecimal: {hash}"
+    );
+
+    let saida = executar_ou_falhar(&["--ticks", "1"], DESTINO_DIFERENTE);
+    assert_eq!(
+        saida.status.code(),
+        Some(2),
+        "destino diferente da posição deveria ser recusado"
+    );
+    assert!(
+        saida.stdout.is_empty(),
+        "stdout deveria estar vazia: {}",
+        texto(&saida.stdout)
+    );
+    assert_eq!(
+        texto(&saida.stderr),
+        format!("linha 1: {}\n", CodigoRecusa::DestinoInvalido),
+        "destino diferente da posição do jogador"
     );
 }
